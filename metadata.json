@@ -1,0 +1,6 @@
+{
+  "name": "LabelBuddy AI",
+  "description": "專為60歲以上長者設計的超市食品成分智能放大鏡與健康評估助手",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
