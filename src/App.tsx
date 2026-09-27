@@ -99,6 +99,14 @@ const STORAGE_CONDITIONS_MIGRATED_KEY = 'labelbuddy_conditions_migrated_v1';
 const STORAGE_DIET_RECORDS_KEY = 'labelbuddy_diet_records_v1';
 const STORAGE_INDICATORS_KEY = 'labelbuddy_senior_indicators_v2';
 const STORAGE_PROFILE_KEY = 'labelbuddy_learner_profile_v1';
+/**
+ * 是否同意把照片上傳雲端辨識。
+ *
+ * ⚠️ 預設值是 **false（不同意）**，這是刻意的：
+ *    沒表態過的使用者，照片一律不離開裝置，由本機離線 OCR 處理。
+ *    要提升準確度必須由使用者自己按下開關（見結果頁的隱私說明區）。
+ */
+const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
 
 /** 全部可勾選的慢性病與過敏原（12 項，來源為共用資料檔） */
 const ALL_CONDITIONS = PHYSICAL_INDICATORS;
@@ -455,6 +463,20 @@ export default function App() {
    * 等待就從「不知道還要多久」變成「我知道已經過幾秒了」，焦慮明顯降低。
    */
   const [loadingSeconds, setLoadingSeconds] = useState<number>(0);
+  /**
+   * 是否同意把照片上傳雲端辨識。預設 false（不同意）。
+   *
+   * 【為什麼預設關】這是隱私優先的預設值：沒表態過的使用者，
+   * 照片一律只在本機用離線 OCR 處理。使用者若覺得本機結果不夠準，
+   * 可以在結果頁按下開關同意上傳，之後的掃描才會走雲端。
+   */
+  const [cloudConsent, setCloudConsent] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_CLOUD_CONSENT_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const latencyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTickRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -596,6 +618,25 @@ export default function App() {
   };
 
   /**
+   * 切換「允許上傳雲端辨識」。
+   *
+   * 【為什麼要語音告知】這是會影響隱私的設定。
+   * 只給視覺提示的話，不識字的長者不會知道自己剛剛把照片送出去了。
+   */
+  const handleToggleCloudConsent = (next: boolean) => {
+    setCloudConsent(next);
+    try {
+      localStorage.setItem(STORAGE_CLOUD_CONSENT_KEY, String(next));
+    } catch {}
+    speakText(
+      next
+        ? '已開啟雲端辨識。之後拍的照片會上傳到雲端分析。'
+        : '已改回本機模式，照片不會離開這支手機。',
+      { rate: 0.9, preferLanguage: 'mandarin' }
+    );
+  };
+
+  /**
    * 發送圖片至中轉後端（Backend Proxy）調用雲端視覺 AI 分析
    * 【重要安全提示】金鑰由後端安全讀取，前端絕無暴露 API Key
    */
@@ -645,6 +686,9 @@ export default function App() {
           conditions: conditionNames,
           // 身分會改變 AI 的判斷基準與每日參考值（例如健身族看蛋白質、學生看鈣質）
           profileId: learnerProfileId,
+          // 【隱私優先】預設 true → 照片只在本機用離線 OCR 處理，不上傳。
+          // 只有使用者自己打開同意開關（cloudConsent）才會送雲端。
+          localOnly: !cloudConsent,
           vitals: {
             systolicBp: physicalIndicators.systolicBp,
             diastolicBp: physicalIndicators.diastolicBp,
@@ -676,6 +720,23 @@ export default function App() {
 
       const data: LabelAnalysisResult = resultJson.data;
       setAnalysisResult(data);
+
+      // ══════════════════════════════════════════════════════════════════
+      // 離線 OCR 讀不到標籤數字（ocr_failed）時就到此為止：
+      //   ① 不寫入飲食紀錄 —— 那不是一次真正的分析，
+      //      存進去會讓週報出現「看不清楚標籤數字」的假紀錄
+      //   ② 仍然用語音念出重拍建議 —— 長者最需要的就是這句引導
+      // ══════════════════════════════════════════════════════════════════
+      if (data.ocr_failed) {
+        if (data.plain_summary) {
+          speakText(data.plain_summary, {
+            rate: 0.88,
+            volume: 1.0,
+            preferLanguage: 'cantonese',
+          });
+        }
+        return;
+      }
 
       // 自動將本次掃描辨識結果存入「我的飲食健康紀錄」，以利一週統計與長者健康習慣養成
       const extractFoodName = (warningTitle?: string, plainSummary?: string) => {
@@ -1201,6 +1262,78 @@ export default function App() {
 
             {/* 已有辨識結果：顯示分析結果（三層結構） */}
             {analysisResult && (() => {
+              /* ══════════════════════════════════════════════════════════
+                 離線 OCR 讀不到標籤數字 → 只顯示「請重拍」，不顯示風險結論
+                 【為什麼】讀不到數字卻照樣給紅／黃／綠，長者會當真。
+                 誠實說「看不清楚」遠比捏造一個結論安全。
+                 ══════════════════════════════════════════════════════════ */
+              if (analysisResult.ocr_failed) {
+                return (
+                  <div className="flex flex-col space-y-[16px] animate-in fade-in duration-200">
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className={`${CONCLUSION_CARD_BASE} p-[20px] gap-[12px]`}
+                      style={{
+                        background: TONES.neutral.bg,
+                        borderColor: TONES.neutral.border,
+                      }}
+                    >
+                      <span
+                        className="w-[64px] h-[64px] rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: TONES.neutral.solid }}
+                        aria-hidden="true"
+                      >
+                        <Camera className="w-[36px] h-[36px] text-white" />
+                      </span>
+
+                      <h2
+                        className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight`}
+                        style={{ color: TONES.neutral.text }}
+                      >
+                        {stripLeadingEmoji(analysisResult.warning_title || '') ||
+                          '看不清楚標籤數字'}
+                      </h2>
+
+                      <p
+                        className={`${TYPE.body} ${WEIGHT.normal} leading-snug`}
+                        style={{ color: TONES.neutral.textMuted }}
+                      >
+                        沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。
+                      </p>
+                    </div>
+
+                    <section
+                      aria-label="重拍建議"
+                      className={`${CARD_BASE} p-[16px] flex flex-col gap-[14px]`}
+                    >
+                      <p
+                        className={`${TYPE.body} ${WEIGHT.normal} text-slate-900 leading-relaxed`}
+                      >
+                        {analysisResult.plain_summary}
+                      </p>
+
+                      {analysisResult.alternative_advice && (
+                        <p
+                          className={`${TYPE.body} ${WEIGHT.normal} text-slate-600 leading-relaxed`}
+                        >
+                          {analysisResult.alternative_advice}
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleResetToCamera}
+                        className={FOOTER_CTA_SECONDARY}
+                      >
+                        <Camera className="w-[28px] h-[28px] shrink-0" />
+                        <span>📷 再拍一次</span>
+                      </button>
+                    </section>
+                  </div>
+                );
+              }
+
               /* 結論的顏色、圖示、文字三重編碼 —— 顏色不能是唯一線索 */
               const tone = TONES[RISK_TONE[analysisResult.risk_level]];
               const riskIconName = RISK_ICON[analysisResult.risk_level];
@@ -1270,9 +1403,9 @@ export default function App() {
                         為什麼？
                       </h3>
 
-                      {/* 結果來源標示：讓使用者能分辨是雲端 AI 還是本機備援引擎 */}
+                      {/* 結果來源標示：讓使用者能分辨是雲端 AI 還是本機離線辨識 */}
                       <span
-                        className={`${TYPE.micro} font-black px-[8px] py-[3px] rounded-full border shrink-0 ${
+                        className={`${TYPE.body} font-black px-[8px] py-[3px] rounded-full border shrink-0 whitespace-nowrap ${
                           analysisResult.analysis_mode === 'cloud_ai'
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
                             : 'bg-amber-50 text-amber-800 border-amber-400'
@@ -1280,6 +1413,8 @@ export default function App() {
                         title={
                           analysisResult.ai_model
                             ? `模型：${analysisResult.ai_model}`
+                            : analysisResult.ocr_used
+                            ? '本機離線 OCR（照片沒有離開裝置）'
                             : '本機規則引擎（未使用雲端 AI）'
                         }
                       >
@@ -1287,8 +1422,63 @@ export default function App() {
                           ? analysisResult.cached
                             ? '☁️ 雲端 AI（快取）'
                             : '☁️ 雲端 AI'
-                          : '📴 本機備援'}
+                          : '📴 本機離線'}
                       </span>
+                    </div>
+
+                    {/* ══════════════════════════════════════════════════════
+                        隱私說明：這張照片到底去了哪裡
+                        【為什麼要放在結果頁】使用者在乎的是「我剛剛拍的這張」，
+                        而不是抽象的政策條文。因此在每一次結果旁直接說明，
+                        並提供一鍵切換，讓「不上傳」是可驗證的事實而非口號。
+                        ══════════════════════════════════════════════════════ */}
+                    <div
+                      className={`flex items-start gap-[8px] rounded-[10px] border px-[10px] py-[8px] ${
+                        analysisResult.data_handling === 'cloud'
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'bg-emerald-50 border-emerald-300'
+                      }`}
+                    >
+                      <ShieldCheck
+                        className={`w-[22px] h-[22px] shrink-0 mt-[2px] ${
+                          analysisResult.data_handling === 'cloud'
+                            ? 'text-blue-700'
+                            : 'text-emerald-700'
+                        }`}
+                      />
+                      <div className="flex flex-col gap-[8px] min-w-0">
+                        <span
+                          className={`${TYPE.body} ${WEIGHT.normal} leading-snug ${
+                            analysisResult.data_handling === 'cloud'
+                              ? 'text-blue-900'
+                              : 'text-emerald-900'
+                          }`}
+                        >
+                          {analysisResult.data_handling === 'cloud'
+                            ? '這次的照片有上傳到雲端辨識。'
+                            : '這次的照片只在這支手機上處理，沒有上傳。'}
+                        </span>
+
+                        {/* 同意開關：永遠顯示「目前設定」的相反動作，
+                            不論這次結果走哪條路徑，使用者都隨時改得回來 */}
+                        {cloudConsent ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCloudConsent(false)}
+                            className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-800 text-[16px] font-black"
+                          >
+                            改回本機模式（不上傳）
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCloudConsent(true)}
+                            className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-blue-800 text-white text-[16px] font-black"
+                          >
+                            開啟雲端辨識（更準）
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 成分對照長條圖：把「2480 毫克」變成「佔每日上限 124%」 */}
@@ -1328,8 +1518,9 @@ export default function App() {
                   {/* ══════════════════════════════════════════════════════
                       第三層：更多資訊 —— 需要時再展開，降低第一眼的負擔
                       ══════════════════════════════════════════════════════ */}
-                  <details className="group">
+                  <details className="group" id="details-more-info">
                     <summary
+                      id="btn-more-info"
                       className={`${CARD_BASE} w-full min-h-[64px] px-[16px] py-[12px] flex items-center justify-between gap-[12px] cursor-pointer list-none [&::-webkit-details-marker]:hidden active:scale-[0.99] transition-all`}
                     >
                       <span className={`${TYPE.body} ${WEIGHT.strong} text-slate-900 flex items-center gap-[8px] min-w-0`}>
@@ -1340,6 +1531,158 @@ export default function App() {
                     </summary>
 
                     <div className="flex flex-col space-y-[16px] mt-[16px]">
+                      {/* ══════════════════════════════════════════════════
+                          食育教學 —— 把「這一包」變成「下一包也會看」
+                          【為什麼放在這一層】它是補充教材，不是結論，
+                          所以不打擾第一眼的判斷，但展開後要看得到。
+                          用 action（藍）色系：藍色在本專案代表「可操作」，
+                          不承載安全／危險語意（長者水晶體黃化會吸收藍光）。
+                          ══════════════════════════════════════════════════ */}
+                      {(analysisResult.knowledge_point ||
+                        analysisResult.label_reading_tip ||
+                        analysisResult.daily_limit_context) && (
+                        <section
+                          aria-label="食育教學"
+                          className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
+                          style={{ background: TONES.action.bg, borderColor: TONES.action.border }}
+                        >
+                          <h3
+                            className={`${TYPE.title} ${WEIGHT.strong} flex items-center gap-[8px]`}
+                            style={{ color: TONES.action.text }}
+                          >
+                            <GraduationCap className="w-[26px] h-[26px] shrink-0" />
+                            學一個帶得走的觀念
+                          </h3>
+
+                          {analysisResult.knowledge_point && (
+                            <div className="flex flex-col gap-[4px]">
+                              <span
+                                className={`${TYPE.body} font-black`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                為什麼
+                              </span>
+                              <p
+                                className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                {analysisResult.knowledge_point}
+                              </p>
+                            </div>
+                          )}
+
+                          {analysisResult.label_reading_tip && (
+                            <div className="flex flex-col gap-[4px]">
+                              <span
+                                className={`${TYPE.body} font-black`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                下次怎麼看
+                              </span>
+                              <p
+                                className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                {analysisResult.label_reading_tip}
+                              </p>
+                            </div>
+                          )}
+
+                          {analysisResult.daily_limit_context && (
+                            <div className="flex flex-col gap-[4px]">
+                              <span
+                                className={`${TYPE.body} font-black`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                對您代表什麼
+                              </span>
+                              <p
+                                className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
+                                style={{ color: TONES.action.text }}
+                              >
+                                {analysisResult.daily_limit_context}
+                              </p>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              stopSpeech();
+                              speakText(
+                                [
+                                  analysisResult.knowledge_point
+                                    ? `為什麼：${analysisResult.knowledge_point}`
+                                    : '',
+                                  analysisResult.label_reading_tip
+                                    ? `下次怎麼看：${analysisResult.label_reading_tip}`
+                                    : '',
+                                  analysisResult.daily_limit_context
+                                    ? `對您代表什麼：${analysisResult.daily_limit_context}`
+                                    : '',
+                                ]
+                                  .filter(Boolean)
+                                  .join('。'),
+                                { rate: 0.88, preferLanguage: 'cantonese' }
+                              );
+                            }}
+                            className={FOOTER_CTA_SECONDARY}
+                          >
+                            <Volume2 className="w-[28px] h-[28px] shrink-0" />
+                            <span>🔊 念給我聽</span>
+                          </button>
+                        </section>
+                      )}
+
+                      {/* ══════════════════════════════════════════════════
+                          慢性病專屬提醒 —— 回答「那我要怎麼挑」
+                          【與上面「判斷依據」的差別】那裡說的是「這一包」，
+                          這裡說的是「這個病」，與產品無關，所以放在補充資訊。
+                          ══════════════════════════════════════════════════ */}
+                      {analysisResult.condition_reminders &&
+                        analysisResult.condition_reminders.length > 0 && (
+                          <section
+                            aria-label="慢性病提醒"
+                            className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
+                          >
+                            <h3
+                              className={`${TYPE.title} ${WEIGHT.strong} text-slate-900 flex items-center gap-[8px]`}
+                            >
+                              <ShieldAlert className="w-[26px] h-[26px] text-slate-700 shrink-0" />
+                              您的慢性病提醒
+                            </h3>
+
+                            <ul className="flex flex-col gap-[10px]">
+                              {analysisResult.condition_reminders.map((reminder) => (
+                                <li
+                                  key={reminder.condition}
+                                  className="flex items-start gap-[10px] bg-white rounded-[12px] border-2 border-slate-300 p-[12px]"
+                                >
+                                  {/* emoji 用固定 px 控制大小，不用 text-[Npx]，
+                                      這樣「字級一律 16–20px」才能用 grep 機械驗證 */}
+                                  <span
+                                    className="w-[26px] h-[26px] leading-none text-center shrink-0"
+                                    role="img"
+                                    aria-hidden="true"
+                                  >
+                                    {reminder.icon}
+                                  </span>
+                                  <div className="flex flex-col gap-[4px] min-w-0">
+                                    <span className={`${TYPE.body} font-black text-slate-900`}>
+                                      {reminder.condition}
+                                    </span>
+                                    <span
+                                      className={`${TYPE.body} ${WEIGHT.normal} text-slate-800 leading-snug`}
+                                    >
+                                      {reminder.advice}
+                                    </span>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        )}
+
                       {/* 替代建議 */}
                       {analysisResult.alternative_advice && (
                         <div

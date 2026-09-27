@@ -11,7 +11,15 @@
 
 import { LabelAnalysisResult, RiskLevel, NutrientFact } from '../src/types';
 
-interface NutritionProfile {
+/**
+ * 本機引擎使用的營養輪廓。
+ *
+ * 【誰會產生這個結構】
+ *   1. `server/ocrLabel.ts` —— 離線 OCR 從真實標籤讀出（首選）
+ *   2. `extractNutritionProfile()` —— 舊的固定樣本，僅在沒有可用圖片時作為最後手段
+ * 兩者都必須回傳同一個形狀，規則引擎才能共用。
+ */
+export interface NutritionProfile {
   sodiumMg: number;       // 鈉 (毫克)
   sugarG: number;         // 糖 (公克)
   carbsG: number;         // 碳水 (公克)
@@ -27,23 +35,22 @@ interface NutritionProfile {
 }
 
 /**
- * 依據圖片特徵或預設標籤解析出營養成分輪廓
+ * 示範用的固定樣本。
+ *
+ * ⚠️ 這個函式**不再依圖片內容猜測**。
+ *    舊版寫成 `extractNutritionProfile(cleanBase64)`，用
+ *    `cleanBase64.length % 3` 在三組寫死的資料之間輪替 ——
+ *    與照片實際內容完全無關，等於對任何一張圖回傳隨機結論。
+ *    對一個健康判斷 App 這是最糟的失敗模式：錯了不會報錯。
+ *    已於 2026-09-26 改為只接受**明確的樣本代號**。
+ *
+ * 真實的離線辨識請用 `server/ocrLabel.ts` 的 `recognizeNutritionFromImage()`。
+ *
+ * @param sampleId 明確的樣本代號；不認識就回傳 null（由呼叫端決定如何處理）
  */
-export function extractNutritionProfile(cleanBase64: string): NutritionProfile {
-  // 檢驗是否為示範標籤或含有特定特徵的食品
-  // 1. 泡麵類 (高鈉、高飽和脂肪、味精)
-  // 2. 夾心餅乾類 (高糖、花生過敏原、棕櫚油)
-  // 3. 無糖黑豆漿/燕麥類 (低鈉、無糖、高鈣、健康)
-  // 4. 一般上傳食品圖片 (自動預設分析輪廓)
-
-  const sampleCheck = cleanBase64.substring(100, 300);
-
-  // 判定是否匹配特定關鍵標籤（若為用戶拍照，根據平均預設常見加工食品模型評估）
-  let isNoodles = cleanBase64.length % 3 === 0;
-  let isSweetSnack = cleanBase64.length % 3 === 1;
-
+export function getSampleNutritionProfile(sampleId: string): NutritionProfile | null {
   // 提供真實長者超市高頻檢測的食品基準值
-  if (cleanBase64.includes('instant_noodles') || isNoodles) {
+  if (sampleId === 'instant_noodles') {
     return {
       foodName: '風味調味速食麵 / 醬料泡麵',
       sodiumMg: 1980,
@@ -63,7 +70,9 @@ export function extractNutritionProfile(cleanBase64: string): NutritionProfile {
         '脫水蔬菜 (脫水青蔥、胡蘿蔔、高麗菜)',
       ],
     };
-  } else if (cleanBase64.includes('peanut_wafer') || isSweetSnack) {
+  }
+
+  if (sampleId === 'peanut_wafer') {
     return {
       foodName: '香酥花生夾心餅乾 / 甜點酥餅',
       sodiumMg: 280,
@@ -85,7 +94,9 @@ export function extractNutritionProfile(cleanBase64: string): NutritionProfile {
         '膨脹劑 (碳酸氫鈉、酸性焦磷酸鈉)',
       ],
     };
-  } else {
+  }
+
+  if (sampleId === 'soy_milk') {
     return {
       foodName: '無加糖高纖高鈣豆奶 / 燕麥黑豆漿',
       sodiumMg: 65,
@@ -97,15 +108,12 @@ export function extractNutritionProfile(cleanBase64: string): NutritionProfile {
       purineLevel: 'medium', // 豆類含中等普林
       hasPhosphates: false,
       hasHighPotassium: true, // 豆類天然含鉀
-      allergens: ['非基因改造黃豆/黑豆', '燕麥麩質'],
-      ingredients: [
-        '水',
-        '特選非基因改造黃豆、黑豆',
-        '澳洲燕麥纖維',
-        '碳酸鈣 (天然補鈣)',
-      ],
+      allergens: ['大豆', '燕麥麩質'],
+      ingredients: ['水', '特選非基因改造黃豆、黑豆', '澳洲燕麥纖維', '碳酸鈣 (天然補鈣)'],
     };
   }
+
+  return null;
 }
 
 /* ---------------------------------------------------------------------------
@@ -175,6 +183,68 @@ export function buildLocalNutrientFacts(
 
   // 嚴重度高的排前面，長者第一眼就看到最該注意的那一項
   return facts.sort((a, b) => b.percent - a.percent).slice(0, 3);
+}
+
+/* ---------------------------------------------------------------------------
+ * 食育教學欄位 — 本機引擎版本
+ *
+ * 【為什麼本機也要產生這三個欄位】
+ *   雲端與本機必須回傳同一個形狀。若只有雲端會產生教學內容，
+ *   一旦降級到本機引擎，長者看到的就會是「有結論、但教學整段不見」的畫面。
+ *   三條路徑（雲端成功 / 快取命中 / 本機備援）都必須齊備。
+ * ------------------------------------------------------------------------- */
+
+/** 每個營養項目對應的一句「為什麼」，依實際超標項目挑選 */
+const LOCAL_KNOWLEDGE_POINTS: Record<string, string> = {
+  鈉: '包裝上的「鈉」就是鹽分。一包泡麵的鈉常常就等於一整天的上限，所以不能天天當正餐。',
+  添加糖: '成分表上的「糖」是外加的精緻糖，不是食物天然的甜。一杯含糖飲料常等於好幾顆方糖。',
+  飽和脂肪: '飽和脂肪多來自動物油與棕櫚油，吃多了血液會變黏稠，心臟比較吃力。',
+  熱量: '熱量要看「整包」不是「每份」。很多包裝寫的是每份，整包其實是好幾份。',
+  蛋白質: '蛋白質要看「蛋白質對熱量」的比例，不要只看正面的大字宣稱。',
+  膳食纖維: '膳食纖維一天要 25 公克以上。成分表越短、越接近原型食物，纖維通常越多。',
+  鈣: '鈣和骨頭有關，和鹽分的「鈉」是兩個完全不同的字，看標籤時不要看錯。',
+};
+
+/** 通用的讀標籤動作，任何產品都適用 */
+const LOCAL_LABEL_TIP =
+  '先找「鈉」那一列看是幾毫克，再找「糖」那一列看是幾公克。這兩列就能判斷一大半。';
+
+/** 把最嚴重的那一項換算成「佔您一天上限幾 %」的白話句 */
+function buildLocalDailyLimitContext(facts: NutrientFact[], foodName?: string): string {
+  if (facts.length === 0) {
+    return '這包的營養數字都還在您每日上限的三成以內，正常份量吃沒有問題。';
+  }
+  const top = facts[0];
+  const subject = foodName ? `這包${foodName}的` : '這包的';
+  return `${subject}${top.name}是 ${top.value} ${top.unit}，等於您一天上限的 ${top.percent}%。`;
+}
+
+/** 依超標項目挑一句教學；都沒有超標時，談「怎麼看標籤」這個更基本的觀念 */
+function pickLocalKnowledgePoint(facts: NutrientFact[]): string {
+  for (const fact of facts) {
+    const point = LOCAL_KNOWLEDGE_POINTS[fact.name];
+    if (point) return point;
+  }
+  return '標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。';
+}
+
+/**
+ * 產生食育教學三欄位（確定性版本）。
+ *
+ * 供兩處使用：
+ *   1. 本機引擎自己產生教學內容
+ *   2. 雲端模型漏給欄位時，由 server.ts 用同一份內容補齊
+ *      （補的內容是從實際 nutrient_facts 推導的，不是憑空編造）
+ */
+export function buildEducationFields(
+  facts: NutrientFact[],
+  foodName?: string
+): { knowledge_point: string; label_reading_tip: string; daily_limit_context: string } {
+  return {
+    knowledge_point: pickLocalKnowledgePoint(facts),
+    label_reading_tip: LOCAL_LABEL_TIP,
+    daily_limit_context: buildLocalDailyLimitContext(facts, foodName),
+  };
 }
 
 /**
@@ -366,16 +436,21 @@ export function analyzeNutritionWithIndicators(
     alternativeAdvice = '平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！';
   }
 
+  // 成分對照表（前端百分比長條圖用），同時用來挑選教學內容
+  const nutrientFacts = buildLocalNutrientFacts(profile, numericLimits);
+
   return {
     risk_level: riskLevel,
     warning_title: warningTitle,
     plain_summary: plainSummary,
     alternative_advice: alternativeAdvice,
+    // 食育教學三欄位：與雲端路徑同一個形狀，降級時教學內容不會消失
+    ...buildEducationFields(nutrientFacts, profile.foodName),
     ingredients_detected: profile.ingredients,
     nutrition_concerns: concerns.length > 0 ? concerns : ['各項營養指標未發現嚴重超標情況，成分相對單純健康。'],
     matched_conditions: matchedConditions,
     // 與雲端 AI 同一個結構，前端才能用同一套程式畫長條圖
-    nutrient_facts: buildLocalNutrientFacts(profile, numericLimits),
+    nutrient_facts: nutrientFacts,
     analysis_mode: 'smart_nutrition_engine',
   };
 }

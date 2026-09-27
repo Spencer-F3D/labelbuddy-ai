@@ -7,3 +7,15 @@ coverage/
 bun.lock
 .env*
 !.env.example
+
+# 驗證腳本的打包產物（npm run ocr:smoke / verify:conditions 會產生，用後即丟）
+.ocr-smoke.mjs
+.verify-conditions.mjs
+.verify-dist/
+shots-verify/
+
+# tesseract.js 若未指定 cacheMethod 會把語言檔複製到工作目錄。
+# 正式路徑已設 cacheMethod:'none'，這裡只是防止測試時不小心把 7.5 MB 的副本提交進去。
+# ⚠️ 只錨定根目錄，不可寫成 *.traineddata（那會排除 server/tessdata/ 的正本）。
+/chi_tra.traineddata
+/eng.traineddata

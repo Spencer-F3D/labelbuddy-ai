@@ -18,6 +18,34 @@ export interface ChronicCondition {
 export type RiskLevel = 'red' | 'yellow' | 'green';
 
 /**
+ * 資料處理模式。
+ *
+ * 【為什麼要讓前端拿得到這個值】
+ *   使用者有權知道自己剛才那張照片到底有沒有離開手機。
+ *   這不是行銷文案，而是回應中實際發生的事實，因此由後端回報而非前端自行推測。
+ *
+ *   - `cloud`      ：照片曾傳送給 Gemini／OpenRouter 進行視覺辨識
+ *   - `local_only` ：照片完全沒有離開本機，由內建離線 OCR 引擎處理
+ */
+export type DataHandling = 'cloud' | 'local_only';
+
+/**
+ * 單一慢性病的專屬提醒。
+ *
+ * 【為什麼不跟 nutrient_facts 混在一起】
+ *   nutrient_facts 說的是「這一包的數字」；本結構說的是「這個病要怎麼挑」，
+ *   與產品無關。兩者生命週期不同，前端也顯示在不同層級。
+ */
+export interface ConditionReminder {
+  /** 使用者勾選的慢性病名稱（原樣回傳，方便前端對照） */
+  condition: string;
+  /** 圖示（三重編碼用，不能只靠顏色傳達嚴重度） */
+  icon: string;
+  /** 一句白話提醒，回答「那我要怎麼挑」 */
+  advice: string;
+}
+
+/**
  * 單一成分的對照結果（供「佔每日上限幾 %」視覺化使用）
  *
  * 【為什麼需要這個結構】
@@ -46,6 +74,19 @@ export interface LabelAnalysisResult {
   warning_title: string;
   plain_summary: string;
   alternative_advice: string;
+  /**
+   * 食育教學三欄位 —— 每次掃描除了給結論，還要教一個能帶去下一包使用的觀念。
+   *
+   * 【為什麼要獨立這三個欄位，而不是塞進 plain_summary】
+   *   1. plain_summary 會被語音朗讀，塞太多會讓朗讀又臭又長（長者會直接關掉）。
+   *   2. 這三項回答的是不同問題，前端可以分層顯示：
+   *      knowledge_point → 為什麼；label_reading_tip → 下次我怎麼看；
+   *      daily_limit_context → 這個數字對「我」代表什麼。
+   *   3. 三條路徑（雲端／快取／本機）都要提供，否則降級時教學內容會整段消失。
+   */
+  knowledge_point?: string;
+  label_reading_tip?: string;
+  daily_limit_context?: string;
   ingredients_detected?: string[];
   nutrition_concerns?: string[];
   matched_conditions?: string[];
@@ -56,6 +97,28 @@ export interface LabelAnalysisResult {
   nutrient_facts?: NutrientFact[];
   /** cloud_ai = 雲端視覺模型；smart_nutrition_engine / local_fallback = 本機備援規則引擎 */
   analysis_mode?: 'cloud_ai' | 'smart_nutrition_engine' | 'local_fallback';
+  /**
+   * 離線辨識讀不到足夠的營養欄位。
+   *
+   * 【為什麼要回報這個狀態而不是硬給結論】
+   *   讀不到標籤數字時如果還回紅／黃／綠，長者會當真。
+   *   設為 true 時前端必須改顯示「請重拍」的引導，不可顯示風險結論。
+   */
+  ocr_failed?: boolean;
+  /** 離線 OCR 實際讀到的營養欄位數（除錯與提示用） */
+  ocr_matched_fields?: number;
+  /** 是否由本機離線 OCR 讀出（true = 有真的讀到標籤數字，非捏造） */
+  ocr_used?: boolean;
+  /**
+   * 這次分析的照片去了哪裡。由後端依實際處理路徑回報。
+   * `local_only` 時照片從未離開裝置，前端應據此顯示對應的隱私說明。
+   */
+  data_handling?: DataHandling;
+  /**
+   * 使用者勾選的每一項慢性病，對應一句「那我要怎麼挑」的白話提醒。
+   * 與產品無關，因此**不隨快取或模型而改變**，由後端依勾選清單直接產生。
+   */
+  condition_reminders?: ConditionReminder[];
   /** 實際回傳結果的模型名稱（僅雲端模式會有） */
   ai_model?: string;
   /** 實際使用的供應商（僅雲端模式會有） */

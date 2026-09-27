@@ -23,10 +23,18 @@ import path from 'path';
 import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import { extractNutritionProfile, analyzeNutritionWithIndicators } from './server/smartNutritionAnalyzer';
+import { analyzeNutritionWithIndicators, buildEducationFields } from './server/smartNutritionAnalyzer';
+import { recognizeNutritionFromImage, type OcrRecognitionResult } from './server/ocrLabel';
 import { analyzeSeniorPhysicalIndicators } from './server/smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './server/smartHealthQA';
-import { SeniorPhysicalIndicators, NutrientFact } from './src/types';
+import { buildConditionReminders } from './server/conditionAdvice';
+import {
+  SeniorPhysicalIndicators,
+  NutrientFact,
+  LabelAnalysisResult,
+  DataHandling,
+  LearnerProfile,
+} from './src/types';
 import { getLearnerProfile } from './src/data/learnerProfiles';
 
 dotenv.config();
@@ -655,10 +663,25 @@ CRITICAL TONE AND COMMUNICATION RULES:
    - plain_summary: at most 80 Chinese characters (1 to 3 short sentences)
    - alternative_advice: at most 60 Chinese characters
    - warning_title: at most 15 Chinese characters
+   - knowledge_point: at most 45 Chinese characters (ONE sentence)
+   - label_reading_tip: at most 40 Chinese characters (ONE sentence)
+   - daily_limit_context: at most 45 Chinese characters (ONE sentence)
    - ingredients_detected: at most 5 items, each at most 12 Chinese characters
    - nutrition_concerns: at most 3 items, each at most 15 Chinese characters
    - matched_conditions: at most 4 items, each at most 15 Chinese characters
 7. Write in Traditional Chinese only. Do not mix in Simplified Chinese characters (e.g. write 適 not 适, 麥 not 麦).
+
+【食育教學欄位規則 — 這個 App 不只是判斷工具，是「看得懂標籤」的教學工具】
+8. knowledge_point：從「這一包」教一個**可以帶去下一包用**的營養觀念，回答「為什麼」。
+   - 必須與本產品實際出現的成分有關，不要寫放諸四海皆準的空話。
+   - 不可以重複 warning_title 或 plain_summary 的結論。
+   - 好例子（長者身分）：「一包泡麵的鈉常常就等於一整天的鹽分上限，所以不能天天當正餐。」
+   - 好例子（健身身分）：「很多『高蛋白』產品同時加了麥芽糊精和糖，要看蛋白質對熱量的比例。」
+9. label_reading_tip：給一個**下次在超市用手和眼睛就能做的具體動作**，回答「下次我怎麼看」。
+   - 必須是動作，不是觀念。例如「先找『鈉』那一列看幾毫克」而不是「要注意鈉含量」。
+10. daily_limit_context：把本產品的關鍵數字，直接對上**這個身分**的每日參考值，用白話講。
+   - 例如：「這一包的鈉 1980 毫克，等於您一天上限的 99%。」
+   - 數字必須與 nutrient_facts 裡的一致，不可自行編造。
 
 JSON SCHEMA:
 {
@@ -666,6 +689,9 @@ JSON SCHEMA:
   "warning_title": "string (Short, clear, bold warning with emoji, e.g. ⚠️ 高鈉警告！ or ✅ 適合食用)",
   "plain_summary": "string (A warm, large-font plain speech summary explaining the conclusion for the user)",
   "alternative_advice": "string (Practical alternative grocery suggestion or healthy portion advice)",
+  "knowledge_point": "string (ONE transferable nutrition concept triggered by THIS product, answering 為什麼)",
+  "label_reading_tip": "string (ONE concrete physical action to do in the supermarket next time, answering 下次我怎麼看)",
+  "daily_limit_context": "string (This product's key number next to THIS learner's daily reference value, in plain speech)",
   "ingredients_detected": ["string", "..."],
   "nutrition_concerns": ["string", "..."],
   "matched_conditions": ["string", "..."],
@@ -788,11 +814,70 @@ function normalizeNutrientFacts(
   return facts.sort((a, b) => b.percent - a.percent).slice(0, 3);
 }
 
+/**
+ * 確保食育教學三欄位一定存在。
+ *
+ * 【為什麼需要這一步】
+ *   免費模型不一定每次都會回傳這三個欄位（漏欄位是常見的失敗模式）。
+ *   少了它們，結果頁會出現一整塊空白。這裡用「由實際 nutrient_facts 推導」的
+ *   確定性內容補齊 —— 補的是從真實數字算出來的，不是憑空編造。
+ *
+ * 三條路徑（雲端成功／快取命中／本機備援）都必須呼叫。
+ */
+function ensureEducationFields(data: any, facts: NutrientFact[]): void {
+  const fallback = buildEducationFields(facts);
+  for (const key of ['knowledge_point', 'label_reading_tip', 'daily_limit_context'] as const) {
+    if (typeof data[key] !== 'string' || data[key].trim().length === 0) {
+      data[key] = fallback[key];
+    }
+  }
+}
+
+/**
+ * 離線辨識讀不到足夠欄位時的回應。
+ *
+ * 【為什麼不給紅黃綠結論】
+ *   長者看到三色結論就會當真。既然我們其實沒有讀到標籤上的數字，
+ *   誠實說「看不清楚、請重拍」遠比給一個憑空捏造的結論安全。
+ *   這是本專案最重要的一條安全原則：**寧可說不知道，也不要說錯。**
+ */
+function buildOcrFailedResult(
+  learnerProfile: LearnerProfile,
+  ocr: Pick<OcrRecognitionResult, 'matchedFields'>
+): LabelAnalysisResult {
+  return {
+    risk_level: 'yellow',
+    warning_title: '🔍 看不清楚標籤數字',
+    plain_summary:
+      '不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？',
+    alternative_advice:
+      '拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。',
+    ingredients_detected: [],
+    nutrition_concerns: [],
+    matched_conditions: [],
+    // 空陣列而不是省略：讓前端明確知道「沒有百分比資料」，不會誤畫長條圖
+    nutrient_facts: [],
+    ocr_failed: true,
+    ocr_matched_fields: ocr.matchedFields,
+    analysis_mode: 'local_fallback',
+    learner_profile_id: learnerProfile.id,
+    learner_profile_name: learnerProfile.name,
+  };
+}
+
 // 核心食品標籤分析 API (中轉後端 Backend Proxy)
+//
+// 【隱私優先架構 Privacy-by-Design】
+//   本端點支援兩種資料處理模式，並在回應中以 `data_handling` 明確標示，
+//   讓使用者隨時知道自己的資料去了哪裡：
+//     - localOnly = true（**預設**）：完全不呼叫任何外部服務，
+//       照片不離開本機，由 server/ocrLabel.ts 的離線 OCR 引擎處理。
+//     - localOnly = false（需使用者明確同意）：照片才會送往 Gemini／OpenRouter。
+//   本端點為無狀態設計：不寫入資料庫、不落地儲存任何圖片，僅在記憶體中處理後回傳。
 app.post('/api/analyze-label', async (req, res) => {
   const handlerStart = Date.now();
   try {
-    const { imageBase64, conditions = [], vitals, profileId } = req.body;
+    const { imageBase64, conditions = [], vitals, profileId, localOnly = true } = req.body;
     console.log(`[LabelBuddy AI] 收到辨識請求（body 解析完成，耗時 ${Date.now() - handlerStart}ms）`);
 
     if (!imageBase64) {
@@ -801,6 +886,11 @@ app.post('/api/analyze-label', async (req, res) => {
         message: '未收到食品標籤圖片，請重新拍照或上傳。',
       });
     }
+
+    // 只有前端明確帶 localOnly:false（使用者按下了「允許上傳雲端」）才允許呼叫雲端。
+    // 預設值刻意設為「不允許」，避免任何未預期的上傳。
+    const allowCloud = localOnly === false;
+    const dataHandling: DataHandling = allowCloud ? 'cloud' : 'local_only';
 
     // 去除 base64 前綴 (如 data:image/jpeg;base64,)
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
@@ -812,6 +902,19 @@ app.post('/api/analyze-label', async (req, res) => {
     const learnerProfile = getLearnerProfile(profileId);
 
     const conditionText = conditions.length > 0 ? conditions.join('、') : '無特殊慢性病史';
+
+    /**
+     * 附加慢性病專屬提醒。
+     *
+     * 【為什麼不寫進快取】
+     *   提醒只跟「使用者勾了哪些病」有關，與照片內容無關，
+     *   而且是由後端確定性產生的，不需要（也不該）佔用快取空間。
+     *   每條回應路徑都直接算一次，成本近乎為零。
+     */
+    const attachReminders = (data: any) => ({
+      ...data,
+      condition_reminders: buildConditionReminders(conditions),
+    });
 
     let vitalText = '';
     if (vitals && vitals.systolicBp) {
@@ -834,92 +937,128 @@ ${vitalText}
     // 先查快取：同一張圖 + 同一組慢性病 + 同一個身分在 TTL 內不重複呼叫 API，
     // 這是節省免費額度最有效的手段（長者常重複掃描同一件商品）。
     // 身分必須納入鍵值：同一包高蛋白粉，對健身族與腎臟病患者結論完全不同。
-    const cacheKey = makeCacheKey(cleanBase64, [...conditions, `profile:${learnerProfile.id}`]);
-    const cached = readCache(cacheKey);
-    if (cached) {
-      console.log(`[LabelBuddy AI] 命中快取，未消耗任何 API 額度（來源：${cached.provider}）`);
-      return res.json({
-        success: true,
-        data: {
+    // 處理模式也要納入鍵值：本機結果不該被拿去回答「已同意上傳」的請求，反之亦然。
+    const cacheKey = makeCacheKey(cleanBase64, [
+      ...conditions,
+      `profile:${learnerProfile.id}`,
+      `mode:${allowCloud ? 'cloud' : 'local'}`,
+    ]);
+
+    if (allowCloud) {
+      const cached = readCache(cacheKey);
+      if (cached) {
+        console.log(`[LabelBuddy AI] 命中快取，未消耗任何 API 額度（來源：${cached.provider}）`);
+        // 快取存的可能是舊格式，出快取時再正規化一次，確保欄位齊全
+        const cachedFacts = normalizeNutrientFacts(
+          cached.data?.nutrient_facts,
+          learnerProfile.numericLimits
+        );
+        const cachedData: any = {
           ...cached.data,
-          // 快取存的可能是舊格式，出快取時再正規化一次，確保欄位齊全
-          nutrient_facts: normalizeNutrientFacts(
-            cached.data?.nutrient_facts,
-            learnerProfile.numericLimits
-          ),
+          nutrient_facts: cachedFacts,
           analysis_mode: 'cloud_ai',
           ai_model: cached.model,
           ai_provider: cached.provider,
           cached: true,
+          data_handling: 'cloud' as DataHandling,
           learner_profile_id: learnerProfile.id,
           learner_profile_name: learnerProfile.name,
-        },
-      });
+        };
+        // 舊快取可能沒有食育欄位，這裡一併補齊
+        ensureEducationFields(cachedData, cachedFacts);
+        return res.json({ success: true, data: attachReminders(cachedData) });
+      }
+    } else {
+      console.log('[LabelBuddy AI] 使用者未同意雲端分析（localOnly），照片不會離開本機');
     }
 
     // 首選：雲端視覺 AI（依使用率在 Gemini 與 OpenRouter 之間輪替）
-    const aiResult = await callAiModel(req, {
-      systemInstruction: buildSystemInstruction(learnerProfile.id),
-      userPrompt: userPromptText,
-      image: { base64: cleanBase64, mimeType },
-      temperature: 0.2,
-    });
+    // 只有使用者明確同意（allowCloud）才會走到這裡。
+    if (allowCloud) {
+      const aiResult = await callAiModel(req, {
+        systemInstruction: buildSystemInstruction(learnerProfile.id),
+        userPrompt: userPromptText,
+        image: { base64: cleanBase64, mimeType },
+        temperature: 0.2,
+      });
 
-    if (aiResult) {
-      aiResult.data.analysis_mode = 'cloud_ai';
-      aiResult.data.ai_model = aiResult.model;
-      aiResult.data.ai_provider = aiResult.provider;
-      aiResult.data.learner_profile_id = learnerProfile.id;
-      aiResult.data.learner_profile_name = learnerProfile.name;
-      // 用每日上限重算百分比，覆蓋模型自己算的數字（模型算術不可靠）
-      aiResult.data.nutrient_facts = normalizeNutrientFacts(
-        aiResult.data.nutrient_facts,
-        learnerProfile.numericLimits
-      );
-      writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
-      console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
+      if (aiResult) {
+        // 用每日上限重算百分比，覆蓋模型自己算的數字（模型算術不可靠）
+        const cloudFacts = normalizeNutrientFacts(
+          aiResult.data.nutrient_facts,
+          learnerProfile.numericLimits
+        );
+        aiResult.data.nutrient_facts = cloudFacts;
+        aiResult.data.analysis_mode = 'cloud_ai';
+        aiResult.data.ai_model = aiResult.model;
+        aiResult.data.ai_provider = aiResult.provider;
+        aiResult.data.data_handling = 'cloud';
+        aiResult.data.learner_profile_id = learnerProfile.id;
+        aiResult.data.learner_profile_name = learnerProfile.name;
+        // 模型漏給食育欄位時用確定性內容補上（由真實 nutrient_facts 推導）
+        ensureEducationFields(aiResult.data, cloudFacts);
+        writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
+        console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
+        return res.json({
+          success: true,
+          data: attachReminders(aiResult.data),
+        });
+      }
+    }
+
+    // ======================================================================
+    // 降級：本機離線引擎（未同意雲端、無金鑰，或雲端連續失敗時）
+    //
+    // 【為什麼要先做 OCR】
+    //   舊版本直接呼叫 extractNutritionProfile()，那是「依圖片位元組長度」
+    //   在三組寫死的營養資料之間輪替 —— 與照片內容完全無關。
+    //   也就是說離線時系統會捏造一份看起來很肯定的紅／黃／綠結論。
+    //   現在改成先在本機用 tesseract.js 讀出真實數字；
+    //   讀不到就誠實請使用者重拍，絕不用預設值湊出結論。
+    // ======================================================================
+    console.log('[LabelBuddy AI] 啟動本機離線辨識引擎');
+    const ocr = await recognizeNutritionFromImage(cleanBase64);
+    console.log(
+      `[LabelBuddy AI] 離線 OCR：讀到 ${ocr.matchedFields} 個營養欄位` +
+        (ocr.ok ? '（採用）' : `（不足，${ocr.error}）`)
+    );
+
+    if (!ocr.ok || !ocr.profile) {
       return res.json({
         success: true,
-        data: aiResult.data,
+        data: attachReminders({
+          ...buildOcrFailedResult(learnerProfile, ocr),
+          data_handling: dataHandling,
+        }),
       });
     }
 
-    // 降級：本機備援引擎（無金鑰或雲端連續失敗時）
-    console.log('[LabelBuddy AI] 雲端 AI 未就緒，啟動本機智慧守護引擎');
-    const profile = extractNutritionProfile(cleanBase64);
     // 帶入該身分的每日上限，讓本機引擎也能產生 nutrient_facts（前端百分比長條圖用）
     const smartResult = analyzeNutritionWithIndicators(
-      profile,
+      ocr.profile,
       conditions,
       learnerProfile.numericLimits
     );
 
     return res.json({
       success: true,
-      data: {
+      data: attachReminders({
         ...smartResult,
+        ocr_used: true,
+        ocr_matched_fields: ocr.matchedFields,
         analysis_mode: 'local_fallback',
+        data_handling: dataHandling,
         learner_profile_id: learnerProfile.id,
         learner_profile_name: learnerProfile.name,
-      },
+      }),
     });
   } catch (error: any) {
-    console.error('API 處理異常，啟動安全保護結果:', error);
-    // 例外路徑同樣要帶身分上限，否則長者會看到「有結果、沒有百分比」的不一致畫面
-    const catchProfile = getLearnerProfile(req.body?.profileId);
-    const fallbackResult = analyzeNutritionWithIndicators(
-      extractNutritionProfile(''),
-      req.body?.conditions || [],
-      catchProfile.numericLimits
-    );
-    return res.json({
-      success: true,
-      data: {
-        ...fallbackResult,
-        analysis_mode: 'local_fallback',
-        learner_profile_id: catchProfile.id,
-        learner_profile_name: catchProfile.name,
-      },
+    // 例外時不再回傳捏造的結果：直接告訴使用者系統忙碌，請他重試。
+    // （舊版會用 extractNutritionProfile('') 生出一份泡麵報告，等於誤導。）
+    console.error('API 處理異常:', error);
+    return res.status(500).json({
+      error: 'INTERNAL_ERROR',
+      message: '系統忙碌中，請稍後再試一次。',
     });
   }
 });
@@ -1112,6 +1251,57 @@ ${contextInfo}
       data: fallbackAnswer,
     });
   }
+});
+
+// ============================================================================
+// 資料處理透明化接口 (Data Handling Disclosure)
+// ============================================================================
+// 讓前端能取得「機器可讀」的資料處理說明，並在介面上誠實揭露給使用者。
+// 這裡描述的內容必須與程式實際行為一致 —— 一旦行為改變，這份說明也要同步更新。
+app.get('/api/privacy', (_req, res) => {
+  const keys = providerKeys();
+  const cloudAvailable = isValidKey(keys.gemini) || isValidKey(keys.openrouter);
+
+  res.json({
+    status: 'ok',
+    /** 預設模式：本機。前端必須在使用者明確同意後才可送 localOnly:false */
+    defaultMode: 'local_only',
+    modes: {
+      local_only: {
+        id: 'local_only',
+        name: '本機模式（預設）',
+        uploadsImage: false,
+        uploadsHealthInfo: false,
+        requiresConsent: false,
+        engine: 'tesseract.js 離線 OCR + 內建食育規則引擎',
+        description:
+          '食品照片只在本機伺服器上以離線 OCR 讀取營養數字，不會傳送給任何第三方。慢性病史也不會離開本機。',
+      },
+      cloud: {
+        id: 'cloud',
+        name: '雲端 AI 增強模式',
+        uploadsImage: true,
+        uploadsHealthInfo: true,
+        requiresConsent: true,
+        available: cloudAvailable,
+        providers: ['Google Gemini', 'OpenRouter'],
+        description:
+          '經您明確同意後，壓縮後的食品標籤照片，以及您勾選的慢性病史項目名稱，會傳送給雲端視覺模型進行辨識。可提升準確度，但資料會離開您的裝置。',
+      },
+    },
+    serverPolicy: {
+      storesImages: false,
+      storesResults: false,
+      stateless: true,
+      note: '本服務為無狀態設計：不寫入資料庫、不保存任何圖片，僅在記憶體中即時處理後回傳。雲端模式的辨識結果會在記憶體中快取 24 小時以節省 API 額度，重啟即清除。',
+    },
+    localData: {
+      storedOnDevice: true,
+      storage: 'localStorage',
+      items: ['學習者身分設定', '健康設定與慢性病史', '飲食與把關紀錄'],
+      note: '所有紀錄僅儲存在您的瀏覽器本機，不會上傳。您可隨時於介面上清除。',
+    },
+  });
 });
 
 // AI 服務狀態檢查接口
