@@ -51,6 +51,27 @@ SDG 3／4／12。
 4. ★ **人臉／姓名／學號／手部**：人臉可用 MediaPipe 在瀏覽器端偵測後**拒絕**；
    號碼格式可用規則比對；**手部不建議做**（拿標籤的手必然入鏡）
 
+## 🚀 【2026-09-27 定案】部署架構：Cloudflare（不是 Vercel）
+
+| 層 | 選擇 |
+| --- | --- |
+| 版控 | GitHub：`https://github.com/Spencer-F3D/labelbuddy-ai`（Private） |
+| 手機測試 | **Cloudflare Tunnel**（`連線到手機.bat`，quick tunnel，網址每次不同） |
+| 正式部署 | **Cloudflare Workers**（含靜態資源，前端＋API 同一個 Worker） |
+| OCR 位置 | **前端（瀏覽器／WebView）**——不是伺服器 |
+| APK | Capacitor ＋ ML Kit 裝置端 OCR |
+
+**為什麼選 Cloudflare 而不是 Vercel**（官方文件查證）：
+- **牆鐘時間無限制** vs Vercel 預設 10 秒（我們的 AI 呼叫要 12 秒）
+- **請求體 100 MB** vs Vercel 4.5 MB（我們傳 base64 圖片）
+- **沒有冷啟動**（V8 isolate）→ 決賽現場更可靠
+- Workers 免費方案每請求 **10ms CPU** → **tesseract.js 不可能跑在上面**
+  → 這正是「OCR 必須搬到前端」的原因
+
+⚠️ 透過 Tunnel 存取時，**Vite 會擋下前端**（`403 Blocked request`，API 不受影響）
+→ `vite.config.ts` 已加 `allowedHosts: ['.trycloudflare.com']`，
+用環境變數 `VITE_ALLOWED_HOSTS` 可覆寫。
+
 ## 專案性質
 超市食品標籤辨識 App，原為 60 歲以上長者設計，現擴為 **6 種身分共用**。
 Vite 8 + React 19 + TypeScript(strict) + Tailwind 4 + Express 4。
