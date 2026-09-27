@@ -58,12 +58,12 @@ SDG 3／4／12。
 | 版控 | GitHub：`https://github.com/Spencer-F3D/labelbuddy-ai`（Private） |
 | 手機測試 | **Cloudflare Tunnel**（`連線到手機.bat`，quick tunnel，網址每次不同） |
 | 正式部署 | **Cloudflare Workers**（含靜態資源，前端＋API 同一個 Worker） |
-| OCR 位置 | **前端（瀏覽器／WebView）**——不是伺服器 |
+| **OCR 位置** | ✅ **已完成搬到前端**（`src/ocr/ocrBrowser.ts`） |
 | APK | Capacitor ＋ ML Kit 裝置端 OCR |
 
 **為什麼選 Cloudflare 而不是 Vercel**（官方文件查證）：
 - **牆鐘時間無限制** vs Vercel 預設 10 秒（我們的 AI 呼叫要 12 秒）
-- **請求體 100 MB** vs Vercel 4.5 MB（我們傳 base64 圖片）
+- **請求體 100 MB** vs Vercel 4.5 MB
 - **沒有冷啟動**（V8 isolate）→ 決賽現場更可靠
 - Workers 免費方案每請求 **10ms CPU** → **tesseract.js 不可能跑在上面**
   → 這正是「OCR 必須搬到前端」的原因
@@ -71,6 +71,34 @@ SDG 3／4／12。
 ⚠️ 透過 Tunnel 存取時，**Vite 會擋下前端**（`403 Blocked request`，API 不受影響）
 → `vite.config.ts` 已加 `allowedHosts: ['.trycloudflare.com']`，
 用環境變數 `VITE_ALLOWED_HOSTS` 可覆寫。
+
+## 🔒 【2026-09-27 完成】OCR 已搬到前端 —— 照片不再上傳
+
+**架構**：
+```
+瀏覽器（PWA / APK WebView）
+ ├─ 拍照 → tesseract.js 在瀏覽器讀出文字   ← 照片到此為止，不出裝置
+ ├─ 只送 ocrText 給後端
+ └─ 後端：本機規則引擎，或（經同意）把**文字**送雲端文字模型
+```
+
+**三個關鍵檔案**：
+- `src/ocr/ocrBrowser.ts` —— 瀏覽器端 OCR（worker 重用 ＋ 任務序列化）
+- `scripts/copy-ocr-assets.mjs` —— 從 `node_modules` 複製 WASM 執行檔到 `public/`
+  （`public/tesseract-core/` 與 `public/tesseract-worker.min.js` **不進版控**）
+- `server/ocrLabel.ts` 的 `buildRecognitionResult()` —— 文字→結果**只留一份實作**，
+  確保兩條路徑的「誠實門檻」一致
+
+**資產位置（2026-09-27 搬家）**：語言檔從 `server/tessdata/` 移到 **`public/tessdata/`**，
+讓瀏覽器（Vite 服務 `public/`）與伺服器（Node 讀檔）共用同一份，不必維護兩個 7.5 MB 副本。
+`resolveTessdataDir()` 的候選順序已更新（`public/tessdata` → `dist/tessdata` → 舊位置相容）。
+
+### ⚠️ 兩個一定要記住的設計決定
+1. **判斷「哪一種模式」要看欄位是否存在，不是看內容是否為空。**
+   前端 OCR 失敗時送 `ocrText: ''`，那仍是**文字模式**，要回「請重拍」而不是 400。
+   送 400 會讓使用者看到「系統壞了」而不是「照片沒拍好」。
+2. **空文字要提早擋掉，不查快取也不呼叫雲端。**
+   把空字串送給語言模型只會得到**幻覺**，還白費額度。
 
 ## 專案性質
 超市食品標籤辨識 App，原為 60 歲以上長者設計，現擴為 **6 種身分共用**。
