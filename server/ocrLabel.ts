@@ -79,9 +79,15 @@ function resolveTessdataDir(): string | null {
 
   const candidates = [
     process.env.TESSDATA_PATH,
+    // 2026-09-27 搬家：語言檔從 server/tessdata 移到 public/tessdata，
+    // 這樣同一個檔案同時能被「瀏覽器（Vite 服務 public/）」與
+    // 「伺服器（Node 讀檔）」取用，不必維護兩份 7.5 MB 的副本。
+    // Vite 建置時會把 public/ 複製到 dist/，所以正式模式走 dist/tessdata。
+    path.join(process.cwd(), 'public', 'tessdata'),
+    path.join(process.cwd(), 'dist', 'tessdata'),
+    // 舊位置保留相容，避免舊環境或已部署的版本找不到檔案
     path.join(process.cwd(), 'server', 'tessdata'),
     path.join(process.cwd(), 'tessdata'),
-    path.join(process.cwd(), 'dist', 'tessdata'),
   ].filter((p): p is string => Boolean(p));
 
   for (const dir of candidates) {
@@ -468,47 +474,14 @@ function inferPurineLevel(text: string): 'high' | 'medium' | 'low' {
 }
 
 /**
- * 主入口：辨識圖片 → 營養輪廓。
+ * 把 OCR 讀出的**原始文字**轉成結構化的辨識結果。
  *
- * ok=false 代表「讀不到足夠欄位」，呼叫端必須請使用者重拍，
- * **不可**用預設值補齊（那就回到捏造結論的老問題了）。
+ * 【為什麼要獨立成一個匯出的函式】
+ *   OCR 搬到瀏覽器之後，文字是前端送過來的，伺服器不需要（也不該）再碰圖片。
+ *   但「文字 → 結果」這一段 —— 包含最重要的**誠實門檻** —— 必須只有一份實作，
+ *   否則兩條路徑（瀏覽器 OCR ／ 伺服器 OCR）遲早會給出不一致的判斷。
  */
-export async function recognizeNutritionFromImage(
-  cleanBase64: string
-): Promise<OcrRecognitionResult> {
-  const langPath = resolveTessdataDir();
-  if (!langPath) {
-    return {
-      ok: false,
-      profile: null,
-      matchedFields: 0,
-      rawText: '',
-      error: '找不到 tessdata 目錄（需 server/tessdata/chi_tra.traineddata 與 eng.traineddata）',
-    };
-  }
-
-  const imageBuffer = Buffer.from(cleanBase64, 'base64');
-  if (imageBuffer.length === 0) {
-    return { ok: false, profile: null, matchedFields: 0, rawText: '', error: '圖片為空' };
-  }
-
-  let rawText = '';
-  try {
-    rawText = await enqueue(async () => {
-      const worker = await getWorker(langPath);
-      const { data } = await worker.recognize(imageBuffer);
-      return data.text || '';
-    });
-  } catch (err: any) {
-    return {
-      ok: false,
-      profile: null,
-      matchedFields: 0,
-      rawText: '',
-      error: `OCR 執行失敗：${err?.message || err}`,
-    };
-  }
-
+export function buildRecognitionResult(rawText: string): OcrRecognitionResult {
   const parsed = parseNutritionLabel(rawText);
 
   // 【誠實門檻】至少讀到 3 個核心欄位，且必須有鈉或糖其中之一。
@@ -551,4 +524,55 @@ export async function recognizeNutritionFromImage(
   };
 
   return { ok: true, profile, matchedFields: parsed.matchedFields, rawText };
+}
+
+/**
+ * 主入口（伺服器端）：辨識圖片 → 營養輪廓。
+ *
+ * ⚠️ 新流程已把 OCR 搬到瀏覽器（見 `src/ocr/ocrBrowser.ts`），
+ *    正常情況下這個函式**不會被呼叫**。
+ *    保留它是為了：
+ *      1. 舊版客戶端仍可能送圖片
+ *      2. `npm run ocr:smoke` 需要在命令列實測準確率
+ *
+ * ok=false 代表「讀不到足夠欄位」，呼叫端必須請使用者重拍，
+ * **不可**用預設值補齊（那就回到捏造結論的老問題了）。
+ */
+export async function recognizeNutritionFromImage(
+  cleanBase64: string
+): Promise<OcrRecognitionResult> {
+  const langPath = resolveTessdataDir();
+  if (!langPath) {
+    return {
+      ok: false,
+      profile: null,
+      matchedFields: 0,
+      rawText: '',
+      error: '找不到 tessdata 目錄（需 public/tessdata/chi_tra.traineddata）',
+    };
+  }
+
+  const imageBuffer = Buffer.from(cleanBase64, 'base64');
+  if (imageBuffer.length === 0) {
+    return { ok: false, profile: null, matchedFields: 0, rawText: '', error: '圖片為空' };
+  }
+
+  let rawText = '';
+  try {
+    rawText = await enqueue(async () => {
+      const worker = await getWorker(langPath);
+      const { data } = await worker.recognize(imageBuffer);
+      return data.text || '';
+    });
+  } catch (err: any) {
+    return {
+      ok: false,
+      profile: null,
+      matchedFields: 0,
+      rawText: '',
+      error: `OCR 執行失敗：${err?.message || err}`,
+    };
+  }
+
+  return buildRecognitionResult(rawText);
 }

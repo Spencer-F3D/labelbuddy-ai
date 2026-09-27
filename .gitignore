@@ -12,13 +12,21 @@ bun.lock
 .ocr-smoke.mjs
 .verify-conditions.mjs
 .verify-dist/
-shots-verify/
+# 驗證腳本的截圖輸出（verify-web-app.mjs 產生，每次目錄名可能不同）
+shots*/
 
 # tesseract.js 若未指定 cacheMethod 會把語言檔複製到工作目錄。
 # 正式路徑已設 cacheMethod:'none'，這裡只是防止測試時不小心把 7.5 MB 的副本提交進去。
-# ⚠️ 只錨定根目錄，不可寫成 *.traineddata（那會排除 server/tessdata/ 的正本）。
+# ⚠️ 只錨定根目錄，不可寫成 *.traineddata（那會排除 public/tessdata/ 的正本）。
 /chi_tra.traineddata
 /eng.traineddata
+
+# OCR 執行檔：由 scripts/copy-ocr-assets.mjs 從 node_modules 複製而來（約 12 MB）。
+# 不進版控的理由：它們本來就是 npm 依賴的一部分，提交等於把第三方二進位檔
+# 放進 git、且可能與 package.json 的版本不一致。用腳本在 dev/build 前複製即可。
+# ⚠️ public/tessdata/*.traineddata 不在此列 —— 那兩個是我們自己的資產，必須提交。
+public/tesseract-core/
+public/tesseract-worker.min.js
 
 # 比賽章程 PDF（2026-09-27 使用者指定不納入版控）。
 # 用萬用字元而非完整檔名，這樣重新下載成「... (2).pdf」時也會被擋下。

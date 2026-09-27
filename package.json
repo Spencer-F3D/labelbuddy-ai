@@ -4,13 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-ocr-assets.mjs",
     "dev": "tsx server.ts",
     "launch": "node scripts/launch.mjs",
+    "phone": "node scripts/tunnel-launch.mjs",
+    "prebuild": "node scripts/copy-ocr-assets.mjs",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
+    "ocr:assets": "node scripts/copy-ocr-assets.mjs",
     "ocr:smoke": "esbuild scripts/ocr-smoke.ts --bundle --platform=node --format=esm --packages=external --outfile=.ocr-smoke.mjs --log-level=error && node .ocr-smoke.mjs",
     "verify:conditions": "esbuild scripts/verify-condition-keywords.ts --bundle --platform=node --format=esm --packages=external --outfile=.verify-conditions.mjs --log-level=error && node .verify-conditions.mjs"
   },

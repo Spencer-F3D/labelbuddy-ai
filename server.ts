@@ -24,7 +24,11 @@ import { createHash } from 'node:crypto';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { analyzeNutritionWithIndicators, buildEducationFields } from './server/smartNutritionAnalyzer';
-import { recognizeNutritionFromImage, type OcrRecognitionResult } from './server/ocrLabel';
+import {
+  recognizeNutritionFromImage,
+  buildRecognitionResult,
+  type OcrRecognitionResult,
+} from './server/ocrLabel';
 import { analyzeSeniorPhysicalIndicators } from './server/smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './server/smartHealthQA';
 import { buildConditionReminders } from './server/conditionAdvice';
@@ -877,14 +881,44 @@ function buildOcrFailedResult(
 app.post('/api/analyze-label', async (req, res) => {
   const handlerStart = Date.now();
   try {
-    const { imageBase64, conditions = [], vitals, profileId, localOnly = true } = req.body;
+    const {
+      imageBase64,
+      ocrText,
+      ocrError,
+      conditions = [],
+      vitals,
+      profileId,
+      localOnly = true,
+    } = req.body;
     console.log(`[LabelBuddy AI] 收到辨識請求（body 解析完成，耗時 ${Date.now() - handlerStart}ms）`);
 
-    if (!imageBase64) {
+    // ══════════════════════════════════════════════════════════════════
+    // 兩種輸入模式
+    //   【新】ocrText  —— 前端已在瀏覽器端讀出標籤文字，**照片從來沒有離開裝置**。
+    //                    這是預設路徑，也是隱私承諾的核心。
+    //   【舊】imageBase64 —— 伺服器端 OCR。保留相容（舊版客戶端），
+    //                    也是 `npm run ocr:smoke` 在命令列實測時走的路。
+    //
+    // ⚠️ 判斷「哪一種模式」要看**欄位是否存在**，不是看內容是否為空。
+    //    前端 OCR 失敗時會送 `ocrText: ''`，那仍然是文字模式，
+    //    應該回「請重拍」而不是 400 —— 送 400 會讓前端顯示網路錯誤，
+    //    使用者看到的是「系統壞了」，而不是「照片沒拍好」。
+    // ══════════════════════════════════════════════════════════════════
+    const isTextMode = typeof ocrText === 'string';
+    const hasOcrText = isTextMode && ocrText.trim().length > 0;
+    const hasImage = typeof imageBase64 === 'string' && imageBase64.length > 0;
+
+    if (!isTextMode && !hasImage) {
       return res.status(400).json({
         error: 'INVALID_REQUEST',
-        message: '未收到食品標籤圖片，請重新拍照或上傳。',
+        message: '未收到食品標籤內容，請重新拍照或上傳。',
       });
+    }
+
+    // 前端 OCR 失敗時只留紀錄，不打擾使用者 —— 下面會走「請重拍」路徑。
+    // 不把 ocrError 直接顯示給長者看：那是技術訊息，對他們沒有幫助。
+    if (isTextMode && !hasOcrText && ocrError) {
+      console.log(`[LabelBuddy AI] 前端 OCR 未讀到文字：${ocrError}`);
     }
 
     // 只有前端明確帶 localOnly:false（使用者按下了「允許上傳雲端」）才允許呼叫雲端。
@@ -892,9 +926,10 @@ app.post('/api/analyze-label', async (req, res) => {
     const allowCloud = localOnly === false;
     const dataHandling: DataHandling = allowCloud ? 'cloud' : 'local_only';
 
-    // 去除 base64 前綴 (如 data:image/jpeg;base64,)
-    const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
-    const mimeTypeMatch = imageBase64.match(/^data:(image\/[a-zA-Z]+);base64,/);
+    // 去除 base64 前綴 (如 data:image/jpeg;base64,)。
+    // 走文字模式時完全不會用到圖片，這裡刻意留空，避免任何機會誤傳。
+    const cleanBase64 = hasImage ? imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '') : '';
+    const mimeTypeMatch = hasImage ? imageBase64.match(/^data:(image\/[a-zA-Z]+);base64,/) : null;
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
 
     // 學習者身分：決定 AI 的判斷基準（每日參考值）。
@@ -916,13 +951,44 @@ app.post('/api/analyze-label', async (req, res) => {
       condition_reminders: buildConditionReminders(conditions),
     });
 
+    // ══════════════════════════════════════════════════════════════════
+    // 文字模式但一個字都沒讀到 → 直接回「請重拍」，**不查快取也不呼叫雲端**。
+    //
+    // 【為什麼要提早擋掉】
+    //   把空字串送給語言模型只會得到幻覺 —— 它會「根據標籤文字」講出一段
+    //   根本不存在的內容，還白白消耗免費額度。這正是本專案最想避免的失敗模式：
+    //   錯了不會報錯，只會很肯定地給錯答案。
+    // ══════════════════════════════════════════════════════════════════
+    if (isTextMode && !hasOcrText) {
+      console.log('[LabelBuddy AI] 文字模式但沒有讀到任何字，直接請使用者重拍');
+      return res.json({
+        success: true,
+        data: attachReminders({
+          ...buildOcrFailedResult(learnerProfile, {
+            ok: false,
+            profile: null,
+            matchedFields: 0,
+            rawText: '',
+            error: '沒有讀到標籤文字',
+          }),
+          data_handling: dataHandling,
+        }),
+      });
+    }
+
     let vitalText = '';
     if (vitals && vitals.systolicBp) {
       vitalText = `【長者量測指標】血壓: ${vitals.systolicBp}/${vitals.diastolicBp} mmHg，心跳: ${vitals.heartRate || 72} bpm，血糖: ${vitals.bloodSugar} ${vitals.bloodSugarUnit || 'mmol/L'} (${vitals.bloodSugarTiming === 'fasting' ? '空腹' : '飯後'})。`;
     }
 
-    const userPromptText = `請分析這張食品標籤，判斷是否適合「${learnerProfile.name}」購買。
-
+    /**
+     * 兩種輸入模式共用的情境說明。
+     *
+     * 抽出來的理由：提示詞裡「標籤內容」那一段必須隨模式不同（文字 vs 圖片），
+     * 但其餘（病史、身分、每日參考值、慢性病清單）完全一樣。
+     * 分成兩份遲早會漂移，所以只留一份。
+     */
+    const promptContext = `
 【使用者的慢性病史】${conditionText}
 ${vitalText}
 
@@ -933,6 +999,17 @@ ${vitalText}
       .join('、')}
 
 【通用慢性病比對清單】高血壓(鈉含量)、高血糖/糖尿病(糖分與精製碳水)、心跳與心血管(反式油脂與高咖啡因)、高血脂(飽和脂肪與反式脂肪)、痛風(普林與果糖)、腎臟病(鈉鉀磷)、胃食道逆流(刺激辛辣酸)、骨質疏鬆(磷酸與重鹽)，以及食物過敏原(花生、堅果、海鮮、乳製品、小麥麩質)。`;
+
+    const userPromptText = hasOcrText
+      ? `以下是從食品標籤照片上讀出的文字，由使用者的裝置以 OCR 產生 —— **照片本身沒有上傳**。
+請只根據這些文字判斷是否適合「${learnerProfile.name}」購買。
+
+【標籤文字開始】
+${ocrText}
+【標籤文字結束】
+${promptContext}`
+      : `請分析這張食品標籤，判斷是否適合「${learnerProfile.name}」購買。
+${promptContext}`;
 
     // 先查快取：同一張圖 + 同一組慢性病 + 同一個身分在 TTL 內不重複呼叫 API，
     // 這是節省免費額度最有效的手段（長者常重複掃描同一件商品）。
@@ -978,7 +1055,11 @@ ${vitalText}
       const aiResult = await callAiModel(req, {
         systemInstruction: buildSystemInstruction(learnerProfile.id),
         userPrompt: userPromptText,
-        image: { base64: cleanBase64, mimeType },
+        // ⚠️ 文字模式下**絕對不傳圖片** —— 這是隱私承諾的核心：
+        //    照片從來沒有離開使用者的裝置，雲端只看得到文字。
+        //    兩個供應商的圖片參數本來就是選填的（`if (options.image)`），
+        //    所以傳 undefined 就會走純文字模式，不需要改供應商程式碼。
+        image: isTextMode ? undefined : { base64: cleanBase64, mimeType },
         temperature: 0.2,
       });
 
@@ -1017,7 +1098,11 @@ ${vitalText}
     //   讀不到就誠實請使用者重拍，絕不用預設值湊出結論。
     // ======================================================================
     console.log('[LabelBuddy AI] 啟動本機離線辨識引擎');
-    const ocr = await recognizeNutritionFromImage(cleanBase64);
+    // 文字模式：前端已經讀好文字，直接解析（不碰圖片，也沒有圖片可碰）。
+    // 圖片模式：伺服器端 OCR（舊客戶端 / 命令列實測用）。
+    const ocr = isTextMode
+      ? buildRecognitionResult(ocrText)
+      : await recognizeNutritionFromImage(cleanBase64);
     console.log(
       `[LabelBuddy AI] 離線 OCR：讀到 ${ocr.matchedFields} 個營養欄位` +
         (ocr.ok ? '（採用）' : `（不足，${ocr.error}）`)
@@ -1258,6 +1343,11 @@ ${contextInfo}
 // ============================================================================
 // 讓前端能取得「機器可讀」的資料處理說明，並在介面上誠實揭露給使用者。
 // 這裡描述的內容必須與程式實際行為一致 —— 一旦行為改變，這份說明也要同步更新。
+//
+// 【2026-09-27 重大變更：照片不再上傳】
+//   OCR 已從伺服器搬到瀏覽器（見 src/ocr/ocrBrowser.ts）。
+//   現在**兩種模式都不會上傳照片**，差別只在「文字要不要送給雲端 AI」。
+//   這讓 uploadsImage 從「雲端模式為 true」變成「一律 false」。
 app.get('/api/privacy', (_req, res) => {
   const keys = providerKeys();
   const cloudAvailable = isValidKey(keys.gemini) || isValidKey(keys.openrouter);
@@ -1266,27 +1356,32 @@ app.get('/api/privacy', (_req, res) => {
     status: 'ok',
     /** 預設模式：本機。前端必須在使用者明確同意後才可送 localOnly:false */
     defaultMode: 'local_only',
+    /** 兩種模式的共同保證：照片永遠不會離開使用者的裝置 */
+    imageNeverLeavesDevice: true,
     modes: {
       local_only: {
         id: 'local_only',
         name: '本機模式（預設）',
         uploadsImage: false,
+        uploadsOcrText: false,
         uploadsHealthInfo: false,
         requiresConsent: false,
-        engine: 'tesseract.js 離線 OCR + 內建食育規則引擎',
+        engine: '瀏覽器內建 OCR（tesseract.js）+ 本機食育規則引擎',
         description:
-          '食品照片只在本機伺服器上以離線 OCR 讀取營養數字，不會傳送給任何第三方。慢性病史也不會離開本機。',
+          '照片在您的手機上就以離線 OCR 讀出文字，照片本身從未離開裝置。接著由本機的規則引擎判斷，不呼叫任何外部服務 —— 連文字也不會上傳。慢性病史同樣留在本機。',
       },
       cloud: {
         id: 'cloud',
         name: '雲端 AI 增強模式',
-        uploadsImage: true,
+        // ⚠️ 照片一律不上傳（兩種模式皆然）。雲端只會收到 OCR 讀出的**文字**。
+        uploadsImage: false,
+        uploadsOcrText: true,
         uploadsHealthInfo: true,
         requiresConsent: true,
         available: cloudAvailable,
         providers: ['Google Gemini', 'OpenRouter'],
         description:
-          '經您明確同意後，壓縮後的食品標籤照片，以及您勾選的慢性病史項目名稱，會傳送給雲端視覺模型進行辨識。可提升準確度，但資料會離開您的裝置。',
+          '經您明確同意後，只會把「OCR 讀出的標籤文字」與「您勾選的慢性病史項目名稱」傳送給雲端文字模型。照片仍然不會上傳。可提升判斷準確度，但文字與病史會離開您的裝置。',
       },
     },
     serverPolicy: {

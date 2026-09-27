@@ -55,6 +55,8 @@ import {
 } from 'lucide-react';
 import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId } from './types';
 import { compressImage } from './utils/imageCompression';
+// OCR 在瀏覽器端執行：照片不會離開使用者的裝置，只有讀出的文字會送到後端。
+import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
@@ -464,6 +466,16 @@ export default function App() {
    */
   const [loadingSeconds, setLoadingSeconds] = useState<number>(0);
   /**
+   * 載入中的階段。
+   *
+   * 【為什麼要分階段】OCR 搬到瀏覽器之後，流程變成兩段：
+   *   ① 讀取標籤文字（在手機上跑，不上傳）
+   *   ② 分析（本機規則引擎，或送到雲端 AI）
+   * 兩段都要幾秒，若都寫「正在為您分析」，使用者會以為卡住了。
+   * 講清楚現在在做什麼，等待就從「不知道還要多久」變成「我知道在幹嘛」。
+   */
+  const [loadingPhase, setLoadingPhase] = useState<'reading' | 'analyzing'>('analyzing');
+  /**
    * 是否同意把照片上傳雲端辨識。預設 false（不同意）。
    *
    * 【為什麼預設關】這是隱私優先的預設值：沒表態過的使用者，
@@ -647,6 +659,34 @@ export default function App() {
     setErrorMessage(null);
     setAnalysisResult(null);
 
+    // 每秒更新一次已等待秒數，讓載入畫面能顯示具體進度
+    setLoadingSeconds(0);
+    if (loadingTickRef.current) clearInterval(loadingTickRef.current);
+    loadingTickRef.current = setInterval(() => {
+      setLoadingSeconds((s) => s + 1);
+    }, 1000);
+
+    // ══════════════════════════════════════════════════════════════════
+    // 第一階段：在瀏覽器端讀出標籤文字
+    //
+    // 【隱私關鍵】照片在這裡就被讀完了，**從來沒有離開使用者的裝置**。
+    // 送到後端的只有下面那段文字，不是照片。
+    // 這也讓後端可以部署到 Cloudflare Workers 這類免費邊緣平台
+    // （那裡的 CPU 額度跑不動 OCR，但當純文字代理綽綽有餘）。
+    // ══════════════════════════════════════════════════════════════════
+    setLoadingPhase('reading');
+    speakText('正在讀取標籤文字', {
+      rate: 0.88,
+      preferLanguage: 'cantonese',
+    });
+
+    const ocr = await recognizeLabelTextInBrowser(base64Data);
+
+    // ══════════════════════════════════════════════════════════════════
+    // 第二階段：把「文字」送去做分析
+    // ══════════════════════════════════════════════════════════════════
+    setLoadingPhase('analyzing');
+
     // AI 分析狀態語音提示：「正在為您分析」（粵語優先）
     speakText('正在為您分析', {
       rate: 0.88,
@@ -664,13 +704,6 @@ export default function App() {
       });
     }, 2500);
 
-    // 每秒更新一次已等待秒數，讓載入畫面能顯示具體進度
-    setLoadingSeconds(0);
-    if (loadingTickRef.current) clearInterval(loadingTickRef.current);
-    loadingTickRef.current = setInterval(() => {
-      setLoadingSeconds((s) => s + 1);
-    }, 1000);
-
     try {
       // 將選取的病史轉換為繁體中文標籤
       const conditionNames = selectedConditions.map((id) => conditionName(id));
@@ -682,12 +715,17 @@ export default function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageBase64: base64Data,
+          // 【只送文字，不送照片】
+          // 照片已經在瀏覽器端讀完了。`ocrText` 是空的代表沒讀到字，
+          // 後端會回「請重拍」，我們不在前端自行捏造結果。
+          ocrText: ocr.ok ? ocr.text : '',
+          // OCR 失敗的原因只在瀏覽器 console 留紀錄，不打擾使用者
+          ocrError: ocr.ok ? undefined : ocr.error,
           conditions: conditionNames,
           // 身分會改變 AI 的判斷基準與每日參考值（例如健身族看蛋白質、學生看鈣質）
           profileId: learnerProfileId,
-          // 【隱私優先】預設 true → 照片只在本機用離線 OCR 處理，不上傳。
-          // 只有使用者自己打開同意開關（cloudConsent）才會送雲端。
+          // 【隱私優先】預設 true → 完全不呼叫雲端，由本機規則引擎判斷。
+          // 只有使用者自己打開同意開關（cloudConsent）才會把**文字**送給雲端 AI。
           localOnly: !cloudConsent,
           vitals: {
             systolicBp: physicalIndicators.systolicBp,
@@ -2261,18 +2299,28 @@ export default function App() {
           </div>
 
           <h2 className="text-[20px] font-black text-white mb-[8px] leading-tight">
-            正在為您分析…
+            {loadingPhase === 'reading' ? '正在讀取標籤…' : '正在為您分析…'}
           </h2>
 
           {/* 具體的等待預期 + 即時秒數：把「不知道還要多久」變成可掌握的進度 */}
           <p className="text-[16px] font-bold text-slate-300 leading-snug">
-            通常需要 5 到 10 秒
+            {loadingPhase === 'reading'
+              ? '照片只在這支手機上處理，不會上傳'
+              : '通常需要 5 到 10 秒'}
             {loadingSeconds > 0 && (
               <span className="ml-[6px] text-slate-400">（已等 {loadingSeconds} 秒）</span>
             )}
           </p>
 
-          {isNetworkDelayed ? (
+          {/* 讀取階段就把「照片沒有離開裝置」講出來 —— 這是承諾，也是事實 */}
+          {loadingPhase === 'reading' ? (
+            <div className="w-full max-w-sm mt-[16px] bg-slate-800 border-[3px] border-emerald-500 rounded-[16px] p-[16px] flex items-center gap-[10px]">
+              <ShieldCheck className="w-[28px] h-[28px] text-emerald-400 shrink-0" />
+              <p className="text-[18px] font-black text-emerald-300 leading-snug">
+                照片不會離開這支手機
+              </p>
+            </div>
+          ) : isNetworkDelayed ? (
             /* 超市弱訊號安撫卡片（醒目大字 22px，消除長者等待焦慮） */
             <div className="w-full max-w-sm mt-[16px] bg-amber-400 text-slate-950 p-[16px] rounded-[16px] border-[3px] border-yellow-200 shadow-2xl flex flex-col items-center gap-[8px]">
               <div className="flex items-center gap-[8px]">
