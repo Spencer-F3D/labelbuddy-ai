@@ -19,3 +19,8 @@ shots-verify/
 # ⚠️ 只錨定根目錄，不可寫成 *.traineddata（那會排除 server/tessdata/ 的正本）。
 /chi_tra.traineddata
 /eng.traineddata
+
+# 比賽章程 PDF（2026-09-27 使用者指定不納入版控）。
+# 用萬用字元而非完整檔名，這樣重新下載成「... (2).pdf」時也會被擋下。
+# 檔案仍留在專案根目錄供查閱，只是不進 git。
+2026全球青少年人工智能未來創新競賽*.pdf
