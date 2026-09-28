@@ -255,8 +255,19 @@ export function buildEducationFields(
 export function analyzeNutritionWithIndicators(
   profile: NutritionProfile,
   selectedConditions: string[],
-  numericLimits?: Record<string, { value: number; unit: string }>
+  numericLimits?: Record<string, { value: number; unit: string }>,
+  /**
+   * 輸出語言（2026-09-28 新增）。
+   *
+   * ⚠️ 這個引擎是**預設路徑**：cloudConsent 預設 false，
+   *    也就是使用者沒有明確同意上傳時，全部由這裡判斷。
+   *    所以英文介面要真的可用，這裡必須跟著雙語 —— 不能只做雲端提示詞。
+   */
+  language: 'zh-TW' | 'en' = 'zh-TW'
 ): LabelAnalysisResult {
+  /** 依語言挑字串。中文是預設，英文只在 language === 'en' 時使用。 */
+  const L = (zh: string, en: string) => (language === 'en' ? en : zh);
+
   const concerns: string[] = [];
   const matchedConditions: string[] = [];
   let riskScore = 0; // 0 = 綠, 1-2 = 黃, 3+ = 紅

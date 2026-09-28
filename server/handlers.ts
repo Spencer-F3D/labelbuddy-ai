@@ -48,6 +48,11 @@ import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
 import { getLearnerProfile } from '../src/data/learnerProfiles';
+// 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
+import { nutrientName, profileName, conditionName } from '../src/data/bilingual';
+import { PHYSICAL_INDICATORS } from '../src/data/conditions';
+// 本機引擎的英文對照（2026-09-28）：引擎本身維持中文，這裡只轉換輸出欄位。
+import { translateLocalResult } from './localEngineEn';
 import type { DataHandling, SeniorPhysicalIndicators } from '../src/types';
 
 /** 極薄的 Express 相容層。只實作 handler 實際用到的兩個方法。 */
@@ -85,7 +90,21 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
       vitals,
       profileId,
       localOnly = true,
+      /**
+       * 介面語言（2026-09-28 新增）。
+       *
+       * 【為什麼後端要知道語言】
+       *   分析結果（warning_title / plain_summary / knowledge_point…）是**後端產生**的。
+       *   前端切成英文後，如果這裡不跟著換，使用者會看到英文介面配中文結論。
+       *
+       * 【為什麼預設 zh-TW】
+       *   舊版客戶端不會帶這個欄位。預設成繁體中文，行為與改動前完全一致，
+       *   不會因為這次改動讓既有使用者看到不同語言。
+       */
+      language = 'zh-TW',
     } = req.body;
+    // 只有明確等於 'en' 才走英文，其餘（含 undefined、亂填）一律當繁體中文
+    const isEnglish = language === 'en';
     console.log(`[LabelBuddy AI] 收到辨識請求（body 解析完成，耗時 ${Date.now() - handlerStart}ms）`);
 
     // ══════════════════════════════════════════════════════════════════
@@ -132,7 +151,18 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     // 傳入無效值時 getLearnerProfile 會安全退回「長者三高」，因此這裡不需額外防護。
     const learnerProfile = getLearnerProfile(profileId);
 
-    const conditionText = conditions.length > 0 ? conditions.join('、') : '無特殊慢性病史';
+    // 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
+    const conditionText =
+      conditions.length > 0
+        ? conditions
+            .map((id: string) => {
+              const zh = PHYSICAL_INDICATORS.find((c) => c.id === id)?.name ?? id;
+              return conditionName(id, zh, language);
+            })
+            .join(isEnglish ? ', ' : '、')
+        : isEnglish
+          ? 'No specific chronic conditions'
+          : '無特殊慢性病史';
 
     /**
      * 附加慢性病專屬提醒。
@@ -168,7 +198,12 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
 
     let vitalText = '';
     if (vitals && vitals.systolicBp) {
-      vitalText = `【長者量測指標】血壓: ${vitals.systolicBp}/${vitals.diastolicBp} mmHg，心跳: ${vitals.heartRate || 72} bpm，血糖: ${vitals.bloodSugar} ${vitals.bloodSugarUnit || 'mmol/L'} (${vitals.bloodSugarTiming === 'fasting' ? '空腹' : '飯後'})。`;
+      const timing = vitals.bloodSugarTiming === 'fasting'
+        ? (isEnglish ? 'fasting' : '空腹')
+        : (isEnglish ? 'after meal' : '飯後');
+      vitalText = isEnglish
+        ? `[Measured vitals] Blood pressure: ${vitals.systolicBp}/${vitals.diastolicBp} mmHg, heart rate: ${vitals.heartRate || 72} bpm, blood sugar: ${vitals.bloodSugar} ${vitals.bloodSugarUnit || 'mmol/L'} (${timing}).`
+        : `【長者量測指標】血壓: ${vitals.systolicBp}/${vitals.diastolicBp} mmHg，心跳: ${vitals.heartRate || 72} bpm，血糖: ${vitals.bloodSugar} ${vitals.bloodSugarUnit || 'mmol/L'} (${timing})。`;
     }
 
     /**
@@ -178,37 +213,68 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
      * 但其餘（病史、身分、每日參考值、慢性病清單）完全一樣。
      * 分成兩份遲早會漂移，所以只留一份。
      */
-    const promptContext = `
+    const promptContext = isEnglish
+      ? `
+[User's medical conditions] ${conditionText}
+${vitalText}
+
+[Judge specifically from this profile's angle]
+- Key ingredients for this profile: ${learnerProfile.aiFocus}
+- Daily reference values: ${learnerProfile.targets
+          .map(
+            (t) =>
+              `${nutrientName(t.nutrient, language)} ${t.direction === 'limit' ? 'at most' : 'at least'} ${t.target}`
+          )
+          .join(', ')}
+
+[General condition checklist] Hypertension (sodium), high blood sugar / diabetes (sugar and refined carbs), heart and cardiovascular (trans fats and high caffeine), high cholesterol (saturated and trans fats), gout (purines and fructose), kidney disease (sodium, potassium, phosphorus), acid reflux (spicy, acidic, irritating foods), osteoporosis (phosphates and heavy salt), plus food allergens (peanuts, tree nuts, seafood, dairy, wheat gluten).`
+      : `
 【使用者的慢性病史】${conditionText}
 ${vitalText}
 
 【請以此身分的角度特別比對】
 - 這個身分的關鍵成分：${learnerProfile.aiFocus}
 - 每日參考值：${learnerProfile.targets
-      .map((t) => `${t.nutrient}${t.direction === 'limit' ? '不超過' : '至少'}${t.target}`)
-      .join('、')}
+          .map((t) => `${t.nutrient}${t.direction === 'limit' ? '不超過' : '至少'}${t.target}`)
+          .join('、')}
 
 【通用慢性病比對清單】高血壓(鈉含量)、高血糖/糖尿病(糖分與精製碳水)、心跳與心血管(反式油脂與高咖啡因)、高血脂(飽和脂肪與反式脂肪)、痛風(普林與果糖)、腎臟病(鈉鉀磷)、胃食道逆流(刺激辛辣酸)、骨質疏鬆(磷酸與重鹽)，以及食物過敏原(花生、堅果、海鮮、乳製品、小麥麩質)。`;
 
-    const userPromptText = hasOcrText
-      ? `以下是從食品標籤照片上讀出的文字，由使用者的裝置以 OCR 產生 —— **照片本身沒有上傳**。
+    const userPromptText = isEnglish
+      ? hasOcrText
+        ? `Below is text read from a food label photo by OCR on the user's own device — **the photo itself was never uploaded**.
+Judge ONLY from this text whether the product is suitable for: ${profileName(learnerProfile.id, learnerProfile.name, language)}.
+
+[LABEL TEXT START]
+${ocrText}
+[LABEL TEXT END]
+${promptContext}`
+        : `Analyze this food label and judge whether it is suitable for: ${profileName(learnerProfile.id, learnerProfile.name, language)}.
+${promptContext}`
+      : hasOcrText
+        ? `以下是從食品標籤照片上讀出的文字，由使用者的裝置以 OCR 產生 —— **照片本身沒有上傳**。
 請只根據這些文字判斷是否適合「${learnerProfile.name}」購買。
 
 【標籤文字開始】
 ${ocrText}
 【標籤文字結束】
 ${promptContext}`
-      : `請分析這張食品標籤，判斷是否適合「${learnerProfile.name}」購買。
+        : `請分析這張食品標籤，判斷是否適合「${learnerProfile.name}」購買。
 ${promptContext}`;
 
     // 先查快取：同一張圖 + 同一組慢性病 + 同一個身分在 TTL 內不重複呼叫 API，
     // 這是節省免費額度最有效的手段（長者常重複掃描同一件商品）。
     // 身分必須納入鍵值：同一包高蛋白粉，對健身族與腎臟病患者結論完全不同。
     // 處理模式也要納入鍵值：本機結果不該被拿去回答「已同意上傳」的請求，反之亦然。
+    // ⚠️ 語言也必須納入鍵值（2026-09-28）：
+    //    分析結果的文字是後端產生的，中英文快取若共用同一個鍵，
+    //    切換語言後會拿到另一種語言的舊結果 —— 而且**不會報錯**，
+    //    使用者只會覺得「切了語言怎麼沒變」。這是最難察覺的一種 bug。
     const cacheKey = makeCacheKey(cleanBase64, [
       ...conditions,
       `profile:${learnerProfile.id}`,
       `mode:${allowCloud ? 'cloud' : 'local'}`,
+      `lang:${isEnglish ? 'en' : 'zh'}`,
     ]);
 
     if (allowCloud) {
@@ -243,7 +309,10 @@ ${promptContext}`;
     // 只有使用者明確同意（allowCloud）才會走到這裡。
     if (allowCloud) {
       const aiResult = await callAiModel(req, {
-        systemInstruction: buildSystemInstruction(learnerProfile.id),
+        systemInstruction: buildSystemInstruction(
+          learnerProfile.id,
+          isEnglish ? 'en' : 'zh-TW'
+        ),
         userPrompt: userPromptText,
         // ⚠️ 文字模式下**絕對不傳圖片** —— 這是隱私承諾的核心：
         //    照片從來沒有離開使用者的裝置，雲端只看得到文字。
@@ -324,16 +393,21 @@ ${promptContext}`;
     }
 
     // 帶入該身分的每日上限，讓本機引擎也能產生 nutrient_facts（前端百分比長條圖用）
+    // 語言也要傳進去：本機引擎是預設路徑（cloudConsent 預設 false），
+    // 不傳的話切到英文仍會拿到中文結論。
     const smartResult = analyzeNutritionWithIndicators(
       ocr.profile,
       conditions,
-      learnerProfile.numericLimits
+      learnerProfile.numericLimits,
+      language
     );
+    // 引擎內部的比對關鍵字維持中文，這裡只把**輸出欄位**轉成英文。
+    const localizedResult = translateLocalResult(smartResult, language);
 
     return res.json({
       success: true,
       data: attachReminders({
-        ...smartResult,
+        ...localizedResult,
         ocr_used: true,
         ocr_matched_fields: ocr.matchedFields,
         analysis_mode: 'local_fallback',

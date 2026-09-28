@@ -306,7 +306,11 @@ export function percentTone(percent: number): ToneName {
  * @example describePercent(124) → '超出 24%'
  * @example describePercent(62)  → '佔 62%'
  */
-export function describePercent(percent: number): string {
+export function describePercent(percent: number, language: 'zh-TW' | 'en' = 'zh-TW'): string {
+  if (language === 'en') {
+    // 英文用 "over by 18%" / "18% of limit"，比直譯「佔 118%」更自然
+    return percent > 100 ? `over by ${percent - 100}%` : `${percent}% of limit`;
+  }
   if (percent > 100) return `超出 ${percent - 100}%`;
   return `佔 ${percent}%`;
 }

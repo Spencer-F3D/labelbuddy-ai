@@ -56,6 +56,9 @@ import {
   LearnerProfile,
 } from '../src/types';
 import { getLearnerProfile } from '../src/data/learnerProfiles';
+// 雙語對照（2026-09-28）：提示詞的營養素名稱是封閉清單，
+// 若清單是中文，模型輸出的 nutrient_facts.name 就會是中文。
+import { nutrientName, unitName, profileName } from '../src/data/bilingual';
 
 /* ---------------------------------------------------------------------------
  * 平台無關的型別
@@ -776,33 +779,86 @@ JSON SCHEMA:
 5. 不需要自己計算百分比，後端會依每日上限換算，你只要把 name / value / unit 填正確即可。`;
 
 /**
+ * 英文輸出覆蓋指示（只在語言為 en 時附加在提示詞最後）。
+ *
+ * 【為什麼是「覆蓋」而不是把整份提示詞翻成英文】
+ *   上面那份共用規則有大量領域細節（術語陷阱、食育欄位規則、JSON schema），
+ *   整份翻成兩份會變成雙倍維護負擔，而且很容易兩邊不同步 ——
+ *   不同步的提示詞會讓中英文結果品質出現落差，而且很難察覺。
+ *
+ *   實務上，模型完全看得懂中文的領域描述（台灣衛福部的參考值標準），
+ *   所以保留中文上下文、只在最後明確指定「輸出語言」，效果一樣好但風險低得多。
+ *
+ * 【⚠️ 字數限制必須換算】
+ *   原本的限制是「80 個中文字」。英文的一個詞平均 5～6 個字元，
+ *   若直接沿用「80 字」會得到過短的句子；改成用「詞」為單位才合理。
+ */
+const ENGLISH_OUTPUT_OVERRIDE = `
+
+════════════════════════════════════════════════════════════════
+OUTPUT LANGUAGE: ENGLISH (this overrides rule 1 and rule 7 above)
+════════════════════════════════════════════════════════════════
+1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
+   anywhere in your output — not in titles, summaries, tips, ingredient names, or condition names.
+2. The user reading this is an older adult or a student, and the text is READ ALOUD to them.
+   Use short, everyday words. Avoid medical jargon. Write the way a kind family member would explain it.
+3. The 鈉/鈣 (sodium/calcium) terminology trap described in rule 2 above does NOT apply in English —
+   "sodium" and "calcium" are clearly different words. But DO be precise about which one you mean.
+4. Length limits — replace the Chinese-character limits above with these English word limits:
+   - plain_summary: at most 45 words (1 to 3 short sentences)
+   - alternative_advice: at most 35 words
+   - warning_title: at most 8 words (short and bold, may include one emoji)
+   - knowledge_point: at most 28 words (ONE sentence)
+   - label_reading_tip: at most 25 words (ONE sentence)
+   - daily_limit_context: at most 28 words (ONE sentence)
+   - ingredients_detected: at most 5 items, each at most 4 words
+   - nutrition_concerns: at most 3 items, each at most 7 words
+   - matched_conditions: at most 4 items, each at most 6 words
+5. For nutrient_facts.name, use the ENGLISH names given in the daily-limit list above
+   (for example "Sodium", "Added sugar", "Saturated fat", "Protein", "Calcium", "Dietary fiber").
+   For nutrient_facts.unit, use the English unit given in that same list (mg, g, kcal).
+6. Keep the JSON keys exactly as specified in the schema — do NOT translate the keys themselves.`;
+
+/**
  * 依學習者身分組裝完整的系統提示詞。
  *
  * @param profileId 前端傳來的學習者身分（可能為 undefined 或無效值，會安全退回「長者三高」）
  * @returns 可直接送給模型的完整系統提示詞
  */
-export function buildSystemInstruction(profileId?: string | null): string {
+export function buildSystemInstruction(
+  profileId?: string | null,
+  language: 'zh-TW' | 'en' = 'zh-TW'
+): string {
   const profile = getLearnerProfile(profileId);
+  const isEnglish = language === 'en';
 
   // 每日參考值：把結構化的 targets 攤平成模型容易讀取的條列文字
   const targetLines = profile.targets
-    .map(
-      (t) =>
-        `   - ${t.nutrient}：${t.direction === 'limit' ? '每日不超過' : '每日至少'} ${t.target}（${t.note}）`
-    )
+    .map((t) => {
+      const name = nutrientName(t.nutrient, language);
+      const dir = t.direction === 'limit' ? '每日不超過' : '每日至少';
+      const target = isEnglish ? `${t.target} (${t.note})` : `${t.target}（${t.note}）`;
+      return isEnglish
+        ? `   - ${name}: at most ${target}`
+        : `   - ${name}：${dir} ${target}`;
+    })
     .join('\n');
 
   const objectiveLines = profile.learningObjectives.map((o) => `   - ${o}`).join('\n');
 
   // 數值化的每日上限：模型必須用這組數字來算 nutrient_facts.percent。
   // 若只給「2000 毫克」這種字串，模型有機會誤讀或自行猜測，因此明確列出。
+  // ⚠️ 英文模式下**必須換成英文名稱與單位**：這是封閉清單，
+  //    模型只能從中挑選，若清單是中文，輸出的 nutrient_facts.name 就會是中文。
   const numericLines = Object.entries(profile.numericLimits)
-    .map(([name, l]) => `   - ${name}：${l.value} ${l.unit}`)
+    .map(([name, l]) => `   - ${nutrientName(name, language)}: ${l.value} ${unitName(l.unit, language)}`)
     .join('\n');
+
+  const profileNameForPrompt = profileName(profile.id, profile.name, language);
 
   return `You are LabelBuddy AI, an expert, caring, and protective supermarket food label analyzer.
 
-【本次辨識的對象身分】${profile.name}（${profile.emoji}）
+【本次辨識的對象身分】${profileNameForPrompt}（${profile.emoji}）
 【這個身分是誰】${profile.audience}
 【他最在意的事】${profile.focusSummary}
 
@@ -823,7 +879,7 @@ ${objectiveLines}
 【挑選建議時優先使用的關鍵字方向】${profile.recommendKeywords.join('、')}
 
 Your goal is to inspect food nutrition labels, ingredient lists, and allergen declarations from the provided image, and determine whether this product is safe and suitable for a person with THIS profile to buy and consume. Judge against the profile's reference values above — do NOT default to generic adult standards, and do NOT assume the user is an elderly person unless the profile above says so. Note that a food may be perfectly fine for one profile and a poor choice for another; your job is to judge it for THIS profile only.
-${SYSTEM_INSTRUCTION_SHARED}`;
+${SYSTEM_INSTRUCTION_SHARED}${isEnglish ? ENGLISH_OUTPUT_OVERRIDE : ''}`;
 }
 
 /* ---------------------------------------------------------------------------

@@ -152,6 +152,13 @@ const zhTW = {
   'mode.imageUploaded': '這次的照片有上傳到雲端辨識。',
   'mode.imageLocal': '這次的照片只在這支手機上處理，沒有上傳。',
 
+  /* 營養素長條圖 */
+  'nutrient.amount': '這包有 {value} {unit}',
+  'nutrient.dailyMax': '，每天上限 {limit} {unit}',
+  'nutrient.dailyMin': '，每天建議至少 {limit} {unit}',
+  'nutrient.reaches': '達到 {n}%',
+  'nutrient.basis': '以上上限是依「{name}」的每日參考值計算',
+
   /* 其他 */
   'common.noConditions': '無特殊病史',
   'common.weakSignalSpeech': '掃描成功，正在處理資料，請保持在網絡訊號良好區域',
@@ -292,6 +299,12 @@ const en: Record<TranslationKey, string> = {
   'mode.localBadge': '📴 On-device',
   'mode.imageUploaded': 'This photo was uploaded for cloud analysis.',
   'mode.imageLocal': 'This photo was processed only on this phone — it was not uploaded.',
+
+  'nutrient.amount': 'This pack has {value} {unit}',
+  'nutrient.dailyMax': ', daily limit {limit} {unit}',
+  'nutrient.dailyMin': ', aim for at least {limit} {unit} per day',
+  'nutrient.reaches': '{n}% of daily target',
+  'nutrient.basis': 'These limits are based on the daily reference values for {name}',
 
   'common.noConditions': 'No specific conditions',
   'common.weakSignalSpeech':

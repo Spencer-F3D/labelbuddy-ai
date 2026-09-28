@@ -70,6 +70,9 @@ import { LanguagePicker } from './i18n/LanguagePicker';
 import type { TranslationKey } from './i18n/translations';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
+// 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
+// 英文介面要換成英文，否則長條圖下方會寫「依『長者三高』的每日參考值計算」。
+import { profileName as localizedProfileName } from './data/bilingual';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
@@ -296,7 +299,7 @@ export default function App() {
    *   這裡只需要翻譯函式。切換語言時 Context 會重新渲染整棵樹，
    *   所有用到 t() 的地方都會跟著更新。
    */
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
@@ -790,6 +793,9 @@ export default function App() {
           conditions: conditionNames,
           // 身分會改變 AI 的判斷基準與每日參考值（例如健身族看蛋白質、學生看鈣質）
           profileId: learnerProfileId,
+          // 介面語言（2026-09-28）：分析結果的文字由後端產生，
+          // 不傳的話切到英文後會看到「英文介面 + 中文結論」。
+          language,
           // 【隱私優先】預設 true → 完全不呼叫雲端，由本機規則引擎判斷。
           // 只有使用者自己打開同意開關（cloudConsent）才會把**文字**送給雲端 AI。
           localOnly: !cloudConsent,
@@ -1721,7 +1727,11 @@ export default function App() {
                     {/* 成分對照長條圖：把「2480 毫克」變成「佔每日上限 124%」 */}
                     <NutrientFactBars
                       facts={analysisResult.nutrient_facts}
-                      profileName={analysisResult.learner_profile_name || learnerProfile.name}
+                      profileName={localizedProfileName(
+                        learnerProfile.id,
+                        learnerProfile.name,
+                        language
+                      )}
                     />
 
                     <p className={`${TYPE.body} ${WEIGHT.normal} text-slate-900 leading-relaxed`}>

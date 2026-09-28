@@ -22,6 +22,8 @@ import React from 'react';
 import type { NutrientFact } from '../types';
 import { TONES, percentTone, describePercent, barWidth } from '../theme';
 import type { ToneName } from '../theme';
+import { useI18n } from '../i18n/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
 
 /**
  * 依「方向」決定這一列的色調。
@@ -40,17 +42,23 @@ function factTone(fact: NutrientFact): ToneName {
 }
 
 /** 依方向產生白話的百分比說法 */
-function factLabel(fact: NutrientFact): string {
-  if (fact.direction === 'target') return `達到 ${fact.percent}%`;
-  return describePercent(fact.percent);
+function factLabel(fact: NutrientFact, language: 'zh-TW' | 'en'): string {
+  if (fact.direction === 'target') {
+    return language === 'en' ? `${fact.percent}% of daily target` : `達到 ${fact.percent}%`;
+  }
+  return describePercent(fact.percent, language);
 }
 
 /** 依方向產生下方的數字說明 */
-function factDetail(fact: NutrientFact): string {
-  const amount = `這包有 ${fact.value} ${fact.unit}`;
+function factDetail(
+  fact: NutrientFact,
+  language: 'zh-TW' | 'en',
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string
+): string {
+  const amount = t('nutrient.amount', { value: fact.value, unit: fact.unit });
   return fact.direction === 'target'
-    ? `${amount}，每天建議至少 ${fact.dailyLimit} ${fact.unit}`
-    : `${amount}，每天上限 ${fact.dailyLimit} ${fact.unit}`;
+    ? amount + t('nutrient.dailyMin', { limit: fact.dailyLimit, unit: fact.unit })
+    : amount + t('nutrient.dailyMax', { limit: fact.dailyLimit, unit: fact.unit });
 }
 
 interface NutrientFactBarsProps {
@@ -61,6 +69,7 @@ interface NutrientFactBarsProps {
 }
 
 export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profileName }) => {
+  const { t, language } = useI18n();
   if (!facts || facts.length === 0) return null;
 
   return (
@@ -74,7 +83,7 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
             <div className="flex items-baseline justify-between gap-[8px]">
               <span className="text-[18px] font-black text-slate-900">{fact.name}</span>
               <span className="text-[20px] font-black shrink-0" style={{ color: tone.text }}>
-                {factLabel(fact)}
+                {factLabel(fact, language)}
               </span>
             </div>
 
@@ -82,7 +91,7 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
             <div
               className="w-full h-[18px] rounded-full bg-slate-200 border border-slate-300 overflow-hidden"
               role="img"
-              aria-label={`${fact.name} ${factLabel(fact)}`}
+              aria-label={`${fact.name} ${factLabel(fact, language)}`}
             >
               <div
                 className="h-full rounded-full transition-all"
@@ -92,7 +101,7 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
 
             {/* 數字明細：想自己複查的人看得到原始數字 */}
             <span className="text-[16px] font-bold text-slate-600 leading-snug">
-              {factDetail(fact)}
+              {factDetail(fact, language, t)}
             </span>
           </div>
         );
@@ -100,7 +109,7 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
 
       {profileName && (
         <p className="text-[16px] font-bold text-slate-600 leading-snug pt-[2px] border-t border-slate-200 mt-[2px]">
-          以上上限是依「{profileName}」的每日參考值計算
+          {t('nutrient.basis', { name: profileName })}
         </p>
       )}
     </div>
