@@ -49,6 +49,11 @@ import {
 } from '../data/learnerProfiles';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
 import { speakText, stopSpeech } from '../utils/tts';
+// 雙語（2026-09-28 第三階段）：介面文字走 t()，教材內容查 educationContentEn.ts
+// ⚠️ 教材與外框必須一起雙語，否則會變成「英文外殼 + 中文內容」
+import { useI18n } from '../i18n/I18nContext';
+import { localizeCard, localizeQuestion } from '../data/educationContentEn';
+import { topicLabel, profileDisplayName } from '../data/bilingualContent';
 
 export const LEARNING_PROGRESS_KEY = 'labelbuddy_learning_progress_v1';
 
@@ -102,6 +107,7 @@ function KnowledgeCardView({
   isRead: boolean;
   onMarkRead: () => void;
 }) {
+  const { t, language } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
@@ -113,7 +119,8 @@ function KnowledgeCardView({
       return;
     }
     speakText(card.voiceScript, {
-      preferLanguage: 'mandarin',
+      // 英文模式要用英文語音，否則會用中文腔念英文
+      preferLanguage: language === 'en' ? 'english' : 'mandarin',
       onEnd: () => setSpeaking(false),
     });
     setSpeaking(true);
@@ -138,7 +145,7 @@ function KnowledgeCardView({
             {isRead && (
               <span className="bg-emerald-600 text-white text-[16px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
                 <Check className="w-3 h-3" />
-                已讀
+                {t('classroom.read')}
               </span>
             )}
           </div>
@@ -179,11 +186,11 @@ function KnowledgeCardView({
             >
               {speaking ? (
                 <>
-                  <VolumeX className="w-5 h-5" /> 停止朗讀
+                  <VolumeX className="w-5 h-5" /> {t('classroom.stopReading')}
                 </>
               ) : (
                 <>
-                  <Volume2 className="w-5 h-5" /> 用聽的
+                  <Volume2 className="w-5 h-5" /> {t('classroom.listen')}
                 </>
               )}
             </button>
@@ -193,7 +200,7 @@ function KnowledgeCardView({
                 onClick={onMarkRead}
                 className="flex-1 min-h-[56px] rounded-xl bg-emerald-600 text-white text-[18px] font-bold flex items-center justify-center gap-2 cursor-pointer hover:bg-emerald-700 active:scale-95 transition-all"
               >
-                <Check className="w-5 h-5" /> 我讀完了
+                <Check className="w-5 h-5" /> {t('classroom.markRead')}
               </button>
             )}
           </div>
@@ -218,6 +225,7 @@ function QuizCard({
   total: number;
   onAnswer: (selectedIndex: number) => void;
 }) {
+  const { t, language } = useI18n();
   const [selected, setSelected] = useState<number | null>(null);
   const answered = selected !== null;
   const isCorrect = answered && selected === question.correctIndex;
@@ -227,10 +235,10 @@ function QuizCard({
       {/* 題號 */}
       <div className="flex items-center justify-between mb-3">
         <span className="bg-blue-900 text-white text-[16px] font-black px-3 py-1 rounded-full">
-          第 {index + 1} 題 / 共 {total} 題
+          {t('classroom.questionOf', { i: index + 1, n: total })}
         </span>
         <span className="text-[16px] font-bold text-slate-500">
-          {TOPIC_LABELS[question.topic]}
+          {topicLabel(question.topic, TOPIC_LABELS[question.topic], language)}
         </span>
       </div>
 
@@ -298,7 +306,7 @@ function QuizCard({
               isCorrect ? 'text-emerald-800' : 'text-amber-800'
             }`}
           >
-            {isCorrect ? '✅ 答對了！' : '💡 再想一下，解說在這裡：'}
+            {isCorrect ? t('classroom.correct') : t('classroom.wrongHint')}
           </p>
           <p className="text-[16px] leading-relaxed text-slate-800">{question.explanation}</p>
         </div>
@@ -315,6 +323,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
   profileId,
   onChangeProfile,
 }) => {
+  const { t, language } = useI18n();
   const [tab, setTab] = useState<ClassroomTab>('cards');
   const [topicFilter, setTopicFilter] = useState<KnowledgeTopic | null>(null);
   const [progress, setProgress] = useState<LearningProgress>(() => loadProgress());
@@ -340,15 +349,20 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
     const filtered = topicFilter
       ? KNOWLEDGE_CARDS.filter((c) => c.topic === topicFilter)
       : KNOWLEDGE_CARDS;
-    return [...filtered].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       const aMine = a.forProfiles.includes(profileId) ? 0 : 1;
       const bMine = b.forProfiles.includes(profileId) ? 0 : 1;
       return aMine - bMine;
     });
-  }, [topicFilter, profileId]);
+    // 教材內容依語言換成英文（查不到會安全退回中文原文，不會半英半中）
+    return sorted.map((c) => localizeCard(c, language));
+  }, [topicFilter, profileId, language]);
 
   /* -------- 測驗題清單 -------- */
-  const questions = useMemo(() => getQuestionsByTopic(quizTopic), [quizTopic]);
+  const questions = useMemo(
+    () => getQuestionsByTopic(quizTopic).map((q) => localizeQuestion(q, language)),
+    [quizTopic, language]
+  );
   const currentQuestion = questions[quizIndex];
 
   /* -------- 統計 -------- */
@@ -411,33 +425,47 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
       <section className="rounded-2xl bg-gradient-to-br from-blue-900 to-blue-800 text-white p-4">
         <div className="flex items-center gap-2">
           <GraduationCap className="w-7 h-7 shrink-0" />
-          <h1 className="text-[20px] font-black">食育學堂</h1>
+          <h1 className="text-[20px] font-black">{t('classroom.title')}</h1>
         </div>
         <p className="text-[16px] mt-1.5 leading-relaxed text-blue-50">
-          學會看懂食品標示，下次去超市就能自己判斷。這裡的內容不需上網，隨時可以看。
+          {t('classroom.intro')}
         </p>
         <div className="mt-3 inline-flex items-center gap-2 bg-white/15 rounded-full px-3 py-1.5">
           <span className="text-[19px]" aria-hidden="true">
             {profile.emoji}
           </span>
-          <span className="text-[16px] font-bold">目前身分：{profile.name}</span>
+          <span className="text-[16px] font-bold">
+            {t('classroom.currentProfile', {
+              name: profileDisplayName(profile.id, profile.name, language),
+            })}
+          </span>
         </div>
       </section>
 
       {/* ---------- 分頁切換 ---------- */}
-      <nav aria-label="學堂分頁" className="grid grid-cols-3 gap-1.5">
+      <nav aria-label={t('classroom.tabsAria')} className="grid grid-cols-3 gap-1.5">
         {(
           [
-            { id: 'cards', label: '知識卡', icon: BookOpen, badge: `${KNOWLEDGE_CARDS.length}` },
-            { id: 'quiz', label: '測驗', icon: Target, badge: `${QUIZ_QUESTIONS.length}` },
+            {
+              id: 'cards',
+              labelKey: 'classroom.tabCards',
+              icon: BookOpen,
+              badge: `${KNOWLEDGE_CARDS.length}`,
+            },
+            {
+              id: 'quiz',
+              labelKey: 'classroom.tabQuiz',
+              icon: Target,
+              badge: `${QUIZ_QUESTIONS.length}`,
+            },
             {
               id: 'progress',
-              label: '我的進度',
+              labelKey: 'classroom.tabProgress',
               icon: Trophy,
               badge: `${cardReadCount}`,
             },
           ] as const
-        ).map(({ id, label, icon: Icon, badge }) => (
+        ).map(({ id, labelKey, icon: Icon, badge }) => (
           <button
             key={id}
             type="button"
@@ -454,7 +482,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
             }`}
           >
             <Icon className="w-6 h-6 shrink-0" />
-            <span className="text-[16px] leading-tight whitespace-nowrap">{label}</span>
+            <span className="text-[16px] leading-tight whitespace-nowrap">{t(labelKey)}</span>
             <span
               className={`absolute top-1 right-1.5 text-[16px] font-black px-1.5 rounded-full ${
                 tab === id ? 'bg-yellow-400 text-blue-950' : 'bg-slate-400 text-white'
@@ -480,26 +508,26 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              全部
+              {t('classroom.all')}
             </button>
-            {TOPIC_ORDER.map((t) => (
+            {TOPIC_ORDER.map((topic) => (
               <button
-                key={t}
+                key={topic}
                 type="button"
-                onClick={() => setTopicFilter(t)}
+                onClick={() => setTopicFilter(topic)}
                 className={`min-h-[48px] px-4 rounded-full text-[16px] font-bold border-2 whitespace-nowrap cursor-pointer transition-all ${
-                  topicFilter === t
+                  topicFilter === topic
                     ? 'bg-blue-900 text-white border-blue-950'
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                {TOPIC_LABELS[t]}
+                {topicLabel(topic, TOPIC_LABELS[topic], language)}
               </button>
             ))}
           </div>
 
           <p className="text-[16px] text-slate-600">
-            共 {cards.length} 張卡片，已讀 {cardReadCount} 張
+            {t('classroom.cardCount', { n: cards.length, m: cardReadCount })}
           </p>
 
           <div className="space-y-2.5">
@@ -532,26 +560,29 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              全部題目
+              {t('classroom.allQuestions')}
             </button>
-            {TOPIC_ORDER.map((t) => {
-              const count = QUIZ_QUESTIONS.filter((q) => q.topic === t).length;
+            {TOPIC_ORDER.map((topic) => {
+              const count = QUIZ_QUESTIONS.filter((q) => q.topic === topic).length;
               if (count === 0) return null;
               return (
                 <button
-                  key={t}
+                  key={topic}
                   type="button"
                   onClick={() => {
-                    setQuizTopic(t);
+                    setQuizTopic(topic);
                     setQuizIndex(0);
                   }}
                   className={`min-h-[48px] px-4 rounded-full text-[16px] font-bold border-2 whitespace-nowrap cursor-pointer transition-all ${
-                    quizTopic === t
+                    quizTopic === topic
                       ? 'bg-blue-900 text-white border-blue-950'
                       : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                   }`}
                 >
-                  {TOPIC_LABELS[t]}（{count}）
+                  {t('classroom.topicCount', {
+                    label: topicLabel(topic, TOPIC_LABELS[topic], language),
+                    n: count,
+                  })}
                 </button>
               );
             })}
@@ -591,7 +622,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                       : 'bg-slate-700 text-white cursor-pointer hover:bg-slate-800 active:scale-95'
                   }`}
                 >
-                  <ChevronLeft className="w-5 h-5" /> 上一題
+                  <ChevronLeft className="w-5 h-5" /> {t('classroom.prev')}
                 </button>
                 <button
                   type="button"
@@ -606,7 +637,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                       : 'bg-blue-900 text-white cursor-pointer hover:bg-blue-950 active:scale-95'
                   }`}
                 >
-                  下一題 <ChevronRight className="w-5 h-5" />
+                  {t('classroom.next')} <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
 
@@ -615,12 +646,12 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                 onClick={resetQuiz}
                 className="w-full min-h-[56px] rounded-xl bg-white border-2 border-slate-300 text-slate-700 text-[16px] font-bold flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all"
               >
-                <RotateCcw className="w-5 h-5" /> 從第一題重新開始
+                <RotateCcw className="w-5 h-5" /> {t('classroom.restart')}
               </button>
             </>
           ) : (
             <p className="text-[18px] text-slate-600 text-center py-8">
-              這個主題目前沒有題目。
+              {t('classroom.noQuestions')}
             </p>
           )}
         </>
@@ -637,7 +668,9 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                 {cardReadCount}
                 <span className="text-[20px] text-slate-500">/{KNOWLEDGE_CARDS.length}</span>
               </p>
-              <p className="text-[16px] font-bold text-slate-700 mt-1">已讀知識卡</p>
+              <p className="text-[16px] font-bold text-slate-700 mt-1">
+                {t('classroom.readCards')}
+              </p>
             </div>
             <div className="rounded-2xl bg-emerald-50 border-3 border-emerald-400 p-4 text-center">
               <Award className="w-8 h-8 text-emerald-800 mx-auto mb-1" />
@@ -645,27 +678,27 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
                 {uniqueCorrect.size}
                 <span className="text-[20px] text-slate-500">/{QUIZ_QUESTIONS.length}</span>
               </p>
-              <p className="text-[16px] font-bold text-slate-700 mt-1">答對過的題數</p>
+              <p className="text-[16px] font-bold text-slate-700 mt-1">
+                {t('classroom.correctCount')}
+              </p>
             </div>
           </div>
 
           {/* 累計作答 */}
           <div className="rounded-2xl bg-slate-100 border-2 border-slate-300 p-4">
             <p className="text-[18px] font-bold text-slate-800">
-              累計作答 {progress.attempts.length} 次，
-              答對 {progress.attempts.filter((a) => a.isCorrect).length} 次
-              {progress.attempts.length > 0 && (
-                <>
-                  {' '}
-                  （正確率{' '}
-                  {Math.round(
+              {t('classroom.attempts', {
+                total: progress.attempts.length,
+                correct: progress.attempts.filter((a) => a.isCorrect).length,
+              })}
+              {progress.attempts.length > 0 &&
+                t('classroom.accuracy', {
+                  pct: Math.round(
                     (progress.attempts.filter((a) => a.isCorrect).length /
                       progress.attempts.length) *
                       100
-                  )}
-                  %）
-                </>
-              )}
+                  ),
+                })}
             </p>
           </div>
 
@@ -673,11 +706,13 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
           {uniqueCorrect.size < QUIZ_QUESTIONS.length && (
             <div className="rounded-2xl bg-amber-50 border-2 border-amber-400 p-4">
               <p className="text-[18px] font-bold text-amber-900 mb-1.5 flex items-center gap-2">
-                <Target className="w-5 h-5" /> 還有{' '}
-                {QUIZ_QUESTIONS.length - uniqueCorrect.size} 題沒答對過
+                <Target className="w-5 h-5" />
+                {t('classroom.remaining', {
+                  n: QUIZ_QUESTIONS.length - uniqueCorrect.size,
+                })}
               </p>
               <p className="text-[16px] text-amber-800 leading-relaxed">
-                建議先回去看對應的知識卡，再回來測一次。
+                {t('classroom.remainingHint')}
               </p>
             </div>
           )}
@@ -695,7 +730,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
             onClick={resetAllProgress}
             className="w-full min-h-[56px] rounded-xl bg-white border-2 border-rose-300 text-rose-700 text-[16px] font-bold flex items-center justify-center gap-2 cursor-pointer hover:bg-rose-50 active:scale-95 transition-all"
           >
-            <RotateCcw className="w-5 h-5" /> 清除學習紀錄
+            <RotateCcw className="w-5 h-5" /> {t('classroom.clearProgress')}
           </button>
         </>
       )}

@@ -26,7 +26,7 @@
  */
 
 import type { Language } from '../i18n/translations';
-import type { KnowledgeTopic, LearnerProfileId } from '../types';
+import type { DietRecord, KnowledgeTopic, LearnerProfileId } from '../types';
 
 /* ===========================================================================
  * 一、學習者身分
@@ -289,4 +289,104 @@ export function describeProfilesLocalized(
   const separator = language === 'en' ? ', ' : '、';
   if (ids.length === 0) return language === 'en' ? 'All profiles' : '所有身分';
   return names.join(separator);
+}
+
+/* ===========================================================================
+ * 五、示範飲食紀錄（初次開啟時顯示的那 6 筆）
+ * ========================================================================= */
+
+/**
+ * 示範紀錄的英文對照，以 record id 為鍵。
+ *
+ * ⚠️ 為什麼要翻譯示範資料：使用者第一次打開 App 就會在「飲食紀錄」頁看到這 6 筆。
+ *    介面切成英文卻顯示中文紀錄，看起來就像沒做完。
+ *
+ * ⚠️ 真實掃描的紀錄不需要翻譯 —— 它們的文字是後端依 `language` 產生的。
+ *    這裡只處理**內建的示範資料**。
+ */
+export const DIET_RECORD_EN: Record<
+  string,
+  {
+    dateString: string;
+    foodName: string;
+    warningTitle: string;
+    plainSummary: string;
+    alternativeAdvice: string;
+  }
+> = {
+  'rec-1': {
+    dateString: 'Today 10:15 AM',
+    foodName: 'Pure wholegrain oats',
+    warningTitle: '✅ Suitable: high fibre, no sodium, protects blood vessels',
+    plainSummary:
+      'Hello! This oatmeal has almost no added sodium or sugar and is very high in fibre. It is good for your blood pressure and digestion, and safe to have for breakfast every day.',
+    alternativeAdvice:
+      'Cook it with a little warm unsweetened black soybean milk for more nutrition and a richer taste.',
+  },
+  'rec-2': {
+    dateString: 'Yesterday 3:40 PM',
+    foodName: 'Low-sugar black soybean milk',
+    warningTitle: '✅ Suitable: natural plant protein',
+    plainSummary:
+      'This black soybean milk has only a trace of natural soy sugar and no added refined fructose, with plenty of plant protein. A good afternoon drink to quench thirst and restore energy.',
+    alternativeAdvice:
+      'If you do not like it cold, pour it into a mug and warm it for a minute — gentler on the stomach.',
+  },
+  'rec-3': {
+    dateString: '2 days ago 11:20 AM',
+    foodName: 'Rich braised beef instant noodles',
+    warningTitle: '⚠️ Not recommended: 2350 mg of sodium per pack',
+    plainSummary:
+      'The sodium in this pack of instant noodles goes past a whole day\u2019s limit. The seasoning oil also contains peanut oil flavouring, which is a heavy burden for your high blood pressure and peanut allergy. Please do not buy it.',
+    alternativeAdvice:
+      'If you want a hot noodle soup, choose plain buckwheat noodles or unsalted rice noodles from the fresh section and cook a clear broth with greens and lean meat.',
+  },
+  'rec-4': {
+    dateString: '3 days ago 2:10 PM',
+    foodName: 'Sun-dried sea-salt soda crackers',
+    warningTitle: '🟡 Watch the portion: two pieces to taste is enough',
+    plainSummary:
+      'These crackers are crisp, but sea salt is sprinkled on top. Two or three with tea is pleasant, but do not absent-mindedly finish the whole pack or your sodium will go over the limit.',
+    alternativeAdvice:
+      'Have them with a large glass of warm water or cassia seed tea to help your body clear the extra salt.',
+  },
+  'rec-5': {
+    dateString: '4 days ago 9:50 AM',
+    foodName: 'Unsweetened whole milk',
+    warningTitle: '✅ Suitable: naturally high in calcium, keeps bones strong',
+    plainSummary:
+      'Made from 100% fresh milk with no preservatives or added sweeteners. The good-quality calcium is especially helpful for keeping an older adult\u2019s bones healthy.',
+    alternativeAdvice: 'A glass of warm milk after breakfast is absorbed best.',
+  },
+  'rec-6': {
+    dateString: '6 days ago 4:30 PM',
+    foodName: 'Traditional five-spice braised dried tofu',
+    warningTitle: '🟡 Watch the portion: the sauce is high in sodium and sugar',
+    plainSummary:
+      'The dried tofu is full of soy flavour, but it is braised in a five-spice honey sauce with a lot of soy sauce and sugar. One or two pieces as a snack is fine — do not make it a meal.',
+    alternativeAdvice:
+      'Choose plain refrigerated tofu or fresh tofu skin instead, and steam it at home with a little spring onion and sesame oil.',
+  },
+};
+
+/**
+ * 把單筆飲食紀錄換成指定語言。
+ *
+ * ⚠️ **在畫面渲染時才轉換，不要轉換後存進 state** ——
+ *    存進 state 的話，使用者切換語言時已經存好的紀錄不會跟著變。
+ * ⚠️ 查不到對照（＝真實掃描的紀錄）時原封不動回傳，
+ *    那些文字本來就是後端依語言產生的。
+ */
+export function localizeDietRecord(record: DietRecord, language: Language): DietRecord {
+  if (language !== 'en') return record;
+  const text = DIET_RECORD_EN[record.id];
+  if (!text) return record;
+  return {
+    ...record,
+    dateString: text.dateString,
+    foodName: text.foodName,
+    warning_title: text.warningTitle,
+    plain_summary: text.plainSummary,
+    alternative_advice: text.alternativeAdvice,
+  };
 }

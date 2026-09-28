@@ -45,6 +45,7 @@ import { speakText, stopSpeech } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
 import { conditionName as localizedConditionName } from '../data/bilingual';
+import { localizeDietRecord } from '../data/bilingualContent';
 
 interface DietHealthHistoryProps {
   records: DietRecord[];
@@ -75,11 +76,15 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
 
   // 計算過去一週（7天內）的紀錄
+  // ⚠️ 在這裡（渲染前）才轉語言，不要轉完存回 state ——
+  //    存回 state 的話切換語言時已存的紀錄不會跟著變。
   const pastWeekRecords = useMemo(() => {
     const now = Date.now();
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-    return records.filter((r) => r.timestamp >= sevenDaysAgo);
-  }, [records]);
+    return records
+      .filter((r) => r.timestamp >= sevenDaysAgo)
+      .map((r) => localizeDietRecord(r, language));
+  }, [records, language]);
 
   // 統計過去一週各風險等級數量與分級評分
   const stats = useMemo(() => {
