@@ -42,6 +42,9 @@ enabled = true
 #
 # 以下是非機密的預設值，可以安心放在版控裡。
 [vars]
-APP_URL = "https://labelbuddy-ai.spencer-f3d.workers.dev"
+# ⚠️ 網址格式是 <Worker名稱>.<子網域>.workers.dev
+#    Worker 名稱來自上面的 name，子網域是註冊 workers.dev 時選的。
+#    兩者剛好同名，所以看起來像重複 —— 這是正常的。
+APP_URL = "https://labelbuddy-ai.labelbuddy-ai.workers.dev"
 AI_REQUEST_TIMEOUT_MS = "45000"
 AI_CACHE_TTL_MS = "86400000"

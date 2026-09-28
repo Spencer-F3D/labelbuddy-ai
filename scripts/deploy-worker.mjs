@@ -65,6 +65,32 @@ function fail(msg, hint) {
   process.exit(1);
 }
 
+/**
+ * 執行 wrangler，同時「即時顯示」與「捕捉輸出」。
+ *
+ * 【為什麼不直接用 spawnSync + capture】
+ *   首次部署要上傳約 28 MB，若用 capture 使用者會盯著一個完全沒動靜的畫面
+ *   一兩分鐘，會以為當掉了。這裡改成串流：邊跑邊印，同時累積起來解析網址。
+ */
+function wranglerStreaming(args) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [WRANGLER, ...args], {
+      cwd: ROOT,
+      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+    });
+    let all = '';
+    const onData = (chunk) => {
+      const text = chunk.toString();
+      all += text;
+      process.stdout.write(text);
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    child.on('error', (e) => resolve({ status: 1, output: String(e) }));
+    child.on('close', (code) => resolve({ status: code ?? 1, output: all }));
+  });
+}
+
 /** 執行 wrangler 並即時顯示輸出（互動式指令需要繼承 stdio） */
 function wrangler(args, opts = {}) {
   return spawnSync(process.execPath, [WRANGLER, ...args], {
@@ -164,7 +190,7 @@ if (uploaded === 0) {
 console.log('');
 console.log(`  ${C.dim}[3/4]${C.reset} 部署中（首次會上傳約 28 MB 的靜態資源，請稍候）...`);
 console.log('');
-const deploy = wrangler(['deploy']);
+const deploy = await wranglerStreaming(['deploy']);
 
 if (deploy.status !== 0) {
   console.log('');
@@ -175,15 +201,23 @@ if (deploy.status !== 0) {
 }
 
 // --- 步驟 4：顯示結果 ---
+// 從 wrangler 的輸出解析網址，而不是寫死 ——
+// 網址格式是 <Worker名稱>.<子網域>.workers.dev，改名就會變。
+const urlMatch = deploy.output.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/);
+const siteUrl = urlMatch ? urlMatch[0] : '(請看上方 wrangler 輸出的網址)';
+
 console.log('');
 console.log(rule());
 console.log(`  ${C.green}${C.bold}✅ 部署完成${C.reset}`);
 console.log('');
-console.log(`  你的網址會長這樣：`);
-console.log(`  ${C.cyan}${C.bold}https://labelbuddy-ai.<你的帳號>.workers.dev${C.reset}`);
+console.log(`  ${C.bold}你的網址：${C.reset}`);
+console.log(`  ${C.cyan}${C.bold}${siteUrl}${C.reset}`);
 console.log('');
-console.log(`  ${C.dim}用手機打開這個網址就能用了。${C.reset}`);
-console.log(`  ${C.dim}這個網址是永久的、有 HTTPS，所以 PWA 的離線快取也會生效。${C.reset}`);
+console.log(`  ${C.dim}⚠️ 格式是「<Worker名稱>.<子網域>.workers.dev」，${C.reset}`);
+console.log(`  ${C.dim}   兩段剛好同名，所以看起來像重複 —— 這是正常的。${C.reset}`);
+console.log('');
+console.log(`  用手機打開這個網址就能用了。`);
+console.log(`  ${C.dim}永久、有 HTTPS，所以 PWA 的離線快取也會生效。${C.reset}`);
 console.log(rule());
 console.log('');
 pause();
