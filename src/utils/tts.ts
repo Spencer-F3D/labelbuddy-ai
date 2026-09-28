@@ -19,16 +19,25 @@ export interface TTSOptions {
   rate?: number;       // 語速，預設 0.88 (慢速清晰)
   pitch?: number;      // 音調，預設 1.0
   volume?: number;     // 音量，預設 1.0
-  preferLanguage?: 'cantonese' | 'mandarin'; // 偏好語言
+  preferLanguage?: TTSLanguage; // 偏好語言
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: any) => void;
 }
 
 /**
- * 取得裝置支援的語音列表，優先選取粵語語音
+ * 朗讀偏好語言。
+ *
+ * 2026-09-28（第三階段雙語）新增 `'english'`：
+ * 英文介面若仍挑中文語音，會用中文腔去念英文字，決賽的英文 Demo 影片會很糟。
+ * 注意：這只影響「挑哪個語音」，不會改變朗讀的文字內容。
  */
-export function findBestVoice(preferLang: 'cantonese' | 'mandarin' = 'cantonese'): SpeechSynthesisVoice | null {
+export type TTSLanguage = 'cantonese' | 'mandarin' | 'english';
+
+/**
+ * 取得裝置支援的語音列表，優先選取指定的語言
+ */
+export function findBestVoice(preferLang: TTSLanguage = 'cantonese'): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !window.speechSynthesis) {
     return null;
   }
@@ -36,6 +45,14 @@ export function findBestVoice(preferLang: 'cantonese' | 'mandarin' = 'cantonese'
   const voices = window.speechSynthesis.getVoices();
   if (!voices || voices.length === 0) {
     return null;
+  }
+
+  if (preferLang === 'english') {
+    // 優先英文語音；找不到就直接回 null，讓 speakText 用 en 當 lang 標籤
+    const englishVoice = voices.find(
+      (v) => v.lang === 'en-US' || v.lang === 'en-GB' || v.lang.startsWith('en')
+    );
+    return englishVoice ?? null;
   }
 
   if (preferLang === 'cantonese') {
@@ -112,8 +129,9 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
     utterance.voice = voice;
     utterance.lang = voice.lang;
   } else {
-    // 預設語言標籤設為繁體中文/香港
-    utterance.lang = preferLanguage === 'cantonese' ? 'zh-HK' : 'zh-TW';
+    // 找不到對應語音時，至少把 lang 標籤設對（瀏覽器會自行挑一個最接近的）
+    utterance.lang =
+      preferLanguage === 'english' ? 'en-US' : preferLanguage === 'cantonese' ? 'zh-HK' : 'zh-TW';
   }
 
   utterance.onstart = () => {

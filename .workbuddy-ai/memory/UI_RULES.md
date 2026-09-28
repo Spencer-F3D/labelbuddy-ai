@@ -1,0 +1,132 @@
+# LabelBuddy AI — UI 與版面細則
+
+> 從 `MEMORY.md` 拆出來的長篇細則（主筆記過大會被注入截斷）。
+> 只在要改 UI 時讀這一份。最後整理：2026-09-28
+
+## 🎨 設計權杖 `src/theme.ts`
+
+5 語意色（safe/caution/danger/action/neutral）、字級、3 層邊框、4 級間距、觸控尺寸、
+`CARD_BASE` / `CONCLUSION_CARD_BASE` / `FOOTER_CTA*`，
+以及 `toPercent / percentTone / describePercent / barWidth`。
+
+改版前是 15 種字級、16 個 `border-4`、色彩無語意 → 每張卡都在搶注意力。
+
+**依據是長者三項生理變化**：
+1. 水晶體黃化（藍光被吸收）→ 藍色只給「可操作」，不承載安全/危險語意
+2. 周邊視野縮減 → 關鍵資訊集中中央主欄
+3. 對比敏感度下降 → 內文一律深色，不用淺灰
+
+**三重編碼鐵則**：`RISK_TONE` / `RISK_ICON` / `RISK_LABEL` 必須一起用
+（紅綠色盲在男性約 8%，只靠顏色等於讀不到結論）。
+
+**結果頁三層**：① 結論 ② 為什麼（百分比長條＋白話＋語音鈕）③ `<details>` 更多資訊。
+**首頁 3 塊**：身分條／拍照卡／示範與測試（折疊）。
+
+## 🔤 字級規則：全域 16–20px（2026-09-25 使用者指定）
+
+**所有實際顯示的文字只能是 16 / 18 / 19 / 20px 這四種，不得有其他值。**
+
+`theme.ts` 的 `TYPE`：`conclusion` 20（頁面主標 + 結論）／`title` 19（卡片標題）／
+`emphasis` 18（強調數字、按鈕、徽章）／`body` 16（所有說明與敘述，**字級地板**）。
+`secondary`／`caption`／`micro` 是 **deprecated 別名，全部指向 16px**
+（保留是為了不逐一改舊呼叫點；新程式碼一律用 `body`）。
+
+- ⚠️ **16px 是地板**：低於 16px 的免責文字對長者等於不可讀。
+  要弱化某段文字請改顏色（`text-slate-600`），**不要縮字級**。
+- ⚠️ **級距只有 4px（16→18→19→20）→ 相鄰兩級幾乎看不出差別。**
+  「用字級表達重要性」這招已經失效，請改用 `WEIGHT`（strong / normal）
+  ＋ `TONES`（語意色）＋ **位置**（中央主欄優先）。
+- ⚠️ **兩個容易漏掉的 Tailwind 預設字級**（因 `:root{font-size:20px}` 被放大）：
+  `text-xs` = **15px**、`text-sm` = **17.5px** — 兩者都**低於** 16px 地板且超出規則。
+  改字級時必須同時 grep `text-\[[0-9]*px\]` **和** `text-(xs|sm|base|lg|xl)`。
+- ⚠️ **emoji 用 `w-[Npx] h-[Npx]` 控制，不要用 `text-[Npx]`**。
+  這樣「字級一律 16–20px」才能用 grep 機械驗證（emoji 不干擾）。
+
+**哪些檔案要改**：`App.tsx`、`theme.ts`、`NutrientFactBars`、`LearnerProfilePicker`、
+`FoodEdClassroom`、`VitalMetricsSection`、`DietHealthHistory`。
+⚠️ **`VitalMetricsSection` 不是死碼**，它真的渲染在「健康設定」頁。
+
+## 📐 折行品質：什麼才算「有礙閱讀」
+
+**不是所有折行都是問題。** 一句 18 字的中文在 360px 上本來就塞不進一行，
+折成 2 行是正確行為，硬不讓它折反而會溢出。真正該修的是這三類：
+
+| 類別 | 判定 | 為什麼 |
+| --- | --- | --- |
+| **被擠壓折行** | 實際行數 > `ceil(估算文字寬 ÷ 可用寬)` | 明明塞得下卻折行 → 排版被擠壓 |
+| **孤行 orphan** | 末行 < 3 字且非句尾標點 | 長者要回頭掃那 1~2 個字，代價很高 |
+| **行數過多** | ≤22 字的句子折 ≥4 行 | 欄寬太窄或字太大 |
+
+**驗證工具**：`sandbox-build-verify/scripts/check-wrapping-quality.mjs`
+（舊的 `check-responsive-layout.mjs` 把**任何多行**都當問題 → 255 筆假警報，別再用它驗折行）
+
+兩個實作關鍵（否則又會一堆假警報）：
+1. **量「真正承載文字的葉節點」**，不要量 `<button>` 本身。
+   導航鈕 66px 高 ÷ 19.2px 行高 = 3.4 → 會誤判 3 行，實際文字只佔 19px = 1 行。
+2. **`whiteSpace: nowrap` 的元素永遠算 1 行。**
+
+**三個常見的擠壓根因與解法**：
+1. `flex` 子項預設 `min-width:auto` → 被最長一行撐寬，擠掉同層元素。
+   **解法：加 `min-w-0`**（慢性病卡片就是這個問題）。
+2. 一行塞太多東西（標籤 + 2 個按鈕）→ **解法：改 `flex-col` 上下堆疊或加 `flex-wrap`**。
+3. flex 自動分配的欄寬不可預期 → **解法：改用 `grid-cols-[30px_1fr]` 固定欄寬**。
+
+⚠️ 有些標籤**本來就該強制單行**：`nowrap`（避免被擠壓）＋ 外層 `flex-wrap`（避免溢出）。
+目前已加：導航標籤、狀態徽章、快選膠囊、單位切換鈕、篩選 chips。
+
+## 📱 16:9 手機版面 + 桌機手機框
+
+使用者手機是 16:9 直向（CSS 視窗 360×640，DPR 3）。
+
+**桌機**用 `min-[520px]:` 斷點包手機框（**<520px 完全不套用，零回歸**）：
+- 外框 `w-[380px] h-[660px]`（border-box）→ **內容區剛好 360×640**
+- ⚠️ 設 `w-[360px]` 內容區只剩 340px，導航按鈕會從 83px 縮到 78px
+- 實測：外框 380×660 @ (530, 24)，左右留白各 530px
+
+**連帶必改 4 處**（漏改就壞）：
+1. **overlay 寫 `fixed inset-0 min-[520px]:absolute`**（不可只寫 `absolute`！）
+   - `App.tsx` Loading 遮罩、`DietHealthHistory.tsx` 匯出彈窗
+   - ⚠️ 手機容器是 `min-h-screen`，內容長時**比視窗高**，只寫 `absolute` 會以「文件」
+     為基準置中 → spinner 掉出視窗外（實測 y≈560）
+2. footer `sticky bottom-0` → `shrink-0`
+3. 主內容容器加 `min-h-0 min-[520px]:overflow-y-auto`
+4. 移除內層 `max-w-md mx-auto`（nav / footer）
+
+**固定列實測合計約 270–274px**（header 92~95 + nav 86~87 + footer 92）；底部 CTA `min-h-[72px]`。
+
+### ⚠️ 三個關鍵陷阱（改 UI 前務必記得）
+1. **`:root { font-size: 20px }`** → Tailwind 所有 rem 間距**放大 1.25 倍**
+   （`py-4`=20px、`w-9`=45px）。要精確尺寸用任意 px（`py-[8px]`）。
+   → 連帶讓 `text-xs`=15px、`text-sm`=17.5px（見上方字級規則）。
+2. **文字折行會默默撐高元素**（不是 min-h 在管）。
+   但**不是所有折行都是問題** → 判定標準見上方「折行品質」段。
+3. **框內截圖 `captureBeyondViewport` 無效**（`overflow-hidden` 會裁掉）。
+   要拍框內長頁面得 `document.querySelector('main').scrollTop = N` 分段截。
+
+## 🧩 已建立的元件設計約定
+
+### `SettingsSection.tsx`（2026-09-28）
+設定頁 4 個區塊改成可收合摺疊選單。
+★★ **最重要的設計決定：收合時必須顯示「目前狀態」**（`summary` prop）。
+如果收起來只顯示標題，長者就得一個一個展開才知道自己設了什麼 —— 那比全部展開還麻煩。
+
+- 動畫用 `grid-template-rows: 0fr → 1fr`，**不要用 max-height**
+  （max-height 要猜值，內容短時動畫會先停頓；grid-template-rows 依實際高度平滑展開，不需 JS 量測）
+- header 觸控高度 **72px**（比一般 48px 規範更大，長者手指較難精準點擊）
+- 展開時 header 變深藍底、chevron 旋轉 180°，並顯示「點一下收起」
+- 預設全部收合；可同時展開多個（不強制單開）
+
+### 側邊選單（2026-09-28，已取代底部 4 格導航列）
+1. **不用條件渲染，改用 transform 位移**
+   `{isMenuOpen && <div>}` 會讓面板憑空出現，做不出滑出動畫。
+   改成永遠渲染，收起時 `-translate-x-full` ＋ `pointer-events-none`
+   （後者是關鍵：不讓隱藏的面板擋住底下的點擊）。
+2. **外層用 `fixed inset-0 min-[520px]:absolute`**（手機全螢幕、桌面 380×660 手機框都要正確定位）
+3. **遮罩點擊關閉、選單項點擊後自動關閉、底部另有「關閉選單」按鈕**
+   （長者可能不熟悉「點空白處關閉」，所以給明確按鈕）
+4. **a11y**：`aria-expanded`、`aria-controls`、`aria-current="page"`、`aria-hidden`
+
+### 標題列寬度（實測教訓）
+360px 手機上標題列塞不下「漢堡鈕 48px ＋ LabelBuddy AI ＋ 狀態標籤」，
+App 名稱被截成「LabelBuddy A」→ 拿掉 h1 的 Sparkles 圖示後剛好放得下。
+**App 名稱被截斷比少一個裝飾圖示嚴重得多。**

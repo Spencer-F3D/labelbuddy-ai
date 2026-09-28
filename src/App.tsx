@@ -67,12 +67,23 @@ import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser'
 // 雙語介面（2026-09-28）：競賽章程要求「未使用英文」可不予評審。
 import { useI18n } from './i18n/I18nContext';
 import { LanguagePicker } from './i18n/LanguagePicker';
-import type { TranslationKey } from './i18n/translations';
+import type { TranslationKey, Language } from './i18n/translations';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
 // 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
 // 英文介面要換成英文，否則長條圖下方會寫「依『長者三高』的每日參考值計算」。
-import { profileName as localizedProfileName } from './data/bilingual';
+import {
+  profileName as localizedProfileName,
+  conditionName as localizedConditionName,
+  nutrientName as localizedNutrientName,
+} from './data/bilingual';
+// 慢性病與身分的「顯示用」英文對照（2026-09-28 第三階段）。
+// 與 bilingual.ts 的分工：bilingual.ts 給後端提示詞用，這份給畫面用。
+import {
+  conditionBadge as localizedConditionBadge,
+  conditionDescription as localizedConditionDescription,
+  categoryName as localizedCategoryName,
+} from './data/bilingualContent';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
@@ -166,11 +177,14 @@ const ALL_CONDITIONS = PHYSICAL_INDICATORS;
 const VALID_CONDITION_IDS = new Set(ALL_CONDITIONS.map((c) => c.id));
 
 /**
- * id → 顯示名稱。
+ * id → 顯示名稱（含語言）。
  * 找不到時回退成原始 id，至少不會顯示空白（正式流程不應發生）。
+ * 英文版查 bilingual.ts 的封閉清單；查不到會安全退回中文原名。
  */
-const conditionName = (id: string) =>
-  ALL_CONDITIONS.find((c) => c.id === id)?.name ?? id;
+const conditionName = (id: string, language: Language) => {
+  const zh = ALL_CONDITIONS.find((c) => c.id === id)?.name ?? id;
+  return localizedConditionName(id, zh, language);
+};
 
 /** id → 完整項目資料（給清單渲染用） */
 const conditionById = (id: string) => ALL_CONDITIONS.find((c) => c.id === id);
@@ -188,9 +202,14 @@ const ALLERGEN_SEVERITY: Record<string, 'critical' | 'mild'> = {
  * 分類膠囊的顯示文字。
  * ⚠️ 不可直接用 `cat.name`：「全部」那顆的名稱在資料檔裡寫死了「(12種)」，
  * 一旦新增或刪除項目就會漂移，所以這裡改成由陣列長度推導。
+ * ⚠️ 英文版另外查對照表（bilingualContent.ts），查不到才退回中文原名。
  */
-const categoryPillLabel = (cat: { id: string; name: string }) =>
-  cat.id === 'all' ? `全部 (${ALL_CONDITIONS.length})` : cat.name;
+const categoryPillLabel = (cat: { id: string; name: string }, language: Language) =>
+  cat.id === 'all'
+    ? language === 'en'
+      ? `All (${ALL_CONDITIONS.length})`
+      : `全部 (${ALL_CONDITIONS.length})`
+    : localizedCategoryName(cat.id, cat.name, language);
 
 /**
  * 底部主要操作按鈕的共用樣式。
@@ -237,56 +256,64 @@ function stripLeadingEmoji(text: string): string {
 
 /**
  * 根據分析結果產生『每日營養建議』簡單健康叮嚀（如：多喝水、少吃重鹹），幫助長者養成健康飲食習慣
+ *
+ * ⚠️ 只回傳**翻譯鍵**，不回傳字串（2026-09-28 第三階段）。
+ *    這是模組層函式，拿不到 useI18n()；回傳字串就得把 t 一路傳進來。
+ *    回傳鍵、由呼叫端 t() 解析，改動最小且不可能漏翻。
+ *
+ * ⚠️ 判斷用的關鍵字（鈉／糖／腎…）維持中文比對**是刻意的**：
+ *    這些字串來自 `warning_title` / `plain_summary`，
+ *    而後端在本機規則引擎路徑下產生的就是中文內容，翻掉會讓比對失效。
  */
 function getDailyNutritionAdvice(result: LabelAnalysisResult): {
-  badge: string;
-  advice: string;
-  habit: string;
+  badgeKey: TranslationKey;
+  adviceKey: TranslationKey;
+  habitKey: TranslationKey;
 } {
   const text = `${result.warning_title || ''} ${result.plain_summary || ''} ${result.alternative_advice || ''}`.toLowerCase();
 
   if (result.risk_level === 'red') {
     if (text.includes('鈉') || text.includes('鹽') || text.includes('高血壓') || text.includes('sodium')) {
       return {
-        badge: '少吃重鹹・多喝溫水',
-        advice: '若吃了重鹹或含鈉較高的食品，請記得多喝 2 至 3 杯溫開水幫助體內排鈉，今天其他餐點請記得少鹽少醬汁！',
-        habit: '長期小習慣：煮菜少放半匙鹽，喝湯只喝半碗，心血管更輕鬆。',
+        badgeKey: 'advice.redSodium.badge',
+        adviceKey: 'advice.redSodium.advice',
+        habitKey: 'advice.redSodium.habit',
       };
     }
     if (text.includes('糖') || text.includes('甜') || text.includes('糖尿病') || text.includes('sugar')) {
       return {
-        badge: '控糖護血管・飯後走動',
-        advice: '高糖容易造成血糖劇烈波動。今天建議改喝溫水或無糖麥茶，飯後在家中慢步 15 分鐘！',
-        habit: '長期小習慣：下午點心用低糖水果或無調味堅果取代精緻甜點蛋糕。',
+        badgeKey: 'advice.redSugar.badge',
+        adviceKey: 'advice.redSugar.advice',
+        habitKey: 'advice.redSugar.habit',
       };
     }
     if (text.includes('腎') || text.includes('磷') || text.includes('鉀')) {
       return {
-        badge: '護腎減負擔・多吃原型',
-        advice: '腎臟代謝需要水分與天然營養，今天其他餐點請以清蒸水煮的原型食物為主，避免重鹹或加工醃製肉品！',
-        habit: '長期小習慣：多吃新鮮蔬果，少喝火鍋湯底與濃稠肉汁。',
+        badgeKey: 'advice.redKidney.badge',
+        adviceKey: 'advice.redKidney.advice',
+        habitKey: 'advice.redKidney.habit',
       };
     }
     return {
-      badge: '減輕負擔・清淡飲食',
-      advice: '這類食品加工與添加成分較多，今天其餘餐點多吃一份深綠色蔬菜，讓腸胃與身體好好休息！',
-      habit: '長期小習慣：正餐盡量選擇看得到食物原本形貌的天然食材。',
+      badgeKey: 'advice.redOther.badge',
+      adviceKey: 'advice.redOther.advice',
+      habitKey: 'advice.redOther.habit',
     };
   }
 
   if (result.risk_level === 'yellow') {
     return {
-      badge: '注意份量・細嚼慢嚥',
-      advice: '這款食品建議偶爾嚐鮮即可，食用時分次少量、慢嚼細嚥，並搭配一杯溫水減少身體負擔！',
-      habit: '長期小習慣：每餐吃七分飽，放慢進食速度，幫助腸胃消化吸收。',
+      badgeKey: 'advice.yellow.badge',
+      adviceKey: 'advice.yellow.advice',
+      habitKey: 'advice.yellow.habit',
     };
   }
 
   // green
   return {
-    badge: '天然安心・保持好習慣',
-    advice: '太棒了！這款食品成分單純無過多負擔，天天多攝取天然原型食物，身體元氣滿分！',
-    habit: '長期小習慣：每天定時喝足溫開水、多吃五色蔬果，維持長壽活力。',
+    badgeKey: 'advice.green.badge',
+    adviceKey: 'advice.green.advice',
+    habitKey: 'advice.green.habit',
   };
 }
 
@@ -300,6 +327,15 @@ export default function App() {
    *   所有用到 t() 的地方都會跟著更新。
    */
   const { t, language } = useI18n();
+
+  /**
+   * 語音朗讀要挑哪個語音（2026-09-28 第三階段）。
+   *
+   * ⚠️ 中文模式維持原本行為（粵語 / 國語各自對應），只有英文模式改成英文語音。
+   *    不這樣做的話，切到英文後會用中文腔念英文句子 —— 決賽的英文 Demo 影片會很難聽。
+   */
+  const ttsLang = language === 'en' ? ('english' as const) : ('cantonese' as const);
+  const ttsLangMandarin = language === 'en' ? ('english' as const) : ('mandarin' as const);
 
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
@@ -334,7 +370,7 @@ export default function App() {
     }
 
     const next = getLearnerProfile(id);
-    speakText(`已切換為${next.name}`, { rate: 0.9, preferLanguage: 'mandarin' });
+    speakText(t('settings.profileSwitched', { name: localizedProfileName(next.id, next.name, language) }), { rate: 0.9, preferLanguage: ttsLangMandarin });
   };
 
   // 1. 個人慢性病設定：預設全選或讀取本地儲存
@@ -418,7 +454,7 @@ export default function App() {
       localStorage.setItem(STORAGE_CONDITIONS_MIGRATED_KEY, 'true');
     } catch {}
     setShowMigrationPrompt(false);
-    speakText('已保留您原本的設定', { rate: 0.9, preferLanguage: 'mandarin' });
+    speakText(t('settings.savedKeptToast'), { rate: 0.9, preferLanguage: ttsLangMandarin });
   };
 
   /** 改用新版資料的預設勾選（高血壓／糖尿病／高血脂），不設成空清單。 */
@@ -430,7 +466,7 @@ export default function App() {
       localStorage.setItem(STORAGE_CONDITIONS_MIGRATED_KEY, 'true');
     } catch {}
     setShowMigrationPrompt(false);
-    speakText('已為您重新套用預設的健康項目', { rate: 0.9, preferLanguage: 'mandarin' });
+    speakText(t('settings.savedResetToast'), { rate: 0.9, preferLanguage: ttsLangMandarin });
   };
 
   // 1.1 長者生理指標量測設定（血壓、心跳、血糖等）
@@ -659,7 +695,7 @@ export default function App() {
       await sendImageForAnalysis(compressed.base64);
     } catch (err) {
       console.error('圖片處理失敗:', err);
-      setErrorMessage('讀取照片失敗，請重新拍照。');
+      setErrorMessage(t('scan.errPhoto'));
     }
   };
 
@@ -711,9 +747,9 @@ export default function App() {
     } catch {}
     speakText(
       next
-        ? '已開啟雲端辨識。之後拍的照片會上傳到雲端分析。'
-        : '已改回本機模式，照片不會離開這支手機。',
-      { rate: 0.9, preferLanguage: 'mandarin' }
+        ? t('scan.savedCloud')
+        : t('scan.savedLocal'),
+      { rate: 0.9, preferLanguage: ttsLangMandarin }
     );
   };
 
@@ -744,9 +780,9 @@ export default function App() {
     // （那裡的 CPU 額度跑不動 OCR，但當純文字代理綽綽有餘）。
     // ══════════════════════════════════════════════════════════════════
     setLoadingPhase('reading');
-    speakText('正在讀取標籤文字', {
+    speakText(t('scan.readingLabel'), {
       rate: 0.88,
-      preferLanguage: 'cantonese',
+      preferLanguage: ttsLang,
     });
 
     const ocr = await recognizeLabelTextInBrowser(base64Data);
@@ -757,9 +793,9 @@ export default function App() {
     setLoadingPhase('analyzing');
 
     // AI 分析狀態語音提示：「正在為您分析」（粵語優先）
-    speakText('正在為您分析', {
+    speakText(t('scan.analyzing'), {
       rate: 0.88,
-      preferLanguage: 'cantonese',
+      preferLanguage: ttsLang,
     });
 
     // 為了提升長者在訊號不佳的超市內的體驗：
@@ -769,13 +805,23 @@ export default function App() {
       setIsNetworkDelayed(true);
       speakText(t('common.weakSignalSpeech'), {
         rate: 0.88,
-        preferLanguage: 'cantonese',
+        preferLanguage: ttsLang,
       });
     }, 2500);
 
     try {
-      // 將選取的病史轉換為繁體中文標籤
-      const conditionNames = selectedConditions.map((id) => conditionName(id));
+      /**
+       * 將選取的病史轉換為繁體中文標籤。
+       *
+       * ⚠️⚠️ 這裡**刻意不隨介面語言改變**（2026-09-28 第三階段雙語時確認）。
+       *     這一組字串是「前端 → 後端」的契約：
+       *       - 它是快取鍵的一部分（中英文共用同一包食品的快取要一致）
+       *       - 後端提示詞用中文病名組裝「使用者的慢性病史」段落
+       *     後端的輸出語言是靠 `language` 參數 + 英文覆蓋指示處理的，
+       *     不需要、也不應該把病名翻成英文送過去。
+       *     若日後有人「順手」把它翻成英文，會讓快取分裂、提示詞對不上病名。
+       */
+      const conditionNames = selectedConditions.map((id) => conditionName(id, 'zh-TW'));
 
       // 呼叫中轉後端 API
       const response = await fetch('/api/analyze-label', {
@@ -812,20 +858,20 @@ export default function App() {
 
       // 錯誤處理：特別針對 429 Too Many Requests 顯示友善提示
       if (response.status === 429) {
-        throw new Error('網絡繁忙，請稍後再試');
+        throw new Error(t('scan.errBusy'));
       }
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
         if (response.status === 429 || errJson.error === 'RATE_LIMIT_EXCEEDED') {
-          throw new Error('網絡繁忙，請稍後再試');
+          throw new Error(t('scan.errBusy'));
         }
-        throw new Error(errJson.message || '網絡繁忙，請稍後再試');
+        throw new Error(errJson.message || t('scan.errBusy'));
       }
 
       const resultJson = await response.json();
       if (!resultJson.success || !resultJson.data) {
-        throw new Error('無法取得食品辨識結果，請再試一次');
+        throw new Error(t('scan.errNoResult'));
       }
 
       const data: LabelAnalysisResult = resultJson.data;
@@ -842,7 +888,7 @@ export default function App() {
           speakText(data.plain_summary, {
             rate: 0.88,
             volume: 1.0,
-            preferLanguage: 'cantonese',
+            preferLanguage: ttsLang,
           });
         }
         return;
@@ -859,30 +905,36 @@ export default function App() {
           if (match && match[1]) return match[1];
         }
         if (plainSummary) {
-          if (plainSummary.includes('泡麵') || plainSummary.includes('牛肉麵')) return '紅燒牛肉風味泡麵';
-          if (plainSummary.includes('燕麥')) return '純天然高纖大燕麥片';
-          if (plainSummary.includes('豆漿') || plainSummary.includes('黑豆')) return '低糖黑豆營養豆漿';
-          if (plainSummary.includes('蘇打餅')) return '海鹽無添加蘇打餅';
-          if (plainSummary.includes('牛奶') || plainSummary.includes('鮮乳')) return '無加糖高鈣全脂鮮奶';
+          // ⚠️ 關鍵字比對維持中文（後端本機引擎產出的就是中文摘要）。
+          //    英文模式下模型改吐英文摘要時，這裡會落空 → 走下面的通用名稱，
+          //    但通用名稱本身是雙語的，所以不會出現中文殘留。
+          if (plainSummary.includes('泡麵') || plainSummary.includes('牛肉麵')) return t('foodname.ramen');
+          if (plainSummary.includes('燕麥')) return t('foodname.oat');
+          if (plainSummary.includes('豆漿') || plainSummary.includes('黑豆')) return t('foodname.soymilk');
+          if (plainSummary.includes('蘇打餅')) return t('foodname.sodaCracker');
+          if (plainSummary.includes('牛奶') || plainSummary.includes('鮮乳')) return t('foodname.milk');
         }
         return data.risk_level === 'green'
-          ? '健康安心選購食品'
+          ? t('foodname.green')
           : data.risk_level === 'yellow'
-          ? '微量調味需注意食品'
-          : '高負擔不建議食品';
+          ? t('foodname.yellow')
+          : t('foodname.red');
       };
 
       const now = new Date();
-      const timeStr = `${now.getMonth() + 1}月${now.getDate()}日 ${
-        now.getHours() < 12 ? '上午' : '下午'
-      } ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(
+      // 日期格式隨語言改變（中文「9月28日 下午」/ 英文「9/28 PM」）
+      const timeStr = `${t('history.dateFormat', {
+        m: now.getMonth() + 1,
+        d: now.getDate(),
+        ampm: now.getHours() < 12 ? t('history.am') : t('history.pm'),
+      })} ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(
         now.getMinutes()
       ).padStart(2, '0')}`;
 
       const newRecord: DietRecord = {
         id: `rec-${Date.now()}`,
         timestamp: Date.now(),
-        dateString: `剛剛 (${timeStr})`,
+        dateString: t('history.justNow', { time: timeStr }),
         foodName: extractFoodName(data.warning_title, data.plain_summary),
         risk_level: data.risk_level,
         warning_title: data.warning_title,
@@ -906,7 +958,7 @@ export default function App() {
           speakText(data.plain_summary, {
             rate: 0.88,
             volume: 1.0,
-            preferLanguage: 'cantonese',
+            preferLanguage: ttsLang,
             onEnd: () => setIsSpeaking(false),
             onError: () => setIsSpeaking(false),
           });
@@ -918,12 +970,12 @@ export default function App() {
       // 其餘（圖片讀取失敗、參數錯誤、伺服器異常）一律引導長者重拍，
       // 避免讓長者對著一個永遠不會成功的狀況反覆重試。
       const isRateLimited =
-        err?.message?.includes('網絡繁忙') ||
+        // ⚠️ 用 t('scan.errBusy') 比對，不要寫死中文字串。
+        //    上面 throw 的就是 t('scan.errBusy')，兩邊同源 → 切語言也不會失準。
+        err?.message?.includes(t('scan.errBusy')) ||
         err?.message?.includes('429') ||
         err?.message?.includes('RATE_LIMIT');
-      const msg = isRateLimited
-        ? '網絡繁忙，請稍後再試'
-        : '照片看不清楚，請重新拍一次';
+      const msg = isRateLimited ? t('scan.errBusy') : t('scan.errUnclear');
 
       if (!isRateLimited) {
         // 照片本身的問題：清掉暫存的舊照片，讓下方「重新再試」按鈕直接開啟相機重拍，
@@ -933,7 +985,7 @@ export default function App() {
 
       setErrorMessage(msg);
       // 以語音同步告知，讓不識字的長者也能理解目前狀況
-      speakText(msg, { preferLanguage: 'cantonese' });
+      speakText(msg, { preferLanguage: ttsLang });
     } finally {
       if (latencyTimerRef.current) {
         clearTimeout(latencyTimerRef.current);
@@ -960,7 +1012,7 @@ export default function App() {
       speakText(analysisResult.plain_summary, {
         rate: 0.88,
         volume: 1.0,
-        preferLanguage: 'cantonese',
+        preferLanguage: ttsLang,
         onEnd: () => setIsSpeaking(false),
         onError: () => setIsSpeaking(false),
       });
@@ -1103,7 +1155,7 @@ export default function App() {
         {/* 選單面板：從左側滑出 */}
         <nav
           id="app-drawer"
-          aria-label="主選單"
+          aria-label={t('app.openMenu')}
           className={`absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
             isMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
@@ -1422,10 +1474,12 @@ export default function App() {
                         {selectedConditions.length === 0
                           ? t('common.noConditions')
                           : selectedConditions.length <= 3
-                          ? selectedConditions.map((id) => conditionName(id)).join(t('common.listSeparator'))
+                          ? selectedConditions
+                              .map((id) => conditionName(id, language))
+                              .join(t('common.listSeparator'))
                           : `${selectedConditions
                               .slice(0, 3)
-                              .map((id) => conditionName(id))
+                              .map((id) => conditionName(id, language))
                               .join(t('common.listSeparator'))} ${t('scan.conditionMore', { n: selectedConditions.length })}`}
                       </strong>
                     </span>
@@ -1485,7 +1539,7 @@ export default function App() {
                         stopSpeech();
                         speakText(t('common.weakSignalSpeech'), {
                           rate: 0.88,
-                          preferLanguage: 'cantonese',
+                          preferLanguage: ttsLang,
                         });
                       }}
                       className="w-full min-h-[56px] p-[12px] rounded-[12px] border-[1.5px] border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 font-black text-[18px] flex items-center justify-between gap-[8px] cursor-pointer transition-all active:scale-[0.98]"
@@ -1597,7 +1651,13 @@ export default function App() {
                   ? t('risk.yellow')
                   : t('risk.green');
 
-              const nutritionAdvice = getDailyNutritionAdvice(analysisResult);
+              // 模組層函式只回翻譯鍵，這裡才解析成字串（見 getDailyNutritionAdvice 的說明）
+              const adviceKeys = getDailyNutritionAdvice(analysisResult);
+              const nutritionAdvice = {
+                badge: t(adviceKeys.badgeKey),
+                advice: t(adviceKeys.adviceKey),
+                habit: t(adviceKeys.habitKey),
+              };
 
               return (
                 <div className="flex flex-col space-y-[16px] animate-in fade-in duration-200">
@@ -1871,7 +1931,7 @@ export default function App() {
                                 ]
                                   .filter(Boolean)
                                   .join('。'),
-                                { rate: 0.88, preferLanguage: 'cantonese' }
+                                { rate: 0.88, preferLanguage: ttsLang }
                               );
                             }}
                             className={FOOTER_CTA_SECONDARY}
@@ -2003,7 +2063,7 @@ export default function App() {
                             stopSpeech();
                             speakText(
                               t('result.speechAdvice', { advice: nutritionAdvice.advice, habit: nutritionAdvice.habit }),
-                              { rate: 0.88, preferLanguage: 'cantonese' }
+                              { rate: 0.88, preferLanguage: ttsLang }
                             );
                           }}
                           className={FOOTER_CTA_SECONDARY}
@@ -2111,7 +2171,7 @@ export default function App() {
               {/* ── 分類篩選膠囊 ─────────────────────────────────────
                   ⚠️ 用 flex-wrap 讓膠囊整顆換行，不要用 overflow-x-auto 水平捲動
                      ——長者看不到「右邊還有東西」，會以為只有這幾顆。 */}
-              <div className="flex flex-wrap gap-[8px]" role="group" aria-label="依分類篩選健康項目">
+              <div className="flex flex-wrap gap-[8px]" role="group" aria-label={t('conditions.filterAria')}>
                 {CONDITION_CATEGORIES.map((cat) => {
                   const isActive = activeCategory === cat.id;
                   return (
@@ -2131,7 +2191,7 @@ export default function App() {
                       <span className="w-[20px] h-[20px] leading-none text-center shrink-0" aria-hidden="true">
                         {cat.icon}
                       </span>
-                      {categoryPillLabel(cat)}
+                      {categoryPillLabel(cat, language)}
                     </button>
                   );
                 })}
@@ -2144,18 +2204,18 @@ export default function App() {
                 <div className="flex items-center gap-[8px] flex-wrap">
                   <h3 className="text-[18px] font-black text-slate-900 flex items-center gap-[6px]">
                     <CheckSquare className="w-[22px] h-[22px] text-blue-900 shrink-0" />
-                    已選擇（{selectedConditions.length}）
+                    {t('conditions.selectedCount', { n: selectedConditions.length })}
                   </h3>
                   {selectedConditions.length === ALL_CONDITIONS.length && (
                     <span className="text-[16px] font-black text-blue-950 bg-blue-100 border border-blue-300 px-[10px] py-[2px] rounded-full whitespace-nowrap shrink-0">
-                      已全部選擇
+                      {t('conditions.allSelected')}
                     </span>
                   )}
                 </div>
 
                 {selectedConditions.length === 0 ? (
                   <p className="text-[16px] font-bold text-slate-700 bg-slate-100 border border-slate-300 rounded-[12px] px-[12px] py-[10px]">
-                    尚未選擇任何項目。建議至少勾選 1 項，AI 才能為您把關。
+                    {t('conditions.noneHint')}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-[8px]">
@@ -2190,14 +2250,14 @@ export default function App() {
                                     isAllergen ? 'text-[#501313]' : 'text-blue-950'
                                   }`}
                                 >
-                                  {cond.name}
+                                  {conditionName(cond.id, language)}
                                 </span>
                                 <span
                                   className={`text-[16px] font-black px-[8px] py-[2px] rounded-full whitespace-nowrap shrink-0 ${
                                     isAllergen ? 'bg-[#A32D2D] text-white' : 'bg-blue-900 text-white'
                                   }`}
                                 >
-                                  {cond.badge}
+                                  {localizedConditionBadge(cond.id, cond.badge, language)}
                                 </span>
                               </div>
                               {/* 44px checkbox：純視覺，不可點（整列已是 tap target） */}
@@ -2214,7 +2274,15 @@ export default function App() {
                               type="button"
                               id={`pinned-expand-${cond.id}`}
                               aria-expanded={isExpanded}
-                              aria-label={isExpanded ? `收起「${cond.name}」說明` : `展開「${cond.name}」說明`}
+                              aria-label={
+                                isExpanded
+                                  ? t('conditions.collapseAria', {
+                                      name: conditionName(cond.id, language),
+                                    })
+                                  : t('conditions.expandAria', {
+                                      name: conditionName(cond.id, language),
+                                    })
+                              }
                               onClick={() =>
                                 setExpandedConditionId(isExpanded ? null : cond.id)
                               }
@@ -2236,7 +2304,7 @@ export default function App() {
                               }`}
                             >
                               <p className="text-[16px] font-bold text-slate-700 leading-relaxed">
-                                {cond.description}
+                                {localizedConditionDescription(cond.id, cond.description, language)}
                               </p>
                             </div>
                           )}
@@ -2252,11 +2320,11 @@ export default function App() {
                 <div className="flex items-center gap-[8px] flex-wrap">
                   <h3 className="text-[18px] font-black text-slate-900 flex items-center gap-[6px]">
                     <SlidersHorizontal className="w-[22px] h-[22px] text-slate-700 shrink-0" />
-                    可選擇的項目（{unselectedConditions.length}）
+                    {t('conditions.available', { n: unselectedConditions.length })}
                   </h3>
                   {activeCategory === 'allergen' && (
                     <span className="text-[16px] font-black text-white bg-[#A32D2D] px-[10px] py-[2px] rounded-full whitespace-nowrap shrink-0">
-                      絕對要避開
+                      {t('conditions.critical')}
                     </span>
                   )}
                 </div>
@@ -2266,10 +2334,10 @@ export default function App() {
                   <div className="flex items-center gap-[8px] flex-wrap bg-[#FCEBEB] border-[1.5px] border-[#A32D2D] rounded-[12px] px-[12px] py-[10px]">
                     <ShieldAlert className="w-[22px] h-[22px] text-[#A32D2D] shrink-0" />
                     <span className="text-[18px] font-black text-[#501313]">
-                      食物過敏原（後果最嚴重）
+                      {t('conditions.allergenTitle')}
                     </span>
                     <span className="text-[16px] font-bold text-[#791F1F]">
-                      誤食可能呼吸困難，請務必勾選
+                      {t('conditions.allergenHint')}
                     </span>
                   </div>
                 )}
@@ -2277,8 +2345,8 @@ export default function App() {
                 {unselectedConditions.length === 0 ? (
                   <p className="text-[16px] font-bold text-slate-700 bg-slate-100 border border-slate-300 rounded-[12px] px-[12px] py-[10px]">
                     {activeCategory === 'all'
-                      ? '所有項目都已勾選完畢。'
-                      : '這個分類的項目都已勾選，都在上方的「已選擇」區。'}
+                      ? t('conditions.allChosen')
+                      : t('conditions.categoryAllChosen')}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-[8px]">
@@ -2322,7 +2390,7 @@ export default function App() {
                                       isAllergen ? 'text-[#501313]' : 'text-slate-900'
                                     }`}
                                   >
-                                    {cond.name}
+                                    {conditionName(cond.id, language)}
                                   </span>
                                   <span
                                     className={`text-[16px] font-black px-[8px] py-[2px] rounded-full whitespace-nowrap shrink-0 ${
@@ -2333,7 +2401,7 @@ export default function App() {
                                         : 'bg-slate-200 text-slate-700'
                                     }`}
                                   >
-                                    {cond.badge}
+                                    {localizedConditionBadge(cond.id, cond.badge, language)}
                                   </span>
                                 </div>
                                 {/* 後果等級用文字明說，避免長者以為過敏原只是「注意一下」 */}
@@ -2343,7 +2411,9 @@ export default function App() {
                                       severity === 'mild' ? 'text-[#854F0B]' : 'text-[#A32D2D]'
                                     }`}
                                   >
-                                    {severity === 'mild' ? '⚠️ 吃了會腹瀉' : '⚠️ 絕對不能吃，會呼吸困難'}
+                                    {severity === 'mild'
+                                      ? t('conditions.mildReaction')
+                                      : t('conditions.severeReaction')}
                                   </span>
                                 )}
                               </div>
@@ -2358,7 +2428,15 @@ export default function App() {
                               type="button"
                               id={`expand-${cond.id}`}
                               aria-expanded={isExpanded}
-                              aria-label={isExpanded ? `收起「${cond.name}」說明` : `展開「${cond.name}」說明`}
+                              aria-label={
+                                isExpanded
+                                  ? t('conditions.collapseAria', {
+                                      name: conditionName(cond.id, language),
+                                    })
+                                  : t('conditions.expandAria', {
+                                      name: conditionName(cond.id, language),
+                                    })
+                              }
                               onClick={() =>
                                 setExpandedConditionId(isExpanded ? null : cond.id)
                               }
@@ -2380,7 +2458,7 @@ export default function App() {
                               }`}
                             >
                               <p className="text-[16px] font-bold text-slate-700 leading-relaxed">
-                                {cond.description}
+                                {localizedConditionDescription(cond.id, cond.description, language)}
                               </p>
                             </div>
                           )}
@@ -2405,21 +2483,34 @@ export default function App() {
                   //    所以改成「N 項 + 前 3 項 + 引導去設定頁看詳細」。
                   const preview = selectedConditions
                     .slice(0, 3)
-                    .map((id) => conditionName(id))
-                    .join('、');
+                    .map((id) => conditionName(id, language))
+                    .join(t('common.listSeparator'));
                   const condPart =
                     selectedConditions.length === 0
-                      ? '目前沒有勾選任何病史'
+                      ? t('settings.noConditionsSelected')
                       : selectedConditions.length <= 3
-                      ? `包括：${preview}`
-                      : `共 ${selectedConditions.length} 項，包括：${preview} 等等`;
-                  const text = `您好！您的健康指標設定為：收縮壓 ${physicalIndicators.systolicBp}，舒張壓 ${physicalIndicators.diastolicBp}，心跳每分鐘 ${physicalIndicators.heartRate || 72} 次，血糖 ${physicalIndicators.bloodSugar} ${physicalIndicators.bloodSugarUnit === 'mmol/L' ? '毫摩爾每升' : '毫克每分升'}。把關的病史${condPart}。詳細設定可以在健康設定頁查看。在超市買餸時，我們會為您嚴密把關！`;
-                  speakText(text, { preferLanguage: 'cantonese' });
+                      ? t('settings.conditionsPreview', { list: preview })
+                      : t('settings.conditionsPreviewMore', {
+                          n: selectedConditions.length,
+                          list: preview,
+                        });
+                  const text = t('settings.speech', {
+                    sys: physicalIndicators.systolicBp,
+                    dia: physicalIndicators.diastolicBp,
+                    hr: physicalIndicators.heartRate || 72,
+                    bs: physicalIndicators.bloodSugar,
+                    bsUnit:
+                      physicalIndicators.bloodSugarUnit === 'mmol/L'
+                        ? t('vitals.speech.unitMmol')
+                        : t('vitals.speech.unitMgdl'),
+                    condPart,
+                  });
+                  speakText(text, { preferLanguage: ttsLang });
                 }}
                 className="w-full min-h-[56px] py-3 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-950 font-black text-[18px] border-3 border-amber-400 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
               >
                 <Volume2 className="w-6 h-6 text-amber-700 shrink-0" />
-                <span>🔊 朗讀我的完整健康設定（粵語/國語）</span>
+                <span>{t('settings.readFull')}</span>
               </button>
 
               {/* 儲存並前往拍照按鈕 */}
@@ -2430,7 +2521,7 @@ export default function App() {
                 className="w-full min-h-[64px] py-3.5 px-5 rounded-2xl bg-blue-900 hover:bg-blue-950 text-white font-black text-[20px] flex items-center justify-center gap-3 shadow-md cursor-pointer active:scale-95 border-3 border-blue-950"
               >
                 <Camera className="w-7 h-7 text-yellow-300 shrink-0" />
-                <span>✅ 設定完成，前往拍照辨識</span>
+                <span>{t('settings.done')}</span>
               </button>
               </div>
             </SettingsSection>
@@ -2490,11 +2581,10 @@ export default function App() {
               className="text-[20px] font-black text-slate-950 flex items-center gap-[8px]"
             >
               <Sparkles className="w-[26px] h-[26px] text-blue-900 shrink-0" />
-              我們新增了更多健康項目
+              {t('settings.upgradeTitle')}
             </h2>
             <p className="text-[16px] font-bold text-slate-700 leading-relaxed">
-              現在可以勾選的慢性病與過敏原變多了（共 {ALL_CONDITIONS.length} 項）。
-              您原本勾選的項目我們都保留了，要不要花一分鐘重新確認一下？
+              {t('settings.upgradeBody', { n: ALL_CONDITIONS.length })}
             </p>
             <button
               type="button"
@@ -2503,7 +2593,7 @@ export default function App() {
               className="w-full min-h-[48px] px-[16px] py-[10px] rounded-[12px] bg-blue-900 hover:bg-blue-950 text-white text-[18px] font-black flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 transition-all"
             >
               <Check className="w-[22px] h-[22px] shrink-0" />
-              保留我原本的設定
+              {t('settings.upgradeKeep')}
             </button>
             <button
               type="button"
@@ -2512,7 +2602,7 @@ export default function App() {
               className="w-full min-h-[48px] px-[16px] py-[10px] rounded-[12px] bg-white hover:bg-slate-100 text-slate-900 text-[18px] font-black border-[1.5px] border-slate-400 flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 transition-all"
             >
               <RotateCcw className="w-[22px] h-[22px] shrink-0" />
-              重新選擇
+              {t('settings.upgradeReselect')}
             </button>
           </div>
         </div>
@@ -2531,16 +2621,16 @@ export default function App() {
           </div>
 
           <h2 className="text-[20px] font-black text-white mb-[8px] leading-tight">
-            {loadingPhase === 'reading' ? '正在讀取標籤…' : '正在為您分析…'}
+            {loadingPhase === 'reading' ? t('loading.reading') : t('loading.analyzing')}
           </h2>
 
           {/* 具體的等待預期 + 即時秒數：把「不知道還要多久」變成可掌握的進度 */}
           <p className="text-[16px] font-bold text-slate-300 leading-snug">
-            {loadingPhase === 'reading'
-              ? '照片只在這支手機上處理，不會上傳'
-              : '通常需要 5 到 10 秒'}
+            {loadingPhase === 'reading' ? t('loading.localOnly') : t('loading.typical')}
             {loadingSeconds > 0 && (
-              <span className="ml-[6px] text-slate-400">（已等 {loadingSeconds} 秒）</span>
+              <span className="ml-[6px] text-slate-400">
+                {t('loading.waited', { n: loadingSeconds })}
+              </span>
             )}
           </p>
 
@@ -2549,7 +2639,7 @@ export default function App() {
             <div className="w-full max-w-sm mt-[16px] bg-slate-800 border-[3px] border-emerald-500 rounded-[16px] p-[16px] flex items-center gap-[10px]">
               <ShieldCheck className="w-[28px] h-[28px] text-emerald-400 shrink-0" />
               <p className="text-[18px] font-black text-emerald-300 leading-snug">
-                照片不會離開這支手機
+                {t('loading.privacyBadge')}
               </p>
             </div>
           ) : isNetworkDelayed ? (
@@ -2557,18 +2647,18 @@ export default function App() {
             <div className="w-full max-w-sm mt-[16px] bg-amber-400 text-slate-950 p-[16px] rounded-[16px] border-[3px] border-yellow-200 shadow-2xl flex flex-col items-center gap-[8px]">
               <div className="flex items-center gap-[8px]">
                 <Wifi className="w-[28px] h-[28px] text-slate-950 shrink-0 animate-pulse" />
-                <span className="text-[20px] font-black">超市訊號提示</span>
+                <span className="text-[20px] font-black">{t('loading.signalTitle')}</span>
               </div>
               <p className="text-[18px] font-black leading-snug">
                 {t('common.weakSignalSpeech')}
               </p>
               <span className="text-[16px] font-bold text-slate-900 bg-amber-300 px-[10px] py-[3px] rounded-full">
-                🔊 語音已為您播報，資料傳輸中
+                {t('loading.signalBadge')}
               </span>
             </div>
           ) : (
             <p className="text-[16px] font-bold text-yellow-300 mt-[8px]">
-              🔊 語音：「正在為您分析」
+              {t('loading.signalSpeech')}
             </p>
           )}
         </div>

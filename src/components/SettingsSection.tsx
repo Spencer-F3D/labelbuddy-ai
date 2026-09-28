@@ -29,6 +29,8 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+// 雙語（2026-09-28 第三階段）：展開提示文字
+import { useI18n } from '../i18n/I18nContext';
 
 export interface SettingsSectionProps {
   /** 供自動化測試與深層連結使用的固定 id */
@@ -55,6 +57,7 @@ export function SettingsSection({
   defaultOpen = false,
   children,
 }: SettingsSectionProps) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const contentId = `${useId()}-content`;
 
@@ -99,7 +102,7 @@ export function SettingsSection({
           )}
           {isOpen && (
             <span className="block text-[16px] font-bold text-blue-200 leading-tight mt-[2px]">
-              點一下收起
+              {t('settings.collapseHint')}
             </span>
           )}
         </span>

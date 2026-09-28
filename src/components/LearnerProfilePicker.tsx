@@ -17,6 +17,16 @@ import React from 'react';
 import { Check, ChevronRight, Users } from 'lucide-react';
 import type { LearnerProfile, LearnerProfileId } from '../types';
 import { getAllLearnerProfiles } from '../data/learnerProfiles';
+// 雙語（2026-09-28 第三階段）：身分名稱、對象說明、每日參考值都放在資料層，
+// 這裡只負責「取值」與介面文字，翻譯資料本身集中在 data/bilingualContent.ts。
+import { useI18n } from '../i18n/I18nContext';
+import { nutrientName } from '../data/bilingual';
+import {
+  profileDisplayName,
+  profileAudience,
+  targetText,
+  targetNote,
+} from '../data/bilingualContent';
 
 interface LearnerProfilePickerProps {
   /** 目前選定的身分 */
@@ -79,14 +89,16 @@ function ProfileCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const { t, language } = useI18n();
   const accent = ACCENT_STYLES[profile.id];
+  const displayName = profileDisplayName(profile.id, profile.name, language);
 
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={isSelected}
-      aria-label={`選擇身分：${profile.name}`}
+      aria-label={t('profile.picker.selectAria', { name: displayName })}
       className={`w-full min-h-[76px] text-left rounded-2xl border-3 p-4 transition-all active:scale-[0.98] cursor-pointer ${
         isSelected
           ? `${accent.bg} ${accent.ring} ring-3 shadow-md`
@@ -109,18 +121,20 @@ function ProfileCard({
             <span
               className={`text-[20px] font-black ${isSelected ? accent.text : 'text-slate-900'}`}
             >
-              {profile.name}
+              {displayName}
             </span>
             {isSelected && (
               <span
                 className={`${accent.badge} text-white text-[16px] font-black px-2 py-0.5 rounded-full flex items-center gap-1`}
               >
                 <Check className="w-3.5 h-3.5" />
-                目前選擇
+                {t('profile.picker.selected')}
               </span>
             )}
           </div>
-          <p className="text-[16px] text-slate-700 leading-snug mt-1">{profile.audience}</p>
+          <p className="text-[16px] text-slate-700 leading-snug mt-1">
+            {profileAudience(profile.id, profile.audience, language)}
+          </p>
         </div>
 
         {/* 未選中時顯示箭頭，提示可點擊 */}
@@ -137,20 +151,24 @@ export const LearnerProfilePicker: React.FC<LearnerProfilePickerProps> = ({
   onSelect,
   compact = false,
 }) => {
+  const { t, language } = useI18n();
   const profiles = getAllLearnerProfiles();
   const selected = profiles.find((p) => p.id === selectedId);
+  const selectedName = selected
+    ? profileDisplayName(selected.id, selected.name, language)
+    : '';
 
   return (
     <section className="w-full">
       {/* 標題 */}
       <div className="flex items-center gap-2 mb-3">
         <Users className="w-6 h-6 text-blue-800 shrink-0" />
-        <h2 className="text-[20px] font-black text-blue-950">先選您的身分</h2>
+        <h2 className="text-[20px] font-black text-blue-950">{t('profile.picker.title')}</h2>
       </div>
 
       {!compact && (
         <p className="text-[16px] text-slate-700 mb-4 leading-relaxed">
-          選好之後，辨識結果和學堂內容都會依您的需求調整。之後隨時可以回來改。
+          {t('profile.picker.desc')}
         </p>
       )}
 
@@ -170,27 +188,31 @@ export const LearnerProfilePicker: React.FC<LearnerProfilePickerProps> = ({
       {selected && (
         <div className="mt-4 rounded-2xl bg-slate-100 border-2 border-slate-300 p-4">
           <p className="text-[20px] font-black text-slate-900 mb-2">
-            {selected.emoji} {selected.name}的每日參考值
+            {selected.emoji} {t('profile.picker.dailyTitle', { name: selectedName })}
           </p>
           <ul className="space-y-1.5">
-            {selected.targets.map((t) => (
+            {selected.targets.map((target) => (
               <li
-                key={t.nutrient}
+                key={target.nutrient}
                 className="flex items-start gap-2 text-[16px] leading-snug text-slate-800"
               >
                 <span
                   className={`shrink-0 mt-1 w-2.5 h-2.5 rounded-full ${
-                    t.direction === 'limit' ? 'bg-rose-500' : 'bg-emerald-500'
+                    target.direction === 'limit' ? 'bg-rose-500' : 'bg-emerald-500'
                   }`}
                   aria-hidden="true"
                 />
                 <span>
-                  <strong className="font-black">{t.nutrient}</strong>
+                  <strong className="font-black">
+                    {nutrientName(target.nutrient, language)}
+                  </strong>
                   <span className="mx-1">·</span>
-                  {t.direction === 'limit' ? '不超過' : '至少'}{' '}
-                  <strong className="font-black">{t.target}</strong>
+                  {target.direction === 'limit'
+                    ? t('profile.picker.limit')
+                    : t('profile.picker.atLeast')}{' '}
+                  <strong className="font-black">{targetText(target.target, language)}</strong>
                   <br />
-                  <span className="text-slate-600">{t.note}</span>
+                  <span className="text-slate-600">{targetNote(target.note, language)}</span>
                 </span>
               </li>
             ))}
