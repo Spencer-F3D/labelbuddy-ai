@@ -80,12 +80,11 @@ const zhTW = {
   'settings.selectedCount': '已選 {n} 項',
   'settings.notSet': '尚未設定',
   'settings.summary.vitals': '血壓 {bp} · 血糖 {sugar}',
-  'settings.language.title': '介面語言',
-  'settings.language.desc': '選擇您習慣閱讀的語言。健康設定的內容不會因語言而改變。',
-  'settings.language.zh': '繁體中文',
+  'settings.language.title': '語言',
+  /* 2026-09-28 使用者要求：不要解釋文字，只要兩個選項。
+     原本的 desc（「選擇您習慣閱讀的語言…」）與兩個 hint 都已移除。 */
+  'settings.language.zh': '中文',
   'settings.language.en': 'English',
-  'settings.language.zhHint': '預設語言',
-  'settings.language.enHint': 'For English-speaking users and judges',
   'settings.language.saved': '語言已切換',
   'settings.conditions.title': '個人慢性病與過敏把關',
   'settings.conditions.availableCount': '共 {n} 項可選',
@@ -153,12 +152,8 @@ const en: Record<TranslationKey, string> = {
   'settings.notSet': 'Not set',
   'settings.summary.vitals': 'BP {bp} · Sugar {sugar}',
   'settings.language.title': 'Language',
-  'settings.language.desc':
-    'Choose the language you prefer. Your health settings stay exactly the same.',
-  'settings.language.zh': '繁體中文',
+  'settings.language.zh': '中文',
   'settings.language.en': 'English',
-  'settings.language.zhHint': '預設語言 / Default',
-  'settings.language.enHint': 'For English-speaking users and judges',
   'settings.language.saved': 'Language changed',
   'settings.conditions.title': 'My conditions and allergens',
   'settings.conditions.availableCount': '{n} available',
@@ -179,9 +174,9 @@ export const TRANSLATIONS: Record<Language, Record<TranslationKey, string>> = {
 export const LANGUAGE_OPTIONS: Array<{
   id: Language;
   labelKey: TranslationKey;
-  hintKey: TranslationKey;
+  /** 圓形徽章上的短標記，讓不識字的視覺線索也能分辨兩個選項 */
   short: string;
 }> = [
-  { id: 'zh-TW', labelKey: 'settings.language.zh', hintKey: 'settings.language.zhHint', short: '中' },
-  { id: 'en', labelKey: 'settings.language.en', hintKey: 'settings.language.enHint', short: 'EN' },
+  { id: 'zh-TW', labelKey: 'settings.language.zh', short: '中' },
+  { id: 'en', labelKey: 'settings.language.en', short: 'EN' },
 ];

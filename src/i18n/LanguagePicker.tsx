@@ -38,11 +38,7 @@ export function LanguagePicker() {
       summary={t(currentOption.labelKey)}
     >
       <div className="flex flex-col gap-[12px]">
-        <p className="text-[16px] font-bold text-slate-700 leading-snug">
-          {t('settings.language.desc')}
-        </p>
-
-      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-[10px]">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-[10px]">
         {LANGUAGE_OPTIONS.map((opt) => {
           const isActive = language === opt.id;
           return (
@@ -68,17 +64,8 @@ export function LanguagePicker() {
                 {opt.short}
               </span>
 
-              <span className="min-w-0 flex-1">
-                <span className="block text-[19px] font-black leading-tight">
-                  {t(opt.labelKey)}
-                </span>
-                <span
-                  className={`block text-[16px] font-bold leading-tight ${
-                    isActive ? 'text-blue-200' : 'text-slate-600'
-                  }`}
-                >
-                  {t(opt.hintKey)}
-                </span>
+              <span className="min-w-0 flex-1 text-[19px] font-black leading-tight">
+                {t(opt.labelKey)}
               </span>
 
               {/* 打勾：不讓顏色單獨承載「已選中」這個資訊 */}
