@@ -61,6 +61,10 @@ import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfi
 import { compressImage } from './utils/imageCompression';
 // OCR 在瀏覽器端執行：照片不會離開使用者的裝置，只有讀出的文字會送到後端。
 import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser';
+// 雙語介面（2026-09-28）：競賽章程要求「未使用英文」可不予評審。
+import { useI18n } from './i18n/I18nContext';
+import { LanguagePicker } from './i18n/LanguagePicker';
+import type { TranslationKey } from './i18n/translations';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
@@ -101,15 +105,27 @@ export type NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classr
  */
 const MENU_ITEMS: Array<{
   tab: NavigationTab;
-  label: string;
-  hint: string;
+  /** ⚠️ 存的是翻譯鍵而不是字串：存字串的話這裡是模組層常數，
+   *  切換語言時不會跟著變。存鍵、render 時才呼叫 t() 才會即時生效。 */
+  labelKey: TranslationKey;
+  hintKey: TranslationKey;
   Icon: typeof Camera;
 }> = [
-  { tab: 'home', label: '主頁', hint: '回到首頁', Icon: HomeIcon },
-  { tab: 'scan', label: '拍照辨識', hint: '掃描食品標籤', Icon: Camera },
-  { tab: 'history', label: '飲食紀錄', hint: '看過去的把關紀錄', Icon: Calendar },
-  { tab: 'classroom', label: '食育學堂', hint: '學怎麼吃得安心', Icon: GraduationCap },
-  { tab: 'conditions', label: '健康設定', hint: '設定慢性病與過敏原', Icon: HeartPulse },
+  { tab: 'home', labelKey: 'menu.home', hintKey: 'menu.home.hint', Icon: HomeIcon },
+  { tab: 'scan', labelKey: 'menu.scan', hintKey: 'menu.scan.hint', Icon: Camera },
+  { tab: 'history', labelKey: 'menu.history', hintKey: 'menu.history.hint', Icon: Calendar },
+  {
+    tab: 'classroom',
+    labelKey: 'menu.classroom',
+    hintKey: 'menu.classroom.hint',
+    Icon: GraduationCap,
+  },
+  {
+    tab: 'conditions',
+    labelKey: 'menu.conditions',
+    hintKey: 'menu.conditions.hint',
+    Icon: HeartPulse,
+  },
 ];
 
 // 預設四大慢性健康指標（單欄垂直勾選）
@@ -267,6 +283,16 @@ function getDailyNutritionAdvice(result: LabelAnalysisResult): {
 }
 
 export default function App() {
+  /**
+   * 0-0. 介面語言。
+   *
+   * 【為什麼 t 只取不用的變數】
+   *   語言狀態本身存在 I18nContext（含 localStorage 持久化），
+   *   這裡只需要翻譯函式。切換語言時 Context 會重新渲染整棵樹，
+   *   所有用到 t() 的地方都會跟著更新。
+   */
+  const { t } = useI18n();
+
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
    *    未選擇或儲存值損毀時，安全退回「長者三高」，與舊版行為一致。
@@ -1005,7 +1031,7 @@ export default function App() {
             <button
               type="button"
               id="btn-open-menu"
-              aria-label={isMenuOpen ? '關閉選單' : '開啟選單'}
+              aria-label={isMenuOpen ? t('app.closeMenu') : t('app.openMenu')}
               aria-expanded={isMenuOpen}
               aria-controls="app-drawer"
               onClick={() => setIsMenuOpen((v) => !v)}
@@ -1032,12 +1058,12 @@ export default function App() {
                 ⚠️ 字級地板 16px：此處已是全站最小，不可再往下 */}
             <div className="flex items-center gap-[4px] px-[8px] py-[3px] rounded-full bg-slate-100 border border-slate-300 text-[16px] font-extrabold text-slate-700 whitespace-nowrap shrink-0">
               <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${geminiConnected ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`} />
-              <span>{geminiConnected ? '雲端 AI 辨識' : '本機備援引擎'}</span>
+              <span>{geminiConnected ? t('app.statusCloud') : t('app.statusLocal')}</span>
             </div>
           </div>
           <p className="text-[16px] font-extrabold text-blue-900 flex items-center justify-center gap-1.5 mt-0.5">
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-            專為長者設計的超市食品健康放大鏡
+            {t('app.tagline')}
           </p>
         </div>
       </header>
@@ -1075,12 +1101,14 @@ export default function App() {
             <Sparkles className="w-[26px] h-[26px] shrink-0" />
             <div className="min-w-0">
               <p className="text-[19px] font-black leading-tight">LabelBuddy AI</p>
-              <p className="text-[16px] font-bold text-blue-200 leading-tight">功能選單</p>
+              <p className="text-[16px] font-bold text-blue-200 leading-tight">
+                {t('app.menuTitle')}
+              </p>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
-            {MENU_ITEMS.map(({ tab, label, hint, Icon }) => {
+            {MENU_ITEMS.map(({ tab, labelKey, hintKey, Icon }) => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -1108,13 +1136,15 @@ export default function App() {
                     <Icon className="w-[24px] h-[24px] shrink-0" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[19px] font-black leading-tight">{label}</span>
+                    <span className="block text-[19px] font-black leading-tight">
+                      {t(labelKey)}
+                    </span>
                     <span
                       className={`block text-[16px] font-bold leading-tight ${
                         isActive ? 'text-blue-200' : 'text-slate-600'
                       }`}
                     >
-                      {hint}
+                      {t(hintKey)}
                     </span>
                   </span>
                 </button>
@@ -1130,7 +1160,7 @@ export default function App() {
               className="w-full min-h-[56px] rounded-[14px] bg-slate-100 hover:bg-slate-200 text-slate-900 text-[19px] font-black border-[2px] border-slate-400 flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 transition-all"
             >
               <CloseIcon className="w-[24px] h-[24px] shrink-0" />
-              關閉選單
+              {t('common.close')}
             </button>
           </div>
         </nav>
@@ -1153,9 +1183,11 @@ export default function App() {
           <>
             {/* 問候語 */}
             <section className="bg-white rounded-[16px] border-[3px] border-blue-900 p-[20px] flex flex-col gap-[6px] shadow-sm">
-              <h2 className="text-[20px] font-black text-slate-950 leading-tight">您好</h2>
+              <h2 className="text-[20px] font-black text-slate-950 leading-tight">
+                {t('home.greeting')}
+              </h2>
               <p className="text-[16px] font-bold text-slate-700 leading-snug">
-                今天也要吃得安心。把包裝上的營養標示拍下來，我幫您看看適不適合。
+                {t('home.intro')}
               </p>
             </section>
 
@@ -1167,15 +1199,19 @@ export default function App() {
               className="w-full min-h-[120px] rounded-[16px] bg-blue-900 hover:bg-blue-950 text-white flex flex-col items-center justify-center gap-[6px] cursor-pointer active:scale-95 transition-all border-[3px] border-blue-950 shadow-md"
             >
               <Camera className="w-[44px] h-[44px] shrink-0" />
-              <span className="text-[20px] font-black leading-tight">拍照辨識</span>
+              <span className="text-[20px] font-black leading-tight">
+                {t('home.cameraButton')}
+              </span>
               <span className="text-[16px] font-bold text-blue-200 leading-tight">
-                掃描食品標籤，馬上知道能不能買
+                {t('home.cameraHint')}
               </span>
             </button>
 
             {/* 我的把關：兩個數字都可點，直接跳到對應頁面 */}
             <section className="bg-white rounded-[16px] border-[3px] border-slate-300 p-[16px] flex flex-col gap-[12px] shadow-sm">
-              <h3 className="text-[19px] font-black text-slate-950 leading-tight">我的把關</h3>
+              <h3 className="text-[19px] font-black text-slate-950 leading-tight">
+                {t('home.summaryTitle')}
+              </h3>
 
               <div className="grid grid-cols-2 gap-[10px]">
                 <button
@@ -1190,7 +1226,9 @@ export default function App() {
                   <span className="text-[20px] font-black text-blue-800 leading-tight">
                     {dietRecords.length}
                   </span>
-                  <span className="text-[16px] font-bold text-slate-600 leading-tight">筆紀錄</span>
+                  <span className="text-[16px] font-bold text-slate-600 leading-tight">
+                    {t('home.recordCount')}
+                  </span>
                 </button>
 
                 <button
@@ -1206,7 +1244,7 @@ export default function App() {
                     {selectedConditions.length}
                   </span>
                   <span className="text-[16px] font-bold text-slate-600 leading-tight">
-                    項健康設定
+                    {t('home.conditionCount')}
                   </span>
                 </button>
               </div>
@@ -1224,7 +1262,7 @@ export default function App() {
                 <span className="text-[20px] shrink-0">{learnerProfile.emoji}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[16px] font-bold text-slate-600 leading-tight">
-                    目前身分
+                    {t('home.currentProfile')}
                   </span>
                   <span className="block text-[19px] font-black text-slate-950 leading-tight">
                     {learnerProfile.name}
@@ -1301,7 +1339,7 @@ export default function App() {
                   className={FOOTER_CTA_CLASS}
                 >
                   <RefreshCw className={FOOTER_CTA_ICON} />
-                  <span>📸 再拍一次</span>
+                  <span>📸 {t('footer.retryScan')}</span>
                 </button>
               </section>
             )}
@@ -1518,7 +1556,7 @@ export default function App() {
                         className={FOOTER_CTA_SECONDARY}
                       >
                         <Camera className="w-[28px] h-[28px] shrink-0" />
-                        <span>📷 再拍一次</span>
+                        <span>📷 {t('footer.retryScan')}</span>
                       </button>
                     </section>
                   </div>
@@ -1996,7 +2034,10 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === 'conditions' && (
           <div className="flex flex-col space-y-6">
-            {/* 第零部分：學習者身分（決定 AI 的判斷基準與每日參考值） */}
+            {/* 第零部分：介面語言（放在最前面，因為它影響整頁的顯示方式） */}
+            <LanguagePicker />
+
+            {/* 第一部分：學習者身分（決定 AI 的判斷基準與每日參考值） */}
             <section className="bg-white rounded-3xl p-5 border-4 border-blue-900 shadow-md">
               <LearnerProfilePicker
                 selectedId={learnerProfileId}
@@ -2508,7 +2549,7 @@ export default function App() {
             className={FOOTER_CTA_CLASS}
           >
             <Camera className={FOOTER_CTA_ICON} />
-            <span>📸 拍照辨識</span>
+            <span>📸 {t('footer.homeCamera')}</span>
           </button>
         ) : activeTab === 'scan' ? (
           analysisResult ? (
@@ -2519,7 +2560,7 @@ export default function App() {
               className={FOOTER_CTA_CLASS}
             >
               <RotateCcw className={FOOTER_CTA_ICON} />
-              <span>📸 重新拍照</span>
+              <span>📸 {t('footer.scanRetake')}</span>
             </button>
           ) : (
             <button
@@ -2530,7 +2571,7 @@ export default function App() {
               className={`${FOOTER_CTA_CLASS} disabled:opacity-60`}
             >
               <Camera className={FOOTER_CTA_ICON} />
-              <span>📸 一鍵拍照</span>
+              <span>📸 {t('footer.scanCamera')}</span>
             </button>
           )
         ) : activeTab === 'conditions' ? (
@@ -2541,7 +2582,7 @@ export default function App() {
             className={FOOTER_CTA_CLASS}
           >
             <Camera className={FOOTER_CTA_ICON} />
-            <span>📸 前往拍照辨識</span>
+            <span>📸 {t('footer.goScan')}</span>
           </button>
         ) : activeTab === 'classroom' ? (
           <button
@@ -2554,7 +2595,7 @@ export default function App() {
             className={FOOTER_CTA_CLASS}
           >
             <Camera className={FOOTER_CTA_ICON} />
-            <span>📸 去超市試試看</span>
+            <span>📸 {t('footer.classroomTry')}</span>
           </button>
         ) : (
           <button
@@ -2567,7 +2608,7 @@ export default function App() {
             className={FOOTER_CTA_CLASS}
           >
             <Camera className={FOOTER_CTA_ICON} />
-            <span>📸 拍照為食品把關</span>
+            <span>📸 {t('footer.historyScan')}</span>
           </button>
         )}
       </footer>
