@@ -8,6 +8,11 @@ bun.lock
 .env*
 !.env.example
 
+# Cloudflare Workers 本機開發用的環境變數（含 API 金鑰）
+# wrangler dev 會自動讀這個檔案；正式環境的金鑰用 `wrangler secret put` 設定。
+.dev.vars
+.wrangler/
+
 # 驗證腳本的打包產物（npm run ocr:smoke / verify:conditions 會產生，用後即丟）
 .ocr-smoke.mjs
 .verify-conditions.mjs
