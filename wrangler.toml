@@ -1,14 +1,19 @@
 # Cloudflare Workers 部署設定
 #
 # 【這個檔案是什麼】
-#   Cloudflare 的部署說明書。`npx wrangler deploy` 會讀它來決定：
+#   Cloudflare 的部署說明書。`wrangler deploy` 會讀它來決定：
 #   進入點在哪、要上傳哪些靜態檔、需要哪些相容性設定。
 #
 # 【為什麼需要 nodejs_compat】
 #   server/core.ts 用了 `node:crypto` 的 createHash（算圖片快取鍵）與 `process.env`
 #   （讀 API 金鑰）。Workers 預設沒有 Node 模組，開啟這個旗標才會提供。
 
-name = "labelbuddy-ai"
+# ⚠️ Worker 名稱會直接變成網址的第一段：<name>.<子網域>.workers.dev
+#    取名 "app" 而不是 "labelbuddy-ai"，是為了讓網址好唸好寫：
+#      app.labelbuddy-ai.workers.dev      ← 現在
+#      labelbuddy-ai.labelbuddy-ai.workers.dev  ← 舊的（兩段同名，看起來像跳針）
+#    改名字等於建一個新的 Worker，**Secret 不會跟著搬**，要重新設定一次。
+name = "app"
 main = "worker.ts"
 
 # 相容性日期：決定 Workers 執行環境的行為版本。用建立當天即可。
@@ -37,14 +42,14 @@ enabled = true
 
 # ── 環境變數 ────────────────────────────────────────────────────
 # ⚠️ 不要把 API 金鑰寫在這裡！這個檔案會進版控。
-#    金鑰用 `npx wrangler secret put OPENROUTER_API_KEY` 設定（加密儲存）。
+#    金鑰用 `wrangler secret put OPENROUTER_API_KEY` 設定（加密儲存）。
 #    本機測試時放在 .dev.vars（已在 .gitignore）。
 #
 # 以下是非機密的預設值，可以安心放在版控裡。
 [vars]
-# ⚠️ 網址格式是 <Worker名稱>.<子網域>.workers.dev
-#    Worker 名稱來自上面的 name，子網域是註冊 workers.dev 時選的。
-#    兩者剛好同名，所以看起來像重複 —— 這是正常的。
-APP_URL = "https://labelbuddy-ai.labelbuddy-ai.workers.dev"
+# 網址格式是 <Worker名稱>.<子網域>.workers.dev
+#   Worker 名稱 = 上面的 name（app）
+#   子網域     = 註冊 workers.dev 時選的（labelbuddy-ai）
+APP_URL = "https://app.labelbuddy-ai.workers.dev"
 AI_REQUEST_TIMEOUT_MS = "45000"
 AI_CACHE_TTL_MS = "86400000"

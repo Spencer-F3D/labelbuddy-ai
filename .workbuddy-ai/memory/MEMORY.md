@@ -51,8 +51,27 @@ SDG 3／4／12。
 4. ★ **人臉／姓名／學號／手部**：人臉可用 MediaPipe 在瀏覽器端偵測後**拒絕**；
    號碼格式可用規則比對；**手部不建議做**（拿標籤的手必然入鏡）
 
-## 🚀 【2026-09-27 定案】部署架構：Cloudflare（不是 Vercel）
+## 🚀 【2026-09-27 定案 / 09-28 上線】部署架構：Cloudflare（不是 Vercel）
 
+### ✅ 正式網址（2026-09-28 上線）
+```
+https://app.labelbuddy-ai.workers.dev
+```
+⚠️ **網址格式是 `<Worker名稱>.<子網域>.workers.dev`**
+- Worker 名稱 = `wrangler.toml` 的 `name`（目前是 `app`）
+- 子網域 = 註冊 workers.dev 時選的（`labelbuddy-ai`）
+- **唯一可靠來源是 `wrangler deploy` 輸出的最後一行**，不要用猜的
+- 原名 `labelbuddy-ai` 會變成 `labelbuddy-ai.labelbuddy-ai.workers.dev`（兩段同名很像跳針）
+  → 2026-09-28 改名為 `app`，舊 Worker 已刪除
+
+| 項目 | 值 |
+| --- | --- |
+| Cloudflare 帳號 | `kanhf28@gmail.com` |
+| Account ID | `4ffa5d1a862bdbeaef2782f9b9774034` |
+| 憑證位置 | `C:\Users\Spencer\AppData\Roaming\xdg.config\.wrangler\config\default.toml` |
+| Secret | `OPENROUTER_API_KEY`、`GEMINI_API_KEY`（加密儲存） |
+
+### 架構
 | 層 | 選擇 |
 | --- | --- |
 | 版控 | GitHub：`https://github.com/Spencer-F3D/labelbuddy-ai`（Private） |
@@ -61,8 +80,23 @@ SDG 3／4／12。
 | **OCR 位置** | ✅ **已完成搬到前端**（`src/ocr/ocrBrowser.ts`） |
 | APK | Capacitor ＋ ML Kit 裝置端 OCR |
 
+### 後端結構（2026-09-28 重構，平台無關）
+```
+server/labelParser.ts   純解析（無 Node API）—— Worker 也能用
+server/ocrLabel.ts      Node 專屬 OCR（命令列實測、舊客戶端降級）
+server/core.ts          共用邏輯（AI 供應商、快取、配額、提示詞、簡繁表）
+server/handlers.ts      6 個 API handler（平台無關）
+server.ts               Express 轉接層（130 行）
+worker.ts               Cloudflare Workers 入口
+```
+★ 技巧：用 `makeRes()` 相容層包住原本的 Express handler，
+   `res.json()` **回傳「結果物件」**（不是 res 本身），
+   所以 `return res.json(...)` 原封不動就能運作。
+★ 伺服器端 OCR 用 **依賴注入**（`CoreDeps.recognizeImage`）——
+   Worker 不提供，收到圖片時回 `OCR_NOT_AVAILABLE`。
+
 **為什麼選 Cloudflare 而不是 Vercel**（官方文件查證）：
-- **牆鐘時間無限制** vs Vercel 預設 10 秒（我們的 AI 呼叫要 12 秒）
+- **牆鐘時間無限制** vs Vercel 預設 10 秒（我們的 AI 呼叫要 8～12 秒）
 - **請求體 100 MB** vs Vercel 4.5 MB
 - **沒有冷啟動**（V8 isolate）→ 決賽現場更可靠
 - Workers 免費方案每請求 **10ms CPU** → **tesseract.js 不可能跑在上面**
@@ -71,6 +105,16 @@ SDG 3／4／12。
 ⚠️ 透過 Tunnel 存取時，**Vite 會擋下前端**（`403 Blocked request`，API 不受影響）
 → `vite.config.ts` 已加 `allowedHosts: ['.trycloudflare.com']`，
 用環境變數 `VITE_ALLOWED_HOSTS` 可覆寫。
+
+⚠️ `wrangler.toml` 的 **`run_worker_first = ["/api/*"]` 是關鍵**：
+沒有的話 SPA 模式會讓 `/api/*` 回 index.html，API 整組壞掉。
+
+⚠️ **改 Worker 名稱等於建新 Worker，Secret 不會跟著搬**，要重新 `wrangler secret put`。
+
+### 部署方式
+- 使用者雙擊 `部署上線.bat`（登入 → 設 Secret → 部署 → 顯示網址）
+- 或助手直接跑：`node node_modules/wrangler/bin/wrangler.js deploy`
+- ⚠️ **不要用 `npx wrangler`** —— 會觸發沙箱的 safe-delete 保護
 
 ## 🔒 【2026-09-27 完成】OCR 已搬到前端 —— 照片不再上傳
 
