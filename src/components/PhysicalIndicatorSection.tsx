@@ -391,7 +391,7 @@ export const PhysicalIndicatorSection: React.FC<PhysicalIndicatorSectionProps> =
               onClick={() => applyPreset('hypertension')}
               className="px-4 py-2.5 rounded-xl text-lg font-black bg-rose-50 border-2 border-rose-300 text-rose-900 hover:bg-rose-100 cursor-pointer shadow-sm active:scale-95"
             >
-              👴 李爺爺血壓偏高 (148/92)
+              👴 血壓偏高 (148/92)
             </button>
             <button
               type="button"
@@ -399,7 +399,7 @@ export const PhysicalIndicatorSection: React.FC<PhysicalIndicatorSectionProps> =
               onClick={() => applyPreset('diabetes')}
               className="px-4 py-2.5 rounded-xl text-lg font-black bg-amber-50 border-2 border-amber-300 text-amber-900 hover:bg-amber-100 cursor-pointer shadow-sm active:scale-95"
             >
-              👵 王奶奶飯後血糖高 (8.8度)
+              👵 飯後血糖高 (8.8度)
             </button>
             <button
               type="button"
@@ -423,7 +423,7 @@ export const PhysicalIndicatorSection: React.FC<PhysicalIndicatorSectionProps> =
               onClick={() => applyPreset('normal')}
               className="px-4 py-2.5 rounded-xl text-lg font-black bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 cursor-pointer shadow-sm active:scale-95"
             >
-              🌿 張伯伯健康正常 (120/78, 5.4度)
+              🌿 健康正常 (120/78, 5.4度)
             </button>
           </div>
         </div>

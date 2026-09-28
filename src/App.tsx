@@ -52,6 +52,10 @@ import {
   Info,
   CheckSquare,
   ShieldAlert,
+  // 側邊選單用（2026-09-28 新增）
+  Menu as MenuIcon,
+  X as CloseIcon,
+  Home as HomeIcon,
 } from 'lucide-react';
 import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId } from './types';
 import { compressImage } from './utils/imageCompression';
@@ -84,7 +88,29 @@ import {
 } from './theme';
 
 // 導航 Bar 頁面定義：拍照辨識、健康設定、飲食紀錄、食育學堂
-export type NavigationTab = 'scan' | 'conditions' | 'history' | 'classroom';
+export type NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classroom';
+
+/**
+ * 側邊選單的項目。
+ *
+ * 【為什麼集中在這裡】
+ *   選單是唯一的頁面切換入口（底部導航列已於 2026-09-28 移除），
+ *   把項目集中成一份資料，新增頁面時只要改這裡，不必在 JSX 裡複製貼上。
+ *
+ * 【順序】依使用者指定的：主頁 → 拍照 → 記錄 → 學堂 → 設定
+ */
+const MENU_ITEMS: Array<{
+  tab: NavigationTab;
+  label: string;
+  hint: string;
+  Icon: typeof Camera;
+}> = [
+  { tab: 'home', label: '主頁', hint: '回到首頁', Icon: HomeIcon },
+  { tab: 'scan', label: '拍照辨識', hint: '掃描食品標籤', Icon: Camera },
+  { tab: 'history', label: '飲食紀錄', hint: '看過去的把關紀錄', Icon: Calendar },
+  { tab: 'classroom', label: '食育學堂', hint: '學怎麼吃得安心', Icon: GraduationCap },
+  { tab: 'conditions', label: '健康設定', hint: '設定慢性病與過敏原', Icon: HeartPulse },
+];
 
 // 預設四大慢性健康指標（單欄垂直勾選）
 // ⚠️ 資料來源改為 src/data/conditions.ts 的 PHYSICAL_INDICATORS（12 項），
@@ -449,7 +475,16 @@ export default function App() {
   });
 
   // 3. 應用狀態管理與導航 Bar
-  const [activeTab, setActiveTab] = useState<NavigationTab>('scan');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('home');
+  /**
+   * 側邊選單是否展開。
+   *
+   * 【為什麼不用條件渲染（isMenuOpen && <div>）】
+   *   條件渲染會讓面板「憑空出現」，做不出滑出動畫。
+   *   這裡改成永遠渲染、用 transform 推出去，
+   *   收起時加 pointer-events-none 讓點擊穿透，才不會擋住底下的畫面。
+   */
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isNetworkDelayed, setIsNetworkDelayed] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<LabelAnalysisResult | null>(null);
@@ -960,14 +995,38 @@ export default function App() {
       {/* ======================================================== */}
       {/* 模組 1：頂部標題區 */}
       {/* ======================================================== */}
-      <header className="bg-white border-b-4 border-blue-900 px-[16px] py-[10px] text-center shadow-sm min-[520px]:shrink-0">
+      <header className="bg-white border-b-4 border-blue-900 px-[16px] py-[10px] shadow-sm min-[520px]:shrink-0">
         <div className="flex flex-col items-center justify-center gap-1">
-          <div className="flex items-center justify-between w-full">
-            <h1 className="text-[20px] font-black text-blue-950 tracking-tight flex items-center gap-[6px] whitespace-nowrap">
-              <Sparkles className="w-[26px] h-[26px] text-blue-800 shrink-0" />
+          <div className="flex items-center justify-between w-full gap-[8px]">
+
+            {/* 漢堡選單鈕（左上角）——現在是唯一的頁面切換入口。
+                觸控尺寸 48×48，符合長者的操作需求。
+                aria-expanded 讓螢幕閱讀器知道選單目前是開還是關。 */}
+            <button
+              type="button"
+              id="btn-open-menu"
+              aria-label={isMenuOpen ? '關閉選單' : '開啟選單'}
+              aria-expanded={isMenuOpen}
+              aria-controls="app-drawer"
+              onClick={() => setIsMenuOpen((v) => !v)}
+              className="w-[48px] h-[48px] shrink-0 rounded-[12px] bg-blue-900 hover:bg-blue-950 text-white flex items-center justify-center cursor-pointer active:scale-95 transition-all border-[2px] border-blue-950"
+            >
+              {isMenuOpen ? (
+                <CloseIcon className="w-[26px] h-[26px] shrink-0" />
+              ) : (
+                <MenuIcon className="w-[26px] h-[26px] shrink-0" />
+              )}
+            </button>
+
+            {/* ⚠️ 這裡刻意不放 Sparkles 圖示：
+                    360px 寬（16:9 手機）下，漢堡鈕 48px ＋ 標題 ＋ 狀態標籤會超出
+                    可用寬度（328px），導致「LabelBuddy AI」被截成「LabelBuddy A」。
+                    實測拿掉 24px 圖示＋4px 間距後剛好放得下。
+                    App 名稱被截斷比少一個裝飾圖示嚴重得多。 */}
+            <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap min-w-0">
               LabelBuddy AI
             </h1>
-            
+
             {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
                 ⚠️ 360px 寬（16:9 手機）下這裡極容易折行，故字級與內距都收斂並強制不換行
                 ⚠️ 字級地板 16px：此處已是全站最小，不可再往下 */}
@@ -984,105 +1043,199 @@ export default function App() {
       </header>
 
       {/* ======================================================== */}
-      {/* 導航 Bar：三大主要頁面快速切換（觸控高度大於 64px，字體 20px） */}
+      {/* 側邊選單（Drawer）                                        */}
+      {/* 2026-09-28 起取代原本的底部 4 格導航列                     */}
       {/* ======================================================== */}
-      <nav
-        aria-label="主要功能導航列"
-        className="sticky top-0 z-40 bg-white border-b-4 border-blue-900 shadow-md w-full min-[520px]:shrink-0"
+      {/* ⚠️ 外層用 `fixed inset-0 min-[520px]:absolute`：
+             手機是全螢幕，桌面版是 380×660 的手機框，兩種都要正確定位。
+             （沿用本檔其他彈窗的既有寫法，見 showMigrationPrompt 的註解） */}
+      <div
+        className={`fixed inset-0 z-[70] min-[520px]:absolute ${
+          isMenuOpen ? '' : 'pointer-events-none'
+        }`}
+        aria-hidden={!isMenuOpen}
       >
-        <div className="w-full grid grid-cols-4 gap-[4px] p-[8px]">
-          {/* 標籤 1：拍照辨識 */}
-          <button
-            type="button"
-            id="nav-tab-scan"
-            role="tab"
-            aria-selected={activeTab === 'scan'}
-            onClick={() => {
-              stopSpeech();
-              setActiveTab('scan');
-            }}
-            className={`min-h-[64px] py-[6px] px-[2px] rounded-2xl flex flex-col items-center justify-center gap-[3px] cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'scan'
-                ? 'bg-blue-900 text-white font-black shadow-md border-3 border-blue-950 ring-3 ring-yellow-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border-2 border-slate-300'
-            }`}
-          >
-            <Camera className="w-[26px] h-[26px] shrink-0" />
-            <span className="text-[16px] leading-[1.2] whitespace-nowrap">拍照辨識</span>
-          </button>
+        {/* 遮罩：點一下關閉選單 */}
+        <div
+          className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${
+            isMenuOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={() => setIsMenuOpen(false)}
+        />
 
-          {/* 標籤 2：健康設定 */}
-          <button
-            type="button"
-            id="nav-tab-conditions"
-            role="tab"
-            aria-selected={activeTab === 'conditions'}
-            onClick={() => {
-              stopSpeech();
-              setActiveTab('conditions');
-            }}
-            className={`min-h-[64px] py-[6px] px-[2px] rounded-2xl flex flex-col items-center justify-center gap-[3px] cursor-pointer transition-all active:scale-95 relative ${
-              activeTab === 'conditions'
-                ? 'bg-blue-900 text-white font-black shadow-md border-3 border-blue-950 ring-3 ring-yellow-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border-2 border-slate-300'
-            }`}
-          >
-            <HeartPulse className="w-[26px] h-[26px] shrink-0" />
-            <span className="text-[16px] leading-[1.2] whitespace-nowrap">健康設定</span>
-            <span className="absolute top-1.5 right-2 bg-rose-600 text-white text-[16px] font-black px-1.5 py-0.2 rounded-full border border-white">
-              {selectedConditions.length}項
-            </span>
-          </button>
+        {/* 選單面板：從左側滑出 */}
+        <nav
+          id="app-drawer"
+          aria-label="主選單"
+          className={`absolute inset-y-0 left-0 w-[80%] max-w-[300px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+            isMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="bg-blue-900 text-white px-[16px] py-[14px] flex items-center gap-[10px] shrink-0">
+            <Sparkles className="w-[26px] h-[26px] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[19px] font-black leading-tight">LabelBuddy AI</p>
+              <p className="text-[16px] font-bold text-blue-200 leading-tight">功能選單</p>
+            </div>
+          </div>
 
-          {/* 標籤 3：飲食紀錄 */}
-          <button
-            type="button"
-            id="nav-tab-history"
-            role="tab"
-            aria-selected={activeTab === 'history'}
-            onClick={() => {
-              stopSpeech();
-              setActiveTab('history');
-            }}
-            className={`min-h-[64px] py-[6px] px-[2px] rounded-2xl flex flex-col items-center justify-center gap-[3px] cursor-pointer transition-all active:scale-95 relative ${
-              activeTab === 'history'
-                ? 'bg-blue-900 text-white font-black shadow-md border-3 border-blue-950 ring-3 ring-yellow-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border-2 border-slate-300'
-            }`}
-          >
-            <Calendar className="w-[26px] h-[26px] shrink-0" />
-            <span className="text-[16px] leading-[1.2] whitespace-nowrap">飲食紀錄</span>
-            <span className="absolute top-1.5 right-2 bg-emerald-600 text-white text-[16px] font-black px-1.5 py-0.2 rounded-full border border-white">
-              {dietRecords.length}筆
-            </span>
-          </button>
+          <div className="flex-1 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
+            {MENU_ITEMS.map(({ tab, label, hint, Icon }) => {
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  id={`menu-item-${tab}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => {
+                    stopSpeech();
+                    setActiveTab(tab);
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full min-h-[64px] px-[14px] py-[10px] rounded-[14px] flex items-center gap-[12px] text-left cursor-pointer transition-all active:scale-95 border-[2px] ${
+                    isActive
+                      ? 'bg-blue-900 text-white border-blue-950 shadow-md'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-900 border-slate-300'
+                  }`}
+                >
+                  {/* 圖示底色圓：用形狀輔助辨識，不讓顏色單獨承載資訊 */}
+                  <span
+                    className={`w-[40px] h-[40px] shrink-0 rounded-full flex items-center justify-center ${
+                      isActive ? 'bg-blue-800' : 'bg-white border border-slate-300'
+                    }`}
+                  >
+                    <Icon className="w-[24px] h-[24px] shrink-0" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[19px] font-black leading-tight">{label}</span>
+                    <span
+                      className={`block text-[16px] font-bold leading-tight ${
+                        isActive ? 'text-blue-200' : 'text-slate-600'
+                      }`}
+                    >
+                      {hint}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-          {/* 標籤 4：食育學堂（知識卡＋測驗，離線可完整使用） */}
-          <button
-            type="button"
-            id="nav-tab-classroom"
-            role="tab"
-            aria-selected={activeTab === 'classroom'}
-            onClick={() => {
-              stopSpeech();
-              setActiveTab('classroom');
-            }}
-            className={`min-h-[64px] py-[6px] px-[2px] rounded-2xl flex flex-col items-center justify-center gap-[3px] cursor-pointer transition-all active:scale-95 ${
-              activeTab === 'classroom'
-                ? 'bg-blue-900 text-white font-black shadow-md border-3 border-blue-950 ring-3 ring-yellow-400'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border-2 border-slate-300'
-            }`}
-          >
-            <GraduationCap className="w-[26px] h-[26px] shrink-0" />
-            <span className="text-[16px] leading-[1.2] whitespace-nowrap">食育學堂</span>
-          </button>
-        </div>
-      </nav>
+          <div className="p-[10px] border-t-2 border-slate-200 shrink-0">
+            <button
+              type="button"
+              id="btn-close-menu"
+              onClick={() => setIsMenuOpen(false)}
+              className="w-full min-h-[56px] rounded-[14px] bg-slate-100 hover:bg-slate-200 text-slate-900 text-[19px] font-black border-[2px] border-slate-400 flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 transition-all"
+            >
+              <CloseIcon className="w-[24px] h-[24px] shrink-0" />
+              關閉選單
+            </button>
+          </div>
+        </nav>
+      </div>
+
 
       {/* ======================================================== */}
-      {/* 主內容區：單欄垂直滾動 (flex-col)，根據導航 Bar 切換 */}
+      {/* 主內容區：單欄垂直滾動 (flex-col)，依側邊選單切換          */}
       {/* ======================================================== */}
       <main className="flex-1 flex flex-col p-4 space-y-5 pb-28 min-h-0 min-[520px]:overflow-y-auto min-[520px]:pb-4">
+        {/* ======================================================== */}
+        {/* 頁面 0：主頁（HOME TAB）                                   */}
+        {/* ======================================================== */}
+        {/* 【設計原則】
+              1. 一打開就要知道「要做什麼」—— 所以拍照按鈕最大、最顯眼
+              2. 不用任何人名或稱謂（2026-09-28 使用者要求）
+              3. 摘要素數字要能點，點下去就跳到對應頁面（減少長者找路徑的負擔）
+              4. 刻意不放隱私區塊：使用者要求，且健康設定頁已有完整說明 */}
+        {activeTab === 'home' && (
+          <>
+            {/* 問候語 */}
+            <section className="bg-white rounded-[16px] border-[3px] border-blue-900 p-[20px] flex flex-col gap-[6px] shadow-sm">
+              <h2 className="text-[20px] font-black text-slate-950 leading-tight">您好</h2>
+              <p className="text-[16px] font-bold text-slate-700 leading-snug">
+                今天也要吃得安心。把包裝上的營養標示拍下來，我幫您看看適不適合。
+              </p>
+            </section>
+
+            {/* 主要動作：超大拍照按鈕（觸控高度 120px，遠超無障礙規範的 48px） */}
+            <button
+              type="button"
+              id="btn-home-camera"
+              onClick={handleTriggerCamera}
+              className="w-full min-h-[120px] rounded-[16px] bg-blue-900 hover:bg-blue-950 text-white flex flex-col items-center justify-center gap-[6px] cursor-pointer active:scale-95 transition-all border-[3px] border-blue-950 shadow-md"
+            >
+              <Camera className="w-[44px] h-[44px] shrink-0" />
+              <span className="text-[20px] font-black leading-tight">拍照辨識</span>
+              <span className="text-[16px] font-bold text-blue-200 leading-tight">
+                掃描食品標籤，馬上知道能不能買
+              </span>
+            </button>
+
+            {/* 我的把關：兩個數字都可點，直接跳到對應頁面 */}
+            <section className="bg-white rounded-[16px] border-[3px] border-slate-300 p-[16px] flex flex-col gap-[12px] shadow-sm">
+              <h3 className="text-[19px] font-black text-slate-950 leading-tight">我的把關</h3>
+
+              <div className="grid grid-cols-2 gap-[10px]">
+                <button
+                  type="button"
+                  id="btn-home-history"
+                  onClick={() => {
+                    stopSpeech();
+                    setActiveTab('history');
+                  }}
+                  className="min-h-[84px] rounded-[14px] bg-slate-50 hover:bg-slate-100 border-[2px] border-slate-300 flex flex-col items-center justify-center gap-[2px] cursor-pointer active:scale-95 transition-all"
+                >
+                  <span className="text-[20px] font-black text-blue-800 leading-tight">
+                    {dietRecords.length}
+                  </span>
+                  <span className="text-[16px] font-bold text-slate-600 leading-tight">筆紀錄</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-home-conditions"
+                  onClick={() => {
+                    stopSpeech();
+                    setActiveTab('conditions');
+                  }}
+                  className="min-h-[84px] rounded-[14px] bg-slate-50 hover:bg-slate-100 border-[2px] border-slate-300 flex flex-col items-center justify-center gap-[2px] cursor-pointer active:scale-95 transition-all"
+                >
+                  <span className="text-[20px] font-black text-rose-700 leading-tight">
+                    {selectedConditions.length}
+                  </span>
+                  <span className="text-[16px] font-bold text-slate-600 leading-tight">
+                    項健康設定
+                  </span>
+                </button>
+              </div>
+
+              {/* 目前身分：讓使用者隨時知道自己是用哪個身分在做判斷 */}
+              <button
+                type="button"
+                id="btn-home-profile"
+                onClick={() => {
+                  stopSpeech();
+                  setActiveTab('conditions');
+                }}
+                className="w-full min-h-[56px] rounded-[14px] bg-slate-50 hover:bg-slate-100 border-[2px] border-slate-300 px-[14px] flex items-center gap-[10px] text-left cursor-pointer active:scale-95 transition-all"
+              >
+                <span className="text-[20px] shrink-0">{learnerProfile.emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-bold text-slate-600 leading-tight">
+                    目前身分
+                  </span>
+                  <span className="block text-[19px] font-black text-slate-950 leading-tight">
+                    {learnerProfile.name}
+                  </span>
+                </span>
+                <ArrowRight className="w-[24px] h-[24px] text-slate-500 shrink-0" />
+              </button>
+            </section>
+          </>
+        )}
+
         {/* ======================================================== */}
         {/* 頁面 1：拍照辨識（SCANNER TAB） */}
         {/* ======================================================== */}
@@ -2346,7 +2499,18 @@ export default function App() {
       {/* 固定在螢幕底部的主要操作按鈕（觸控高度 ≥ 72px，符合無障礙規範） */}
       {/* ======================================================== */}
       <footer className="sticky bottom-0 left-0 right-0 z-30 w-full p-[8px] bg-white/95 backdrop-blur-md border-t-4 border-blue-900 shadow-[0_-8px_25px_rgba(0,0,0,0.2)] min-[520px]:shrink-0">
-        {activeTab === 'scan' ? (
+        {activeTab === 'home' ? (
+          /* 主頁的主要動作與頁面中央的大按鈕一致，讓長者不用思考「該按哪一個」 */
+          <button
+            type="button"
+            id="btn-home-footer-camera"
+            onClick={handleTriggerCamera}
+            className={FOOTER_CTA_CLASS}
+          >
+            <Camera className={FOOTER_CTA_ICON} />
+            <span>📸 拍照辨識</span>
+          </button>
+        ) : activeTab === 'scan' ? (
           analysisResult ? (
             <button
               type="button"
