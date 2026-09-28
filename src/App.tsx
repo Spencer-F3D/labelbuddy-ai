@@ -764,7 +764,7 @@ export default function App() {
     if (latencyTimerRef.current) clearTimeout(latencyTimerRef.current);
     latencyTimerRef.current = setTimeout(() => {
       setIsNetworkDelayed(true);
-      speakText('掃描成功，正在處理資料，請保持在網絡訊號良好區域', {
+      speakText(t('common.weakSignalSpeech'), {
         rate: 0.88,
         preferLanguage: 'cantonese',
       });
@@ -1301,10 +1301,10 @@ export default function App() {
                     <AlertCircle className="w-[40px] h-[40px] text-white" />
                   </span>
                   <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight`}>
-                    這次沒成功
+                    {t('scan.retakeTitle')}
                   </h3>
                   <p className={`${TYPE.body} ${WEIGHT.normal} text-[#791F1F] leading-snug`}>
-                    不是您的問題，不用擔心。
+                    {t('scan.retakeSubtitle')}
                   </p>
                 </div>
 
@@ -1316,13 +1316,13 @@ export default function App() {
                 {/* 三個具體可做的事 */}
                 <div className="flex flex-col gap-[8px]">
                   <span className={`${TYPE.secondary} font-black text-[#501313]`}>
-                    可以試試這三件事：
+                    {t('scan.retakeTips')}
                   </span>
                   <ul className="flex flex-col gap-[6px]">
                     {[
-                      '把手機靠近成分標籤一點，讓字看清楚',
-                      '找光線亮一點的地方，避開反光',
-                      '走到訊號比較好的位置再拍一次',
+                      t('scan.tip1'),
+                      t('scan.tip2'),
+                      t('scan.tip3'),
                     ].map((tip, i) => (
                       <li
                         key={tip}
@@ -1371,14 +1371,14 @@ export default function App() {
                       {learnerProfile.emoji}
                     </span>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[16px] font-bold text-slate-600">目前身分</span>
+                      <span className="text-[16px] font-bold text-slate-600">{t('home.currentProfile')}</span>
                       <span className="text-[20px] font-black text-slate-900 truncate">
                         {learnerProfile.name}
                       </span>
                     </div>
                   </div>
                   <span className="text-[16px] font-black text-[#0C447C] shrink-0 whitespace-nowrap">
-                    切換 ➔
+                    {t('scan.switchProfile')}
                   </span>
                 </button>
 
@@ -1392,12 +1392,12 @@ export default function App() {
                     <Camera className="w-[48px] h-[48px]" />
                   </div>
                   <h2 className="text-[20px] font-black text-slate-900 leading-snug">
-                    對準商品背後的成分標籤
+                    {t('scan.aimLabel')}
                   </h2>
                   {/* ⚠️ 文案長度上限：360px 下可用寬約 320px，16px 全形字每字約 16px
                       → 含 emoji 請控制在 17 個全形字以內，否則折行會把卡片撐高 */}
                   <p className="text-[16px] font-bold text-slate-700 leading-snug">
-                    點下方「📸 一鍵拍照」
+                    {t('scan.tapButton')}
                   </p>
 
                   {/* 目前把關的健康項目：合併自原本獨立的區塊 */}
@@ -1409,18 +1409,18 @@ export default function App() {
                   >
                     <HeartPulse className="w-[22px] h-[22px] text-rose-600 shrink-0" />
                     <span className="text-[16px] font-bold text-slate-700 min-w-0">
-                      正在把關：
+                      {t('scan.checking')}
                       <strong className="font-black text-slate-900">
                         {/* ⚠️ 最多只列前 3 項。改為 12 項後若全部列出，
                             這段會變成 2～3 行並把首頁卡片撐高。 */}
                         {selectedConditions.length === 0
-                          ? '無特殊病史'
+                          ? t('common.noConditions')
                           : selectedConditions.length <= 3
-                          ? selectedConditions.map((id) => conditionName(id)).join('、')
+                          ? selectedConditions.map((id) => conditionName(id)).join(t('common.listSeparator'))
                           : `${selectedConditions
                               .slice(0, 3)
                               .map((id) => conditionName(id))
-                              .join('、')} 等 ${selectedConditions.length} 項`}
+                              .join(t('common.listSeparator'))} ${t('scan.conditionMore', { n: selectedConditions.length })}`}
                       </strong>
                     </span>
                     <SlidersHorizontal className="w-[18px] h-[18px] text-slate-500 shrink-0 ml-auto" />
@@ -1436,9 +1436,12 @@ export default function App() {
                   <summary
                     className={`${CARD_BASE} w-full min-h-[56px] px-[16px] py-[10px] flex items-center justify-between gap-[12px] cursor-pointer list-none [&::-webkit-details-marker]:hidden active:scale-[0.99] transition-all`}
                   >
+                    {/* ⚠️ 這裡原本是 truncate（單行截斷）。中文 10 個字放得下，
+                        但英文較長會被切成「No product? Try a s...」——
+                        寧可讓它換行，也不要顯示被截斷的句子。 */}
                     <span className="text-[16px] font-black text-slate-700 flex items-center gap-[8px] min-w-0">
                       <Lightbulb className="w-[22px] h-[22px] text-amber-600 shrink-0" />
-                      <span className="truncate">沒有食品？用示範標籤</span>
+                      <span className="text-left">{t('scan.demoTitle')}</span>
                     </span>
                     <ChevronDown className="w-[24px] h-[24px] text-slate-600 shrink-0 transition-transform group-open:rotate-180" />
                   </summary>
@@ -1450,9 +1453,9 @@ export default function App() {
                       onClick={() => handleLoadSample('ramen')}
                       className="w-full min-h-[60px] p-[14px] rounded-[12px] border-[1.5px] border-[#854F0B] bg-[#FAEEDA] hover:brightness-95 text-[#412402] font-black text-[18px] text-left flex items-center justify-between gap-[8px] cursor-pointer transition-all active:scale-[0.98]"
                     >
-                      <span>🍜 高鈉泡麵標籤</span>
+                      <span>{t('scan.demoRamen')}</span>
                       <span className="text-[16px] font-bold px-[8px] py-[3px] rounded-[8px] bg-[#FAC775] text-[#412402] shrink-0">
-                        高鈉警示
+                        {t('scan.demoRamenTag')}
                       </span>
                     </button>
 
@@ -1462,9 +1465,9 @@ export default function App() {
                       onClick={() => handleLoadSample('oatmeal')}
                       className="w-full min-h-[60px] p-[14px] rounded-[12px] border-[1.5px] border-[#3B6D11] bg-[#EAF3DE] hover:brightness-95 text-[#173404] font-black text-[18px] text-left flex items-center justify-between gap-[8px] cursor-pointer transition-all active:scale-[0.98]"
                     >
-                      <span>🥣 無糖燕麥片標籤</span>
+                      <span>{t('scan.demoOat')}</span>
                       <span className="text-[16px] font-bold px-[8px] py-[3px] rounded-[8px] bg-[#C0DD97] text-[#173404] shrink-0">
-                        安全適合
+                        {t('scan.demoOatTag')}
                       </span>
                     </button>
 
@@ -1474,7 +1477,7 @@ export default function App() {
                       id="btn-test-weak-signal-voice"
                       onClick={() => {
                         stopSpeech();
-                        speakText('掃描成功，正在處理資料，請保持在網絡訊號良好區域', {
+                        speakText(t('common.weakSignalSpeech'), {
                           rate: 0.88,
                           preferLanguage: 'cantonese',
                         });
@@ -1483,10 +1486,10 @@ export default function App() {
                     >
                       <span className="flex items-center gap-[8px]">
                         <Wifi className="w-[22px] h-[22px] text-slate-600 shrink-0" />
-                        <span>弱訊號語音安撫</span>
+                        <span>{t('scan.weakSignal')}</span>
                       </span>
                       <span className="text-[16px] font-black px-[8px] py-[3px] rounded-[8px] bg-slate-200 text-slate-800 shrink-0">
-                        🔊 試聽
+                        {t('scan.previewVoice')}
                       </span>
                     </button>
                   </div>
@@ -1526,19 +1529,19 @@ export default function App() {
                         style={{ color: TONES.neutral.text }}
                       >
                         {stripLeadingEmoji(analysisResult.warning_title || '') ||
-                          '看不清楚標籤數字'}
+                          t('risk.unclearTitle')}
                       </h2>
 
                       <p
                         className={`${TYPE.body} ${WEIGHT.normal} leading-snug`}
                         style={{ color: TONES.neutral.textMuted }}
                       >
-                        沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。
+                        {t('result.noConclusion')}
                       </p>
                     </div>
 
                     <section
-                      aria-label="重拍建議"
+                      aria-label={t('result.retakeAdvice')}
                       className={`${CARD_BASE} p-[16px] flex flex-col gap-[14px]`}
                     >
                       <p
@@ -1583,10 +1586,10 @@ export default function App() {
                 RISK_LABEL[analysisResult.risk_level];
               const riskSubline =
                 analysisResult.risk_level === 'red'
-                  ? '這包對您的身體負擔比較大，建議先放回架上。'
+                  ? t('risk.red')
                   : analysisResult.risk_level === 'yellow'
-                  ? '可以吃，但要留意份量，不要一次吃完整包。'
-                  : '成分溫和，可以放心買回家。';
+                  ? t('risk.yellow')
+                  : t('risk.green');
 
               const nutritionAdvice = getDailyNutritionAdvice(analysisResult);
 
@@ -1628,13 +1631,13 @@ export default function App() {
                       第二層：為什麼 —— 百分比長條 + 白話說明 + 語音
                       ══════════════════════════════════════════════════════ */}
                   <section
-                    aria-label="判斷依據"
+                    aria-label={t('result.basis')}
                     className={`${CARD_BASE} p-[16px] flex flex-col gap-[14px]`}
                   >
                     <div className="flex items-center justify-between gap-[8px] flex-wrap">
                       <h3 className={`${TYPE.title} ${WEIGHT.strong} text-slate-900 flex items-center gap-[8px]`}>
                         <BarChart3 className="w-[26px] h-[26px] text-slate-700 shrink-0" />
-                        為什麼？
+                        {t('result.why')}
                       </h3>
 
                       {/* 結果來源標示：讓使用者能分辨是雲端 AI 還是本機離線辨識 */}
@@ -1646,17 +1649,17 @@ export default function App() {
                         }`}
                         title={
                           analysisResult.ai_model
-                            ? `模型：${analysisResult.ai_model}`
+                            ? t('result.modelLabel', { name: analysisResult.ai_model })
                             : analysisResult.ocr_used
-                            ? '本機離線 OCR（照片沒有離開裝置）'
-                            : '本機規則引擎（未使用雲端 AI）'
+                            ? t('mode.ocrLocal')
+                            : t('mode.ruleLocal')
                         }
                       >
                         {analysisResult.analysis_mode === 'cloud_ai'
                           ? analysisResult.cached
-                            ? '☁️ 雲端 AI（快取）'
-                            : '☁️ 雲端 AI'
-                          : '📴 本機離線'}
+                            ? t('mode.cloudCache')
+                            : t('mode.cloud')
+                          : t('mode.localBadge')}
                       </span>
                     </div>
 
@@ -1689,8 +1692,8 @@ export default function App() {
                           }`}
                         >
                           {analysisResult.data_handling === 'cloud'
-                            ? '這次的照片有上傳到雲端辨識。'
-                            : '這次的照片只在這支手機上處理，沒有上傳。'}
+                            ? t('mode.imageUploaded')
+                            : t('mode.imageLocal')}
                         </span>
 
                         {/* 同意開關：永遠顯示「目前設定」的相反動作，
@@ -1701,7 +1704,7 @@ export default function App() {
                             onClick={() => handleToggleCloudConsent(false)}
                             className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-800 text-[16px] font-black"
                           >
-                            改回本機模式（不上傳）
+                            {t('result.switchToLocal')}
                           </button>
                         ) : (
                           <button
@@ -1709,7 +1712,7 @@ export default function App() {
                             onClick={() => handleToggleCloudConsent(true)}
                             className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-blue-800 text-white text-[16px] font-black"
                           >
-                            開啟雲端辨識（更準）
+                            {t('result.switchToCloud')}
                           </button>
                         )}
                       </div>
@@ -1733,17 +1736,17 @@ export default function App() {
                       className={`${FOOTER_CTA_CLASS} ${
                         isSpeaking ? '!bg-[#A32D2D] !border-[#791F1F] animate-pulse' : ''
                       }`}
-                      title="點擊聽語音朗讀"
+                      title={t('result.tapToRead')}
                     >
                       {isSpeaking ? (
                         <>
                           <VolumeX className="w-[28px] h-[28px] shrink-0" />
-                          <span>⏹️ 停止朗讀</span>
+                          <span>{t('result.stopReading')}</span>
                         </>
                       ) : (
                         <>
                           <Volume2 className="w-[28px] h-[28px] shrink-0" />
-                          <span>🔊 念給我聽</span>
+                          <span>{t('result.readToMe')}</span>
                         </>
                       )}
                     </button>
@@ -1759,7 +1762,8 @@ export default function App() {
                     >
                       <span className={`${TYPE.body} ${WEIGHT.strong} text-slate-900 flex items-center gap-[8px] min-w-0`}>
                         <Info className="w-[24px] h-[24px] text-slate-700 shrink-0" />
-                        <span className="truncate">更多資訊與替代建議</span>
+                        {/* ⚠️ 同上：英文較長，改為可換行不要截斷 */}
+                        <span className="text-left">{t('result.moreInfo')}</span>
                       </span>
                       <ChevronDown className="w-[26px] h-[26px] text-slate-600 shrink-0 transition-transform group-open:rotate-180" />
                     </summary>
@@ -1776,7 +1780,7 @@ export default function App() {
                         analysisResult.label_reading_tip ||
                         analysisResult.daily_limit_context) && (
                         <section
-                          aria-label="食育教學"
+                          aria-label={t('result.education')}
                           className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
                           style={{ background: TONES.action.bg, borderColor: TONES.action.border }}
                         >
@@ -1785,7 +1789,7 @@ export default function App() {
                             style={{ color: TONES.action.text }}
                           >
                             <GraduationCap className="w-[26px] h-[26px] shrink-0" />
-                            學一個帶得走的觀念
+                            {t('result.learnConcept')}
                           </h3>
 
                           {analysisResult.knowledge_point && (
@@ -1794,7 +1798,7 @@ export default function App() {
                                 className={`${TYPE.body} font-black`}
                                 style={{ color: TONES.action.text }}
                               >
-                                為什麼
+                                {t('result.learnWhy')}
                               </span>
                               <p
                                 className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
@@ -1811,7 +1815,7 @@ export default function App() {
                                 className={`${TYPE.body} font-black`}
                                 style={{ color: TONES.action.text }}
                               >
-                                下次怎麼看
+                                {t('result.learnHow')}
                               </span>
                               <p
                                 className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
@@ -1828,7 +1832,7 @@ export default function App() {
                                 className={`${TYPE.body} font-black`}
                                 style={{ color: TONES.action.text }}
                               >
-                                對您代表什麼
+                                {t('result.learnMeaning')}
                               </span>
                               <p
                                 className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
@@ -1846,13 +1850,13 @@ export default function App() {
                               speakText(
                                 [
                                   analysisResult.knowledge_point
-                                    ? `為什麼：${analysisResult.knowledge_point}`
+                                    ? t('result.speechWhy', { text: analysisResult.knowledge_point })
                                     : '',
                                   analysisResult.label_reading_tip
-                                    ? `下次怎麼看：${analysisResult.label_reading_tip}`
+                                    ? t('result.speechHow', { text: analysisResult.label_reading_tip })
                                     : '',
                                   analysisResult.daily_limit_context
-                                    ? `對您代表什麼：${analysisResult.daily_limit_context}`
+                                    ? t('result.speechMeaning', { text: analysisResult.daily_limit_context })
                                     : '',
                                 ]
                                   .filter(Boolean)
@@ -1863,7 +1867,7 @@ export default function App() {
                             className={FOOTER_CTA_SECONDARY}
                           >
                             <Volume2 className="w-[28px] h-[28px] shrink-0" />
-                            <span>🔊 念給我聽</span>
+                            <span>{t('result.readToMe')}</span>
                           </button>
                         </section>
                       )}
@@ -1876,14 +1880,14 @@ export default function App() {
                       {analysisResult.condition_reminders &&
                         analysisResult.condition_reminders.length > 0 && (
                           <section
-                            aria-label="慢性病提醒"
+                            aria-label={t('result.conditions')}
                             className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
                           >
                             <h3
                               className={`${TYPE.title} ${WEIGHT.strong} text-slate-900 flex items-center gap-[8px]`}
                             >
                               <ShieldAlert className="w-[26px] h-[26px] text-slate-700 shrink-0" />
-                              您的慢性病提醒
+                              {t('result.conditionReminders')}
                             </h3>
 
                             <ul className="flex flex-col gap-[10px]">
@@ -1928,7 +1932,7 @@ export default function App() {
                             style={{ color: TONES.safe.text }}
                           >
                             <Lightbulb className="w-[26px] h-[26px] shrink-0" />
-                            可以改買這些
+                            {t('result.alternatives')}
                           </span>
                           <p
                             className={`${TYPE.body} ${WEIGHT.normal} leading-relaxed`}
@@ -1941,7 +1945,7 @@ export default function App() {
 
                       {/* 每日營養建議 */}
                       <section
-                        aria-label="每日營養建議"
+                        aria-label={t('result.dailyAdvice')}
                         className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
                         style={{ background: TONES.caution.bg, borderColor: TONES.caution.border }}
                       >
@@ -1951,7 +1955,7 @@ export default function App() {
                             style={{ color: TONES.caution.text }}
                           >
                             <span aria-hidden="true">💡</span>
-                            每日營養建議
+                            {t('result.dailyAdvice')}
                           </h3>
                           <span
                             className={`${TYPE.caption} font-black px-[10px] py-[3px] rounded-full bg-white/70 border shrink-0`}
@@ -1969,12 +1973,12 @@ export default function App() {
                         </p>
 
                         <div className="bg-white/90 rounded-[12px] p-[12px] border border-[#EF9F27] flex items-start gap-[10px]">
-                          <span className="text-[20px] shrink-0" role="img" aria-label="習慣">
+                          <span className="text-[20px] shrink-0" role="img" aria-label={t('result.habit')}>
                             🌱
                           </span>
                           <div className="flex flex-col">
                             <span className={`${TYPE.secondary} font-black`} style={{ color: TONES.caution.text }}>
-                              長效健康習慣
+                              {t('result.habits')}
                             </span>
                             <span className={`${TYPE.body} ${WEIGHT.normal} text-slate-800 leading-snug`}>
                               {nutritionAdvice.habit}
@@ -1988,14 +1992,14 @@ export default function App() {
                           onClick={() => {
                             stopSpeech();
                             speakText(
-                              `每日營養建議：${nutritionAdvice.advice}。長效健康習慣：${nutritionAdvice.habit}`,
+                              t('result.speechAdvice', { advice: nutritionAdvice.advice, habit: nutritionAdvice.habit }),
                               { rate: 0.88, preferLanguage: 'cantonese' }
                             );
                           }}
                           className={FOOTER_CTA_SECONDARY}
                         >
                           <Volume2 className="w-[26px] h-[26px] shrink-0" />
-                          <span>🔊 念這條叮嚀</span>
+                          <span>{t('result.readTip')}</span>
                         </button>
                       </section>
 
@@ -2010,7 +2014,7 @@ export default function App() {
                             style={{ color: TONES.action.text }}
                           />
                           <span className={`${TYPE.body} ${WEIGHT.normal}`} style={{ color: TONES.action.text }}>
-                            已自動存入您的「飲食健康紀錄」
+                            {t('result.saved')}
                           </span>
                         </div>
                         <button
@@ -2023,7 +2027,7 @@ export default function App() {
                           className={FOOTER_CTA_SECONDARY}
                         >
                           <Calendar className="w-[26px] h-[26px] shrink-0" />
-                          <span>查看本週紀錄</span>
+                          <span>{t('result.viewHistory')}</span>
                         </button>
                       </div>
                     </div>
@@ -2546,7 +2550,7 @@ export default function App() {
                 <span className="text-[20px] font-black">超市訊號提示</span>
               </div>
               <p className="text-[18px] font-black leading-snug">
-                掃描成功，正在處理資料，請保持在網絡訊號良好區域
+                {t('common.weakSignalSpeech')}
               </p>
               <span className="text-[16px] font-bold text-slate-900 bg-amber-300 px-[10px] py-[3px] rounded-full">
                 🔊 語音已為您播報，資料傳輸中
