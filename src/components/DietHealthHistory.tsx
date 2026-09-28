@@ -41,6 +41,10 @@ import {
 import { DietRecord, SeniorPhysicalIndicators } from '../types';
 import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { speakText, stopSpeech } from '../utils/tts';
+// 雙語（2026-09-28 第三階段）：介面文字走 t()，慢性病名稱查共用對照表
+import { useI18n } from '../i18n/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
+import { conditionName as localizedConditionName } from '../data/bilingual';
 
 interface DietHealthHistoryProps {
   records: DietRecord[];
@@ -59,6 +63,10 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
   indicators,
   selectedConditions = [],
 }) => {
+  const { t, language } = useI18n();
+  /** 朗讀語言：中文維持粵語，英文改用英文語音（否則會用中文腔念英文句子） */
+  const ttsLang = language === 'en' ? ('english' as const) : ('cantonese' as const);
+
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<GradeFilter>('all');
   const [expandedRecordIds, setExpandedRecordIds] = useState<Record<string, boolean>>({});
   const [isSpeakingSummary, setIsSpeakingSummary] = useState<boolean>(false);
@@ -88,16 +96,16 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
     const score = total > 0 ? Math.round((greenCount * 100 + yellowCount * 60) / total) : 85;
 
     let gradeLetter = 'A';
-    let gradeTitle = '優良把關';
+    let gradeTitleKey: TranslationKey = 'history.gradeA';
     let gradeBadgeClass = 'bg-emerald-100 text-emerald-950 border-emerald-500';
 
     if (score < 60 || redCount >= 3) {
       gradeLetter = 'C';
-      gradeTitle = '注意防護';
+      gradeTitleKey = 'history.gradeC';
       gradeBadgeClass = 'bg-rose-100 text-rose-950 border-rose-500';
     } else if (score < 80 || redCount >= 1) {
       gradeLetter = 'B';
-      gradeTitle = '良好維持';
+      gradeTitleKey = 'history.gradeB';
       gradeBadgeClass = 'bg-amber-100 text-amber-950 border-amber-500';
     }
 
@@ -111,7 +119,7 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
       redPercent,
       score,
       gradeLetter,
-      gradeTitle,
+      gradeTitleKey,
       gradeBadgeClass,
     };
   }, [pastWeekRecords]);
@@ -133,7 +141,12 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
   // 生成供長者與家人分享的簡潔純文字健康概況週報
   const exportSummaryText = useMemo(() => {
     const today = new Date();
-    const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+    const dateStr =
+      language === 'en'
+        ? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+            today.getDate()
+          ).padStart(2, '0')}`
+        : `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
 
     // ⚠️ 舊版這裡是硬編碼的 4 項對照表，新增到 12 項之後其餘 8 項會走 `|| id`
     //    直接印出英文代碼（例如「gout」），使用者完全看不懂。
@@ -141,27 +154,44 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
     const conditionListStr =
       selectedConditions.length > 0
         ? selectedConditions
-            .map((id) => PHYSICAL_INDICATORS.find((c) => c.id === id)?.name ?? id)
-            .join('、')
-        : '無特殊慢性病史';
+            .map((id) => {
+              const zh = PHYSICAL_INDICATORS.find((c) => c.id === id)?.name ?? id;
+              return localizedConditionName(id, zh, language);
+            })
+            .join(t('common.listSeparator'))
+        : t('history.report.noConditions');
 
     let vitalsStr = '';
     if (indicators) {
       const bpComment =
         indicators.systolicBp >= 140 || indicators.diastolicBp >= 90
-          ? '（偏高警戒）'
+          ? t('history.report.bpHigh')
           : indicators.systolicBp >= 130
-          ? '（輕微偏高）'
-          : '（標準健康）';
-      const bsTiming = indicators.bloodSugarTiming === 'fasting' ? '空腹' : '飯後';
-      vitalsStr = `👵 長輩生理指標量測：
-  • 血壓：${indicators.systolicBp}/${indicators.diastolicBp} mmHg ${bpComment}
-  • 心跳：${indicators.heartRate || 72} bpm (正常區間 60~100)
-  • 血糖：${indicators.bloodSugar} ${indicators.bloodSugarUnit || 'mmol/L'} (${bsTiming})
-  • 把關病史與過敏：${conditionListStr}
-`;
+          ? t('history.report.bpElevated')
+          : t('history.report.bpNormal');
+      const bsTiming =
+        indicators.bloodSugarTiming === 'fasting'
+          ? t('history.report.fasting')
+          : t('history.report.postMeal');
+      vitalsStr =
+        [
+          t('history.report.vitalsHeader'),
+          t('history.report.bp', {
+            sys: indicators.systolicBp,
+            dia: indicators.diastolicBp,
+            comment: bpComment,
+          }),
+          t('history.report.hr', { hr: indicators.heartRate || 72 }),
+          t('history.report.bs', {
+            bs: indicators.bloodSugar,
+            unit: indicators.bloodSugarUnit || 'mmol/L',
+            timing: bsTiming,
+          }),
+          t('history.report.conditions', { list: conditionListStr }),
+          '',
+        ].join('\n') + '\n';
     } else {
-      vitalsStr = `👵 把關健康條件：${conditionListStr}\n`;
+      vitalsStr = t('history.report.conditionsOnly', { list: conditionListStr }) + '\n';
     }
 
     const itemsSummary =
@@ -171,33 +201,44 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
             .map((r, idx) => {
               const tag =
                 r.risk_level === 'green'
-                  ? '🟢安心級'
+                  ? t('history.report.itemGreen')
                   : r.risk_level === 'yellow'
-                  ? '🟡留意級'
-                  : '🔴避開級';
-              return `  ${idx + 1}. 【${r.foodName}】 ${tag}：${r.warning_title}`;
+                  ? t('history.report.itemYellow')
+                  : t('history.report.itemRed');
+              return t('history.report.item', {
+                i: idx + 1,
+                name: r.foodName,
+                tag,
+                title: r.warning_title,
+              });
             })
             .join('\n')
-        : '  （暫無掃描紀錄）';
+        : t('history.report.noItems');
 
-    return `【LabelBuddy AI 長者飲食健康概況週報】
-📅 產出日期：${dateStr}
-
-${vitalsStr}
-📊 過去一週飲食健康綜合評級：【評級 ${stats.gradeLetter} - ${stats.gradeTitle}】
-  • 總共把關：${stats.total} 次食品
-  • 🟢 安心推薦級：${stats.greenCount} 次 (${stats.greenPercent}%)
-  • 🟡 留意份量級：${stats.yellowCount} 次 (${stats.yellowPercent}%)
-  • 🔴 成功避開級：${stats.redCount} 次 (${stats.redPercent}%)
-
-🛒 近期把關食品明細摘要：
-${itemsSummary}
-
-💡 溫馨健康叮嚀：
-  • 請保持每日充足水分攝取（約1500~2000cc）。
-  • 採買時認明綠燈天然原型食材，少吃高鈉加工醬料與高糖零食。
-  • 規律量測血壓與血糖，有助維持長久健康！`;
-  }, [pastWeekRecords, stats, indicators, selectedConditions]);
+    return [
+      t('history.report.title'),
+      t('history.report.date', { date: dateStr }),
+      '',
+      vitalsStr,
+      t('history.report.gradeHeader', {
+        letter: stats.gradeLetter,
+        title: t(stats.gradeTitleKey),
+      }),
+      t('history.report.total', { n: stats.total }),
+      t('history.report.greenRow', { n: stats.greenCount, pct: stats.greenPercent }),
+      t('history.report.yellowRow', { n: stats.yellowCount, pct: stats.yellowPercent }),
+      t('history.report.redRow', { n: stats.redCount, pct: stats.redPercent }),
+      '',
+      t('history.report.itemsHeader'),
+      itemsSummary,
+      '',
+      t('history.report.tipsHeader'),
+      t('history.report.tip1'),
+      t('history.report.tip2'),
+      t('history.report.tip3'),
+    ].join('\n');
+    // t 與 language 都要進依賴：切語言時週報文字必須重新產生
+  }, [pastWeekRecords, stats, indicators, selectedConditions, t, language]);
 
   // 執行複製到剪貼簿
   const handleCopyText = async () => {
@@ -224,7 +265,7 @@ ${itemsSummary}
     if (navigator.share) {
       try {
         await navigator.share({
-          title: '長者飲食健康概況週報',
+          title: t('history.shareTitle'),
           text: exportSummaryText,
         });
       } catch (e) {
@@ -237,11 +278,15 @@ ${itemsSummary}
 
   // 產生長輩大白話週總結語音文稿
   const weeklyVoiceScript = useMemo(() => {
-    if (stats.total === 0) {
-      return '長輩您好！您過去一週尚未有掃描紀錄，只要點擊底部的拍照按鈕，就可以開始為您的健康飲食把關囉！';
-    }
-    return `長輩您好！這是您過去一週的健康飲食評級：總共把關了 ${stats.total} 次食品，綜合評定為 ${stats.gradeLetter} 級！其中安心綠燈食品有 ${stats.greenCount} 次，黃燈提醒 ${stats.yellowCount} 次，避開紅燈 ${stats.redCount} 次。您有細心照顧身體，繼續保持！`;
-  }, [stats]);
+    if (stats.total === 0) return t('history.speech.empty');
+    return t('history.speech.summary', {
+      total: stats.total,
+      letter: stats.gradeLetter,
+      green: stats.greenCount,
+      yellow: stats.yellowCount,
+      red: stats.redCount,
+    });
+  }, [stats, t]);
 
   // 朗讀本週總結語音
   const handleToggleSpeakWeeklySummary = () => {
@@ -253,7 +298,7 @@ ${itemsSummary}
       speakText(weeklyVoiceScript, {
         rate: 0.88,
         volume: 1.0,
-        preferLanguage: 'cantonese',
+        preferLanguage: ttsLang,
         onEnd: () => setIsSpeakingSummary(false),
         onError: () => setIsSpeakingSummary(false),
       });
@@ -272,7 +317,7 @@ ${itemsSummary}
       speakText(textToSpeak, {
         rate: 0.88,
         volume: 1.0,
-        preferLanguage: 'cantonese',
+        preferLanguage: ttsLang,
         onEnd: () => setActiveSpeakingRecordId(null),
         onError: () => setActiveSpeakingRecordId(null),
       });
@@ -281,7 +326,7 @@ ${itemsSummary}
 
   return (
     <section
-      aria-label="我的飲食健康紀錄模組"
+      aria-label={t('history.ariaModule')}
       className="w-full bg-white rounded-3xl p-4 sm:p-5 border-3 border-blue-900 shadow-sm flex flex-col space-y-4 relative"
     >
       {/* 1. 模組標題與分級總評頂欄 (緊湊設計) */}
@@ -292,10 +337,10 @@ ${itemsSummary}
           </div>
           <div>
             <h2 className="text-[20px] font-black text-slate-950 leading-tight">
-              飲食健康週紀錄
+              {t('history.title')}
             </h2>
             <p className="text-[16px] font-bold text-slate-500">
-              過去 7 天把關與分級分析
+              {t('history.subtitle')}
             </p>
           </div>
         </div>
@@ -309,14 +354,17 @@ ${itemsSummary}
             className="px-3.5 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border-2 border-indigo-700 font-black text-[16px] whitespace-nowrap flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
           >
             <Share2 className="w-4 h-4 text-indigo-700 shrink-0" />
-            <span>匯出健康概況</span>
+            <span>{t('history.export')}</span>
           </button>
 
           {/* 飲食分級評等 Badge */}
           <div className={`px-3 py-1.5 rounded-2xl border-2 whitespace-nowrap flex items-center gap-1.5 shadow-xs ${stats.gradeBadgeClass}`}>
             <Award className="w-5 h-5 shrink-0" />
             <span className="text-[16px] font-black">
-              評級 {stats.gradeLetter} ({stats.gradeTitle})
+              {t('history.gradeBadge', {
+                letter: stats.gradeLetter,
+                title: t(stats.gradeTitleKey),
+              })}
             </span>
           </div>
         </div>
@@ -328,11 +376,11 @@ ${itemsSummary}
         <div className="flex items-center justify-between gap-[8px] flex-wrap">
           <div className="flex items-baseline gap-1.5 whitespace-nowrap">
             <TrendingUp className="w-5 h-5 text-yellow-400 shrink-0 self-center" />
-            <span className="text-[16px] font-bold text-slate-300">7天把關</span>
+            <span className="text-[16px] font-bold text-slate-300">{t('history.sevenDays')}</span>
             <span className="text-[20px] font-black text-yellow-300 ml-1 drop-shadow">
               {stats.total}
             </span>
-            <span className="text-[16px] font-bold text-slate-200">次食品</span>
+            <span className="text-[16px] font-bold text-slate-200">{t('history.timesFood')}</span>
           </div>
 
           <button
@@ -348,12 +396,12 @@ ${itemsSummary}
             {isSpeakingSummary ? (
               <>
                 <VolumeX className="w-4 h-4 shrink-0" />
-                <span>停止播報</span>
+                <span>{t('history.stopSpeak')}</span>
               </>
             ) : (
               <>
                 <Volume2 className="w-4 h-4 text-slate-950 shrink-0" />
-                <span>🔊 朗讀週總結</span>
+                <span>{t('history.speakWeekly')}</span>
               </>
             )}
           </button>
@@ -365,10 +413,12 @@ ${itemsSummary}
           <div className="bg-emerald-950/70 border border-emerald-500/60 rounded-xl p-2.5 text-center flex flex-col items-center">
             <span className="text-[16px] font-bold text-emerald-300 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-              安心綠燈
+              {t('history.greenLight')}
             </span>
             <span className="text-[20px] font-black text-emerald-300 my-0.5">
-              {stats.greenCount} <span className="text-[16px] font-bold text-emerald-400">次</span>
+              {stats.greenCount} <span className="text-[16px] font-bold text-emerald-400">
+                {t('history.timesUnit')}
+              </span>
             </span>
             <span className="text-[16px] font-bold text-emerald-400 bg-emerald-900/60 px-2 py-0.5 rounded-full">
               {stats.greenPercent}%
@@ -379,10 +429,12 @@ ${itemsSummary}
           <div className="bg-amber-950/70 border border-amber-500/60 rounded-xl p-2.5 text-center flex flex-col items-center">
             <span className="text-[16px] font-bold text-amber-300 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-              留意黃燈
+              {t('history.yellowLight')}
             </span>
             <span className="text-[20px] font-black text-amber-300 my-0.5">
-              {stats.yellowCount} <span className="text-[16px] font-bold text-amber-400">次</span>
+              {stats.yellowCount} <span className="text-[16px] font-bold text-amber-400">
+                {t('history.timesUnit')}
+              </span>
             </span>
             <span className="text-[16px] font-bold text-amber-400 bg-amber-900/60 px-2 py-0.5 rounded-full">
               {stats.yellowPercent}%
@@ -393,10 +445,12 @@ ${itemsSummary}
           <div className="bg-rose-950/70 border border-rose-500/60 rounded-xl p-2.5 text-center flex flex-col items-center">
             <span className="text-[16px] font-bold text-rose-300 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" />
-              避開紅燈
+              {t('history.redLight')}
             </span>
             <span className="text-[20px] font-black text-rose-300 my-0.5">
-              {stats.redCount} <span className="text-[16px] font-bold text-rose-400">次</span>
+              {stats.redCount} <span className="text-[16px] font-bold text-rose-400">
+                {t('history.timesUnit')}
+              </span>
             </span>
             <span className="text-[16px] font-bold text-rose-400 bg-rose-900/60 px-2 py-0.5 rounded-full">
               {stats.redPercent}%
@@ -411,21 +465,21 @@ ${itemsSummary}
               <div
                 style={{ width: `${stats.greenPercent}%` }}
                 className="bg-emerald-500 h-full"
-                title={`綠燈 ${stats.greenPercent}%`}
+                title={t('history.barGreen', { n: stats.greenPercent })}
               />
             )}
             {stats.yellowPercent > 0 && (
               <div
                 style={{ width: `${stats.yellowPercent}%` }}
                 className="bg-amber-400 h-full"
-                title={`黃燈 ${stats.yellowPercent}%`}
+                title={t('history.barYellow', { n: stats.yellowPercent })}
               />
             )}
             {stats.redPercent > 0 && (
               <div
                 style={{ width: `${stats.redPercent}%` }}
                 className="bg-rose-500 h-full"
-                title={`紅燈 ${stats.redPercent}%`}
+                title={t('history.barRed', { n: stats.redPercent })}
               />
             )}
           </div>
@@ -444,7 +498,7 @@ ${itemsSummary}
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>全部 ({pastWeekRecords.length})</span>
+          <span>{t('history.filterAll', { n: pastWeekRecords.length })}</span>
         </button>
 
         <button
@@ -457,7 +511,7 @@ ${itemsSummary}
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-          <span>安心級 ({stats.greenCount})</span>
+          <span>{t('history.filterGreen', { n: stats.greenCount })}</span>
         </button>
 
         <button
@@ -470,7 +524,7 @@ ${itemsSummary}
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-          <span>留意級 ({stats.yellowCount})</span>
+          <span>{t('history.filterYellow', { n: stats.yellowCount })}</span>
         </button>
 
         <button
@@ -483,7 +537,7 @@ ${itemsSummary}
           }`}
         >
           <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-          <span>避開級 ({stats.redCount})</span>
+          <span>{t('history.filterRed', { n: stats.redCount })}</span>
         </button>
       </div>
 
@@ -491,7 +545,7 @@ ${itemsSummary}
       <div className="flex flex-col space-y-2.5">
         {filteredRecords.length === 0 ? (
           <div className="p-6 text-center bg-slate-50 rounded-2xl border-2 border-slate-200 text-slate-500 font-bold text-[16px]">
-            此分級目前暫無紀錄。
+            {t('history.emptyFilter')}
           </div>
         ) : (
           filteredRecords.map((record) => {
@@ -514,10 +568,10 @@ ${itemsSummary}
               : 'bg-rose-700 text-white';
 
             const badgeText = isGreen
-              ? '🟢 安心級'
+              ? t('history.badgeGreen')
               : isYellow
-              ? '🟡 留意級'
-              : '🔴 避開級';
+              ? t('history.badgeYellow')
+              : t('history.badgeRed');
 
             return (
               <div
@@ -551,14 +605,14 @@ ${itemsSummary}
                         ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
                         : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300 shadow-xs'
                     }`}
-                    title="語音播報此食品分析"
+                    title={t('history.speakThisTitle')}
                   >
                     {isSpeakingThis ? (
                       <VolumeX className="w-4 h-4 shrink-0 text-white" />
                     ) : (
                       <Volume2 className="w-4 h-4 shrink-0 text-blue-900" />
                     )}
-                    <span className="hidden sm:inline">播報</span>
+                    <span className="hidden sm:inline">{t('history.speakThis')}</span>
                   </button>
                 </div>
 
@@ -572,7 +626,7 @@ ${itemsSummary}
                   <div className="mt-2.5 pt-2.5 border-t border-slate-200/80 flex flex-col space-y-2 animate-in fade-in duration-150">
                     <div className="bg-white/80 rounded-xl p-2.5 border border-slate-200">
                       <span className="text-[16px] font-bold text-slate-500 block mb-0.5">
-                        💬 長者白話說明：
+                        {t('history.plainLabel')}
                       </span>
                       <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
                         {record.plain_summary}
@@ -582,7 +636,7 @@ ${itemsSummary}
                     {record.alternative_advice && (
                       <div className="bg-blue-50/70 rounded-xl p-2.5 border border-blue-200">
                         <span className="text-[16px] font-bold text-blue-900 block mb-0.5">
-                          💡 採買替代建議：
+                          {t('history.altLabel')}
                         </span>
                         <p className="text-[16px] font-bold text-blue-950 leading-relaxed">
                           {record.alternative_advice}
@@ -598,7 +652,7 @@ ${itemsSummary}
                   onClick={() => toggleExpand(record.id)}
                   className="mt-2 text-[16px] font-bold text-blue-900 hover:text-blue-950 flex items-center gap-1 cursor-pointer"
                 >
-                  <span>{isExpanded ? '▲ 收起詳細說明' : '▼ 查看完整白話說明與建議'}</span>
+                  <span>{t(isExpanded ? 'history.collapse' : 'history.expand')}</span>
                 </button>
               </div>
             );
@@ -615,7 +669,7 @@ ${itemsSummary}
           className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[16px] flex items-center gap-1.5 cursor-pointer border border-slate-300 active:scale-95"
         >
           <RotateCcw className="w-4 h-4 text-slate-600" />
-          <span>恢復示範紀錄</span>
+          <span>{t('history.resetSample')}</span>
         </button>
 
         <button
@@ -624,7 +678,7 @@ ${itemsSummary}
           className="px-3.5 py-2 rounded-xl bg-blue-900 hover:bg-blue-950 text-white font-black text-[16px] flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
         >
           <Share2 className="w-4 h-4 text-yellow-300 shrink-0" />
-          <span>📤 匯出健康週報給家人</span>
+          <span>{t('history.exportFooter')}</span>
         </button>
 
         {pastWeekRecords.length > 0 && (
@@ -632,14 +686,14 @@ ${itemsSummary}
             type="button"
             id="btn-clear-all-records"
             onClick={() => {
-              if (window.confirm('確定要清空過去一週的飲食紀錄嗎？')) {
+              if (window.confirm(t('history.clearConfirm'))) {
                 onClearRecords();
               }
             }}
             className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-rose-700 font-bold text-[16px] flex items-center gap-1.5 cursor-pointer border border-slate-300 hover:border-rose-300 active:scale-95"
           >
             <Trash2 className="w-4 h-4 text-rose-600" />
-            <span>清空紀錄</span>
+            <span>{t('history.clear')}</span>
           </button>
         )}
       </div>
@@ -662,10 +716,10 @@ ${itemsSummary}
                 </div>
                 <div>
                   <h3 className="text-[20px] font-black text-slate-950">
-                    匯出長者健康概況
+                    {t('history.modalTitle')}
                   </h3>
                   <p className="text-[16px] font-bold text-slate-500">
-                    已整理好生理指標與飲食週報，可複製分享給家人
+                    {t('history.modalSubtitle')}
                   </p>
                 </div>
               </div>
@@ -674,7 +728,7 @@ ${itemsSummary}
                 type="button"
                 onClick={() => setShowExportModal(false)}
                 className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer active:scale-90 border border-slate-300"
-                aria-label="關閉"
+                aria-label={t('history.closeAria')}
               >
                 <X className="w-6 h-6" />
               </button>
@@ -684,15 +738,19 @@ ${itemsSummary}
             <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-3 flex items-start gap-2.5">
               <Info className="w-5 h-5 text-blue-800 shrink-0 mt-0.5" />
               <p className="text-[16px] font-bold text-blue-950 leading-snug">
-                點擊下方大按鈕即可<strong>一鍵複製文字</strong>，或在下方文字框<strong>長按全選複製</strong>，直接貼至 LINE、WhatsApp 等通訊軟體傳給子女或家人查看！
+                {t('history.modalTip1')}
+                <strong>{t('history.modalTipStrong1')}</strong>
+                {t('history.modalTip2')}
+                <strong>{t('history.modalTipStrong2')}</strong>
+                {t('history.modalTip3')}
               </p>
             </div>
 
             {/* 格式化純文字預覽區（支援長按選取複製） */}
             <div className="flex flex-col space-y-1.5">
               <label htmlFor="export-text-area" className="text-[16px] font-black text-slate-700 flex items-center justify-between">
-                <span>📋 概況文字內容（可長按選取）：</span>
-                <span className="text-[16px] text-slate-500 font-bold">點選即可手動複製</span>
+                <span>{t('history.textLabel')}</span>
+                <span className="text-[16px] text-slate-500 font-bold">{t('history.textHint')}</span>
               </label>
               <textarea
                 id="export-text-area"
@@ -720,12 +778,12 @@ ${itemsSummary}
                 {copiedSuccess ? (
                   <>
                     <CheckCheck className="w-6 h-6 text-yellow-300 shrink-0" />
-                    <span>✅ 已複製到剪貼簿！</span>
+                    <span>{t('history.copied')}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-5 h-5 text-yellow-300 shrink-0" />
-                    <span>📋 一鍵複製全文</span>
+                    <span>{t('history.copy')}</span>
                   </>
                 )}
               </button>
@@ -738,7 +796,7 @@ ${itemsSummary}
                 className="min-h-[56px] py-3 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 border-3 border-emerald-800 text-white font-black text-[18px] flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-sm"
               >
                 <Share2 className="w-5 h-5 text-white shrink-0" />
-                <span>📤 分享給家人</span>
+                <span>{t('history.share')}</span>
               </button>
             </div>
 
@@ -748,7 +806,7 @@ ${itemsSummary}
               onClick={() => setShowExportModal(false)}
               className="w-full py-2.5 text-center text-slate-600 hover:text-slate-900 font-bold text-[16px] cursor-pointer"
             >
-              關閉視窗
+              {t('history.closeWindow')}
             </button>
           </div>
         </div>
