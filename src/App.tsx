@@ -56,6 +56,9 @@ import {
   Menu as MenuIcon,
   X as CloseIcon,
   Home as HomeIcon,
+  // 設定頁收合區塊的圖示（2026-09-28 新增）
+  Users as UsersIcon,
+  Activity as ActivityIcon,
 } from 'lucide-react';
 import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId } from './types';
 import { compressImage } from './utils/imageCompression';
@@ -65,6 +68,8 @@ import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser'
 import { useI18n } from './i18n/I18nContext';
 import { LanguagePicker } from './i18n/LanguagePicker';
 import type { TranslationKey } from './i18n/translations';
+// 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
+import { SettingsSection } from './components/SettingsSection';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
@@ -2038,38 +2043,56 @@ export default function App() {
             <LanguagePicker />
 
             {/* 第一部分：學習者身分（決定 AI 的判斷基準與每日參考值） */}
-            <section className="bg-white rounded-3xl p-5 border-4 border-blue-900 shadow-md">
+            <SettingsSection
+              id="settings-profile"
+              icon={<UsersIcon className="w-[26px] h-[26px]" />}
+              title={t('settings.profile.title')}
+              summary={`${learnerProfile.emoji} ${learnerProfile.name}`}
+            >
               <LearnerProfilePicker
                 selectedId={learnerProfileId}
                 onSelect={handleChangeProfile}
               />
-            </section>
+            </SettingsSection>
 
-            {/* 第一部分：日常生理指標量測（血壓、心跳、血糖等） */}
-            <VitalMetricsSection
-              indicators={physicalIndicators}
-              onChangeIndicators={handleUpdateIndicators}
-            />
+            {/* 第二部分：日常生理指標量測（血壓、心跳、血糖等） */}
+            <SettingsSection
+              id="settings-vitals"
+              icon={<ActivityIcon className="w-[26px] h-[26px]" />}
+              title={t('settings.vitals.title')}
+              /* 收合時顯示血壓與血糖，長者不必展開就知道自己填了什麼 */
+              summary={
+                physicalIndicators.systolicBp
+                  ? t('settings.summary.vitals', {
+                      bp: `${physicalIndicators.systolicBp}/${physicalIndicators.diastolicBp}`,
+                      sugar: `${physicalIndicators.bloodSugar}`,
+                    })
+                  : t('settings.notSet')
+              }
+            >
+              <VitalMetricsSection
+                indicators={physicalIndicators}
+                onChangeIndicators={handleUpdateIndicators}
+              />
+            </SettingsSection>
 
             {/* 第二部分：常見慢性病與過敏原把關清單 */}
-            <section
-              aria-label="個人慢性健康狀況勾選"
-              className="bg-white rounded-3xl p-5 border-4 border-blue-900 shadow-md flex flex-col space-y-5"
+            <SettingsSection
+              id="settings-conditions"
+              icon={<HeartPulse className="w-[26px] h-[26px]" />}
+              title={t('settings.conditions.title')}
+              summary={t('settings.selectedCount', { n: selectedConditions.length })}
             >
-              <div className="border-b-2 border-slate-200 pb-3">
-                <div className="flex items-center justify-between gap-[8px] flex-wrap">
-                  <h2 className="text-[20px] font-black text-slate-950 flex items-center gap-2">
-                    <HeartPulse className="w-[32px] h-[32px] text-rose-600 shrink-0" />
-                    個人慢性病與過敏把關
-                  </h2>
-                  <span className="text-[16px] font-black bg-blue-100 text-blue-950 px-[12px] py-[4px] rounded-full border border-blue-300 whitespace-nowrap shrink-0">
-                    共 {ALL_CONDITIONS.length} 項可選
-                  </span>
+              <div className="flex flex-col space-y-5">
+                {/* 說明文字保留（原本在內部標題下方），只移除與收合標題重複的 h2 */}
+                <div className="flex flex-col gap-[4px]">
+                  <p className="text-[16px] font-bold text-slate-700 leading-snug">
+                    {t('settings.conditions.desc')}
+                  </p>
+                  <p className="text-[16px] font-black text-blue-950">
+                    {t('settings.conditions.availableCount', { n: ALL_CONDITIONS.length })}
+                  </p>
                 </div>
-                <p className="text-[16px] font-bold text-slate-600 mt-[4px]">
-                  AI 在超市辨識食品時，會依據勾選項目嚴格比對食品成分與禁忌：
-                </p>
-              </div>
 
               {/* ── 分類篩選膠囊 ─────────────────────────────────────
                   ⚠️ 用 flex-wrap 讓膠囊整顆換行，不要用 overflow-x-auto 水平捲動
@@ -2395,7 +2418,8 @@ export default function App() {
                 <Camera className="w-7 h-7 text-yellow-300 shrink-0" />
                 <span>✅ 設定完成，前往拍照辨識</span>
               </button>
-            </section>
+              </div>
+            </SettingsSection>
           </div>
         )}
 

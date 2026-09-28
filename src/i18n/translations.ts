@@ -74,6 +74,12 @@ const zhTW = {
 
   /* ── 設定頁 ───────────────────────────────────────────────── */
   'settings.title': '健康設定',
+  'settings.collapseHint': '點一下收起',
+  'settings.profile.title': '學習者身分',
+  'settings.vitals.title': '日常生理指標',
+  'settings.selectedCount': '已選 {n} 項',
+  'settings.notSet': '尚未設定',
+  'settings.summary.vitals': '血壓 {bp} · 血糖 {sugar}',
   'settings.language.title': '介面語言',
   'settings.language.desc': '選擇您習慣閱讀的語言。健康設定的內容不會因語言而改變。',
   'settings.language.zh': '繁體中文',
@@ -140,6 +146,12 @@ const en: Record<TranslationKey, string> = {
   'footer.retryScan': 'Take another photo',
 
   'settings.title': 'Health settings',
+  'settings.collapseHint': 'Tap to collapse',
+  'settings.profile.title': 'Learner profile',
+  'settings.vitals.title': 'Daily health measurements',
+  'settings.selectedCount': '{n} selected',
+  'settings.notSet': 'Not set',
+  'settings.summary.vitals': 'BP {bp} · Sugar {sugar}',
   'settings.language.title': 'Language',
   'settings.language.desc':
     'Choose the language you prefer. Your health settings stay exactly the same.',

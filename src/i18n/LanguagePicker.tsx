@@ -22,28 +22,25 @@
 import { Check, Languages } from 'lucide-react';
 import { useI18n } from './I18nContext';
 import { LANGUAGE_OPTIONS } from './translations';
+import { SettingsSection } from '../components/SettingsSection';
 
 export function LanguagePicker() {
   const { language, setLanguage, t } = useI18n();
 
+  // 收合時顯示的目前語言（用母語名稱，與選項一致）
+  const currentOption = LANGUAGE_OPTIONS.find((o) => o.id === language) ?? LANGUAGE_OPTIONS[0];
+
   return (
-    <section
+    <SettingsSection
       id="settings-language"
-      aria-labelledby="settings-language-title"
-      className="bg-white rounded-3xl p-5 border-4 border-blue-900 shadow-md flex flex-col space-y-4"
+      icon={<Languages className="w-[26px] h-[26px]" />}
+      title={t('settings.language.title')}
+      summary={t(currentOption.labelKey)}
     >
-      <div className="border-b-2 border-slate-200 pb-3">
-        <h2
-          id="settings-language-title"
-          className="text-[20px] font-black text-slate-950 flex items-center gap-2"
-        >
-          <Languages className="w-[32px] h-[32px] text-blue-800 shrink-0" />
-          {t('settings.language.title')}
-        </h2>
-        <p className="text-[16px] font-bold text-slate-700 mt-[4px]">
+      <div className="flex flex-col gap-[12px]">
+        <p className="text-[16px] font-bold text-slate-700 leading-snug">
           {t('settings.language.desc')}
         </p>
-      </div>
 
       <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-[10px]">
         {LANGUAGE_OPTIONS.map((opt) => {
@@ -91,7 +88,8 @@ export function LanguagePicker() {
             </button>
           );
         })}
+        </div>
       </div>
-    </section>
+    </SettingsSection>
   );
 }
