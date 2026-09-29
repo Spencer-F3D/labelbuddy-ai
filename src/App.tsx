@@ -59,6 +59,7 @@ import {
   // 設定頁收合區塊的圖示（2026-09-28 新增）
   Users as UsersIcon,
   Activity as ActivityIcon,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId } from './types';
 import { compressImage } from './utils/imageCompression';
@@ -91,6 +92,7 @@ import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
+import { HealthQASection } from './components/HealthQASection';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
 import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { NutrientFactBars } from './components/NutrientFactBars';
@@ -2146,6 +2148,17 @@ export default function App() {
                 indicators={physicalIndicators}
                 onChangeIndicators={handleUpdateIndicators}
               />
+            </SettingsSection>
+
+            {/* 第三部分：健康問答（2026-09-29 接回）
+                放在生理指標之後 —— 問答會用到上面量到的數字當背景。 */}
+            <SettingsSection
+              id="settings-qa"
+              icon={<MessageCircleQuestion className="w-[26px] h-[26px]" />}
+              title={t('settings.qa.title')}
+              summary={t('settings.qa.summary')}
+            >
+              <HealthQASection indicators={physicalIndicators} />
             </SettingsSection>
 
             {/* 第二部分：常見慢性病與過敏原把關清單 */}

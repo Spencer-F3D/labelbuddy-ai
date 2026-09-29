@@ -288,52 +288,58 @@ console.log('\n── 生理指標引擎（斷網後備）──');
 }
 
 /* ── 健康問答引擎（斷網後備）───────────────────────────────────
- * ⚠️ 這個引擎的英文是**另寫一份**，不是翻譯中文字串。
- *    原因：它的比對是 `q.includes('咖啡')` 這種**中文關鍵字**，
- *    英文提問一個字都對不上，會全部掉到「通用解答」。
- *    → 所以測試必須用**英文問句**，用中文問句測不出這個問題。
+ * ⚠️ 這個引擎比指標更麻煩：它的分支靠**中文關鍵字**比對
+ *    （`q.includes('咖啡')`），英文提問一個字都對不上，
+ *    只翻譯輸出會讓英文版永遠回同一句通用解答。
+ *    → 所以英文另寫一份 `answerInEnglish()`，關鍵字也一起換。
+ *    這裡就是驗證那條路真的接得上、而且沒有中文殘留。
  */
 console.log('\n── 健康問答引擎（斷網後備）──');
 {
-  // 用英文提問，且每個主題都要命中（掉到通用解答就代表關鍵字沒對上）
-  const questions = [
-    'Can I drink coffee if I have high blood pressure?',
-    'Can I eat bananas with diabetes?',
-    'Is tofu bad for gout?',
-    'I take blood pressure medicine, can I eat grapefruit?',
-    'Is red wine good for my heart?',
-    'My legs are swollen, should I drink less water?',
+  const cases: Array<[string, string]> = [
+    ['咖啡', 'I have high blood pressure. Can I drink coffee?'],
+    ['水果血糖', 'Can I eat bananas with high blood sugar?'],
+    ['豆腐痛風', 'Can I eat tofu if I have gout?'],
+    ['柚子藥物', 'Can I eat grapefruit while taking blood pressure medicine?'],
+    ['酒精', 'Is red wine good for my heart?'],
+    ['水腫喝水', 'My ankles are swollen, should I stop drinking water?'],
+    ['通用（無關鍵字）', 'Tell me something about staying healthy'],
   ];
-
-  const indicators: SeniorPhysicalIndicators = {
-    systolicBp: 148, diastolicBp: 92, heartRate: 78,
-    bloodSugar: 7.4, bloodSugarUnit: 'mmol/L', bloodSugarTiming: 'fasting',
-    uricAcidStatus: 'high', cholesterolStatus: 'normal', kidneyStatus: 'normal',
-    symptoms: [], ageGroup: '70-79歲',
+  const ind = {
+    systolicBp: 152, diastolicBp: 94, heartRate: 80,
+    bloodSugar: 8.2, bloodSugarUnit: 'mmol/L' as const, bloodSugarTiming: 'fasting' as const,
+    uricAcidStatus: 'high' as const, cholesterolStatus: 'normal' as const,
+    kidneyStatus: 'normal' as const, symptoms: [], ageGroup: '70-79歲',
   };
 
+  // 每個主題都必須命中「自己的」答案，而不是全部掉到通用解答
+  const takeaways = new Set<string>();
   let bad = 0;
-  for (const q of questions) {
-    const en = answerSeniorHealthQuestion(q, indicators, 'en');
+  for (const [name, q] of cases) {
+    const a = answerSeniorHealthQuestion(q, ind, 'en');
     checks++;
-
-    const hits = findCJK(en);
-    // 掉到通用解答 = 關鍵字沒命中 → 英文使用者問什麼都得到同一段話
-    const fellThrough = /could not reach the AI right now/i.test(en.key_takeaway);
-
+    const hits = findCJK(a);
     if (hits.length) {
       bad += hits.length;
       leaks += hits.length;
-      console.log(`  ❌ 「${q.slice(0, 42)}…」→ ${hits.length} 處中文`);
+      console.log(`  ❌ ${name} / en → ${hits.length} 處中文`);
       hits.slice(0, 3).forEach((h) => console.log(`     ${h.slice(0, 100)}`));
-    } else if (fellThrough) {
+    }
+    if (a.source !== 'smart_health_qa') {
       bad++;
       leaks++;
-      console.log(`  ❌ 「${q.slice(0, 42)}…」→ 掉到通用解答（關鍵字沒命中）`);
+      console.log(`  ❌ ${name}：source 應為 smart_health_qa，實際 ${a.source}`);
     }
+    takeaways.add(a.key_takeaway);
+  }
+  // 7 個問題若只有 1 種答案，代表關鍵字完全沒生效（最陰險的失敗模式）
+  if (takeaways.size < 6) {
+    bad++;
+    leaks++;
+    console.log(`  ❌ 只有 ${takeaways.size} 種不同答案 —— 英文關鍵字沒有生效`);
   }
   if (bad === 0) {
-    console.log(`  ✅ ${questions.length} 個英文提問：全部命中主題且零中文殘留`);
+    console.log(`  ✅ ${cases.length} 個主題：各自命中、英文零中文、source 正確`);
   }
 }
 

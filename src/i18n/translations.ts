@@ -273,6 +273,25 @@ const zhTW = {
   'vitals.ai.modeLocal': '📴 離線分析（目前沒有連線，用內建規則給您建議）',
   'vitals.ai.error': '目前連不上 AI，請稍後再試一次。',
 
+  // ── 健康問答（2026-09-29 接回）────────────────────────────────
+  'settings.qa.title': '問健康問題',
+  'settings.qa.summary': '有問題就問，AI 用白話回答',
+  'qa.hint': '有健康或飲食的問題可以直接問。AI 會看您上面填的數字，用白話回答您。',
+  'qa.commonTitle': '大家常問的問題',
+  'qa.suggestCoffee': '我有高血壓，喝咖啡可以嗎？',
+  'qa.suggestBanana': '血糖高可以吃香蕉嗎？',
+  'qa.suggestTofu': '痛風可以吃豆腐嗎？',
+  'qa.suggestGrapefruit': '吃降血壓藥可以吃柚子嗎？',
+  'qa.inputLabel': '或自己輸入問題',
+  'qa.placeholder': '例如：我有糖尿病，可以吃西瓜嗎？',
+  'qa.ask': '問 AI',
+  'qa.busy': 'AI 正在想…',
+  'qa.readAloud': '唸給我聽',
+  'qa.tips': '💡 安心小叮嚀',
+  'qa.modeCloud': '☁️ 雲端 AI 回答',
+  'qa.modeLocal': '📴 離線回答（目前沒有連線，用內建知識回答）',
+  'qa.error': '目前連不上 AI，請稍後再試一次。',
+
   /* 語音朗讀用的單位（拼接給 TTS，不是畫面文字） */
   'vitals.speech.unitMmol': '毫摩爾每升',
   'vitals.speech.unitMgdl': '毫克每分升',
@@ -742,6 +761,26 @@ const en: Record<TranslationKey, string> = {
   'vitals.ai.modeLocal':
     '📴 Offline analysis (no connection right now, so built-in rules are advising you)',
   'vitals.ai.error': 'Cannot reach the AI right now. Please try again in a moment.',
+
+  // ── Health Q&A (restored 2026-09-29) ──────────────────────────
+  'settings.qa.title': 'Ask a health question',
+  'settings.qa.summary': 'Ask anything \u2014 the AI answers in plain words',
+  'qa.hint':
+    'Have a health or diet question? Just ask. The AI will look at the numbers you entered above and answer in plain words.',
+  'qa.commonTitle': 'Questions people often ask',
+  'qa.suggestCoffee': 'I have high blood pressure \u2014 can I drink coffee?',
+  'qa.suggestBanana': 'Can I eat bananas if my blood sugar is high?',
+  'qa.suggestTofu': 'Can I eat tofu if I have gout?',
+  'qa.suggestGrapefruit': 'I take blood pressure medicine \u2014 can I eat grapefruit?',
+  'qa.inputLabel': 'Or type your own question',
+  'qa.placeholder': 'For example: I have diabetes \u2014 can I eat watermelon?',
+  'qa.ask': 'Ask the AI',
+  'qa.busy': 'The AI is thinking\u2026',
+  'qa.readAloud': 'Read this to me',
+  'qa.tips': '💡 Good to know',
+  'qa.modeCloud': '☁️ Answered by cloud AI',
+  'qa.modeLocal': '📴 Offline answer (no connection right now, using built-in knowledge)',
+  'qa.error': 'Cannot reach the AI right now. Please try again in a moment.',
 
   'vitals.speech.unitMmol': 'mmol/L',
   'vitals.speech.unitMgdl': 'mg/dL',

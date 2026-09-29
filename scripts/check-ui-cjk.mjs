@@ -325,6 +325,33 @@ try {
   if (!scrolled) console.log('  ⚠️  找不到「AI 深入分析」區塊 —— 可能沒有渲染出來');
   await capture('04b-vitals-ai');
 
+  /* ── 健康問答區塊 ──────────────────────────────────────────────
+   * 同樣收合在健康設定頁裡，不展開就掃不到。
+   */
+  const qaOpen = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('button, [role="button"]')].find(e =>
+        /Ask a health question|問健康問題/i.test(e.textContent || ''));
+      if (!el) return false;
+      el.click();
+      return true;
+    })()
+  `);
+  await sleep(1500);
+  if (!qaOpen) console.log('  ⚠️  找不到「Ask a health question」區塊');
+  const qaScrolled = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('span')].find(e =>
+        /Questions people often ask|大家常問的問題/i.test(e.textContent || ''));
+      if (!el) return false;
+      el.scrollIntoView({ block: 'start' });
+      return true;
+    })()
+  `);
+  await sleep(1000);
+  if (!qaScrolled) console.log('  ⚠️  找不到健康問答的常見問題區塊');
+  await capture('04c-health-qa');
+
   // ── 示範標籤（會走完整的「前端 OCR → 後端分析 → 結果頁」流程）────
   console.log('\n── 示範標籤（完整分析流程）──────────────');
   // 示範按鈕在「拍照辨識」分頁上
