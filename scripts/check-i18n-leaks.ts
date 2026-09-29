@@ -27,8 +27,9 @@ import { translateLocalResult } from '../server/localEngineEn';
 import { buildConditionReminders } from '../server/conditionAdvice';
 import { buildOcrFailedResult } from '../server/core';
 import { parseNutritionLabel } from '../server/labelParser';
+import { analyzeSeniorPhysicalIndicators } from '../server/smartIndicatorAnalyzer';
 import { getLearnerProfile } from '../src/data/learnerProfiles';
-import type { LabelAnalysisResult } from '../src/types';
+import type { LabelAnalysisResult, SeniorPhysicalIndicators } from '../src/types';
 
 const CJK = /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/;
 
@@ -213,6 +214,75 @@ console.log('\n── 英文標籤解析（可用性）──');
   }
   if (bad === 0) {
     console.log(`  ✅ 中英文標籤都讀到 ${en.matchedFields}/6 個欄位，且數值一致`);
+  }
+}
+
+/* ── 生理指標引擎（斷網後備）───────────────────────────────────
+ * 這個端點的英文輸出有兩層：
+ *   1. 雲端 AI（提示詞的 ENGLISH_OUTPUT_OVERRIDE_INDICATORS）
+ *   2. 本機規則引擎（analyzeSeniorPhysicalIndicators 的 STATIC_EN 對照）
+ * 雲端那層要靠實際呼叫才知道，這裡測的是**本機那層** ——
+ * 斷網時它就是唯一輸出，漏中文等於英文介面在離線時破功。
+ *
+ * ★ 實測抓到的兩個 bug 都在這一層：
+ *   ① 對照表的鍵寫「嚴防」、程式推的是「嚴控」→ 一字之差查不到，且不報錯
+ *   ② sugarDisplay 裡的「度」是中文，被插進 explanation 與 voice_summary
+ */
+console.log('\n── 生理指標引擎（斷網後備）──');
+{
+  const cases: Array<[string, SeniorPhysicalIndicators]> = [
+    [
+      '紅燈（血壓＋血糖＋腎臟）',
+      {
+        systolicBp: 158, diastolicBp: 96, heartRate: 92,
+        bloodSugar: 8.4, bloodSugarUnit: 'mmol/L', bloodSugarTiming: 'fasting',
+        uricAcidStatus: 'high', cholesterolStatus: 'high', kidneyStatus: 'ckd',
+        symptoms: ['頭暈', '口渴'], ageGroup: '70-79歲',
+      },
+    ],
+    [
+      '黃燈（血壓略高）',
+      {
+        systolicBp: 138, diastolicBp: 87, heartRate: 76,
+        bloodSugar: 5.6, bloodSugarUnit: 'mmol/L', bloodSugarTiming: 'fasting',
+        uricAcidStatus: 'normal', cholesterolStatus: 'normal', kidneyStatus: 'normal',
+        symptoms: [], ageGroup: '60-69歲',
+      },
+    ],
+    [
+      '綠燈（全部正常）',
+      {
+        systolicBp: 118, diastolicBp: 76, heartRate: 70,
+        bloodSugar: 5.2, bloodSugarUnit: 'mmol/L', bloodSugarTiming: 'fasting',
+        uricAcidStatus: 'normal', cholesterolStatus: 'normal', kidneyStatus: 'normal',
+        symptoms: [], ageGroup: '60-69歲',
+      },
+    ],
+  ];
+
+  let bad = 0;
+  for (const [name, ind] of cases) {
+    // 中英文的 status_level 必須一致 —— 顏色是中英文共用的安全訊號，
+    // 若因為翻譯而改變，等於兩種語言給出不同建議。
+    const zh = analyzeSeniorPhysicalIndicators(ind, 'zh-TW');
+    const en = analyzeSeniorPhysicalIndicators(ind, 'en');
+    checks += 2;
+
+    if (zh.status_level !== en.status_level) {
+      bad++;
+      leaks++;
+      console.log(`  ❌ ${name}：中英顏色不一致（${zh.status_level} vs ${en.status_level}）`);
+    }
+    const hits = findCJK(en);
+    if (hits.length) {
+      bad += hits.length;
+      leaks += hits.length;
+      console.log(`  ❌ ${name} / en → ${hits.length} 處中文`);
+      hits.slice(0, 4).forEach((h) => console.log(`     ${h.slice(0, 110)}`));
+    }
+  }
+  if (bad === 0) {
+    console.log(`  ✅ ${cases.length} 種情境：中英顏色一致、英文零中文殘留`);
   }
 }
 

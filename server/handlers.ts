@@ -37,6 +37,7 @@ import {
   rollDateIfNeeded,
   SYSTEM_INSTRUCTION_HEALTH_QA,
   SYSTEM_INSTRUCTION_INDICATORS,
+  ENGLISH_OUTPUT_OVERRIDE_INDICATORS,
   writeCache,
   type ApiResult,
   type CoreDeps,
@@ -447,6 +448,10 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
       });
     }
 
+    // 介面語言（與標籤分析同一套規則：只有明確 'en' 才走英文）
+    const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
+    const isEnglish = language === 'en';
+
     const sugarDisplay = indicators.bloodSugarUnit === 'mg/dL'
       ? `${indicators.bloodSugar} mg/dL`
       : `${indicators.bloodSugar} mmol/L (度)`;
@@ -463,7 +468,9 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 請用最通俗、最溫暖的「阿公阿嬤大白話」，清楚告訴他現在身體狀況如何，並給出超實用的「超市買菜指南（什麼不能買、什麼可以買）」與語音朗讀摘要。`;
 
     const aiResult = await callAiModel(req, {
-      systemInstruction: SYSTEM_INSTRUCTION_INDICATORS,
+      systemInstruction: isEnglish
+        ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
+        : SYSTEM_INSTRUCTION_INDICATORS,
       userPrompt: promptText,
       temperature: 0.3,
       maxTokens: 1200,
@@ -471,6 +478,24 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 
     if (aiResult) {
       aiResult.data.analysis_mode = 'cloud_ai';
+
+      /* ── 安全覆蓋：顏色一律以「規則引擎」為準 ─────────────────────
+       * 實測發現：血壓 158/96、空腹血糖 8.4（兩項都超過紅燈門檻）
+       * 規則引擎判 red，但雲端模型回 yellow。
+       *
+       * 對健康 App 來說，**低估警告（該紅卻報黃）比誤報更危險** ——
+       * 使用者看到黃色就會覺得「還好」，可能延誤就醫。
+       * 模型的文字解釋可以採用（它比規則引擎細膩），
+       * 但「紅黃綠」這個安全訊號必須由可預測的門檻決定。
+       */
+      const ruleLevel = analyzeSeniorPhysicalIndicators(indicators, language).status_level;
+      const order: Record<string, number> = { green: 0, yellow: 1, red: 2 };
+      const aiLevel = String(aiResult.data.status_level ?? 'green');
+      // 只在「規則比 AI 更嚴重」時升級；AI 判得比規則重就保留（寧可保守）
+      if ((order[ruleLevel] ?? 0) > (order[aiLevel] ?? 0)) {
+        aiResult.data.status_level = ruleLevel;
+      }
+
       return res.json({
         success: true,
         data: aiResult.data,
@@ -479,13 +504,16 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 
     // 降級：本機備援智慧指標分析引擎 (100% 大白話守護)
     console.log('[LabelBuddy AI] 指標分析啟動本機守護引擎');
-    const smartAnalysis = analyzeSeniorPhysicalIndicators(indicators);
+    const smartAnalysis = analyzeSeniorPhysicalIndicators(indicators, language);
     return res.json({
       success: true,
       data: smartAnalysis,
     });
   } catch (error: any) {
     console.error('身體指標處理異常:', error);
+    // ⚠️ `language` 宣告在 try 區塊內，catch 取不到 → 這裡重新算一次。
+    //    不能只寫死 'zh-TW'，否則英文模式遇到例外會突然冒出中文。
+    const fallbackLanguage: 'zh-TW' | 'en' = req.body?.language === 'en' ? 'en' : 'zh-TW';
     const fallback = analyzeSeniorPhysicalIndicators(req.body?.indicators || {
       systolicBp: 130,
       diastolicBp: 82,
@@ -497,7 +525,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
       kidneyStatus: 'normal',
       symptoms: [],
       ageGroup: '70-79歲',
-    });
+    }, fallbackLanguage);
     return res.json({
       success: true,
       data: fallback,

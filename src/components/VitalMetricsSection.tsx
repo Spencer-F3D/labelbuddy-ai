@@ -14,7 +14,7 @@
  *   回傳鍵、在 render 時才 t()，是最小改動且不會漏翻的做法。
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   HeartPulse,
   Activity,
@@ -22,8 +22,9 @@ import {
   Plus,
   Minus,
   Volume2,
+  Sparkles,
 } from 'lucide-react';
-import { SeniorPhysicalIndicators } from '../types';
+import { SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
 import { speakText, stopSpeech } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
@@ -46,7 +47,49 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
   indicators,
   onChangeIndicators,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+
+  /* ── AI 深入分析（2026-09-29 接回）──────────────────────────────
+   * 上面的評估是「固定門檻」的即時判斷，不需要連線。
+   * 這裡是使用者主動要求的**雲端 AI 分析**：把數字與症狀一起交給 AI，
+   * 換得更完整的解釋與超市建議。
+   * 斷網或雲端失敗時，後端會回本機規則引擎的結果（analysis_mode 會標明）。
+   */
+  const [aiResult, setAiResult] = useState<SeniorIndicatorAnalysis | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState(false);
+
+  const runAiAnalysis = async () => {
+    setAiBusy(true);
+    setAiError(false);
+    try {
+      const response = await fetch('/api/analyze-indicators', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // ⚠️ 一定要帶 language，否則英文介面會拿到中文結果
+        body: JSON.stringify({ indicators, language }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) throw new Error('bad response');
+      setAiResult(payload.data as SeniorIndicatorAnalysis);
+    } catch {
+      setAiError(true);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  /** 把 AI 的語音摘要唸出來（長者用） */
+  const readAiAloud = () => {
+    if (!aiResult) return;
+    stopSpeech();
+    // ⚠️ TTSLanguage 是 'cantonese' | 'mandarin' | 'english'，
+    //    不是介面語言的 'zh-TW' | 'en' → 必須轉換，否則會唸錯語言。
+    speakText(aiResult.voice_summary, {
+      rate: 0.9,
+      preferLanguage: language === 'en' ? 'english' : 'mandarin',
+    });
+  };
 
   // 1. 血壓狀態評估
   const getBpStatus = (systolic: number, diastolic: number): StatusResult => {
@@ -671,6 +714,120 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── AI 深入分析（2026-09-29 接回）────────────────────────────
+          放在最下面：上面四張卡是「不用連線的即時判斷」，
+          這裡才是使用者主動要求的 AI 分析。順序本身就是一種說明。 */}
+      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border-3 border-indigo-700 rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Sparkles className="w-6 h-6 text-indigo-800 shrink-0" aria-hidden="true" />
+          <span className="text-[20px] font-black text-indigo-950">{t('vitals.ai.title')}</span>
+        </div>
+
+        <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
+          {t('vitals.ai.hint')}
+        </p>
+
+        <button
+          type="button"
+          onClick={runAiAnalysis}
+          disabled={aiBusy}
+          className="self-start min-h-[48px] px-4 py-2 rounded-xl bg-indigo-800 text-white text-[18px] font-black whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+        >
+          {aiBusy ? t('vitals.ai.busy') : t('vitals.ai.button')}
+        </button>
+
+        {aiError && (
+          <p className="text-[16px] font-black text-rose-950 bg-rose-100 border-2 border-rose-400 rounded-xl p-3">
+            {t('vitals.ai.error')}
+          </p>
+        )}
+
+        {aiResult && (
+          <div className="flex flex-col space-y-3 pt-1">
+            {/* 走雲端還是走離線？一定要講清楚，不要讓使用者以為斷網時也是 AI */}
+            <span
+              className={`self-start px-3 py-1.5 rounded-lg text-[16px] font-black border-2 ${
+                aiResult.analysis_mode === 'cloud_ai'
+                  ? 'bg-sky-100 text-sky-950 border-sky-400'
+                  : 'bg-amber-100 text-amber-950 border-amber-400'
+              }`}
+            >
+              {aiResult.analysis_mode === 'cloud_ai'
+                ? t('vitals.ai.modeCloud')
+                : t('vitals.ai.modeLocal')}
+            </span>
+
+            <p className="text-[19px] font-black text-slate-950">{aiResult.status_title}</p>
+
+            <p className="text-[16px] font-bold text-slate-800 bg-white rounded-xl p-3 border-2 border-slate-200 whitespace-pre-line leading-relaxed">
+              {aiResult.simple_explanation}
+            </p>
+
+            {aiResult.supermarket_rules.do_not_buy.length > 0 && (
+              <div className="bg-white rounded-xl p-3 border-2 border-slate-200 flex flex-col gap-1.5">
+                <span className="text-[18px] font-black text-rose-950">
+                  {t('vitals.ai.doNotBuy')}
+                </span>
+                {aiResult.supermarket_rules.do_not_buy.map((item, i) => (
+                  <p key={`no-${i}`} className="text-[16px] font-bold text-slate-800 leading-relaxed">
+                    {item}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {aiResult.supermarket_rules.recommended_to_buy.length > 0 && (
+              <div className="bg-white rounded-xl p-3 border-2 border-slate-200 flex flex-col gap-1.5">
+                <span className="text-[18px] font-black text-emerald-950">
+                  {t('vitals.ai.recommended')}
+                </span>
+                {aiResult.supermarket_rules.recommended_to_buy.map((item, i) => (
+                  <p key={`yes-${i}`} className="text-[16px] font-bold text-slate-800 leading-relaxed">
+                    {item}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {aiResult.daily_care_tips.length > 0 && (
+              <div className="bg-white rounded-xl p-3 border-2 border-slate-200 flex flex-col gap-1.5">
+                <span className="text-[18px] font-black text-slate-950">
+                  {t('vitals.ai.tips')}
+                </span>
+                {aiResult.daily_care_tips.map((item, i) => (
+                  <p key={`tip-${i}`} className="text-[16px] font-bold text-slate-800 leading-relaxed">
+                    {item}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {aiResult.linked_conditions.length > 0 && (
+              <div className="bg-white rounded-xl p-3 border-2 border-slate-200 flex flex-col gap-1.5">
+                <span className="text-[18px] font-black text-slate-950">
+                  {t('vitals.ai.linked')}
+                </span>
+                <p className="text-[16px] font-bold text-slate-800">
+                  {aiResult.linked_conditions.join('・')}
+                </p>
+                <p className="text-[16px] font-bold text-slate-600">
+                  {t('vitals.ai.linkedNote')}
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={readAiAloud}
+              className="self-start min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-indigo-700 text-indigo-900 text-[16px] font-black whitespace-nowrap cursor-pointer flex items-center gap-2"
+            >
+              <Volume2 className="w-5 h-5" aria-hidden="true" />
+              {t('vitals.ai.readAloud')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1053,6 +1053,40 @@ CRITICAL RULES FOR ELDERLY UNDERSTANDING:
   "linked_conditions": ["連動到食品標籤掃描的關注重點 (例如：高血壓(嚴防太鹹)、糖尿病(嚴防高糖))"]
 }`;
 
+/**
+ * 生理指標分析的英文輸出覆蓋。
+ *
+ * 【為什麼不能沿用標籤用的 ENGLISH_OUTPUT_OVERRIDE】
+ *   兩者的輸出欄位完全不同 —— 標籤是 warning_title / plain_summary /
+ *   knowledge_point…，指標是 status_title / simple_explanation /
+ *   supermarket_rules / daily_care_tips / voice_summary / linked_conditions。
+ *   共用一份的話，模型會看到一堆不存在的欄位名稱，反而更容易亂寫。
+ *
+ * ⚠️ 這裡的欄位名稱**必須與 SYSTEM_INSTRUCTION_INDICATORS 的 schema 一致**，
+ *    改了其中一邊就要同步改另一邊。
+ */
+export const ENGLISH_OUTPUT_OVERRIDE_INDICATORS = `
+
+════════════════════════════════════════════════════════════════
+OUTPUT LANGUAGE: ENGLISH (this overrides the Chinese output rules above)
+════════════════════════════════════════════════════════════════
+1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
+   anywhere in your output — not in the title, the explanation, the shopping lists, the tips,
+   the voice summary, or the linked conditions.
+2. The reader is an older adult and this text is READ ALOUD to them. Use short everyday words,
+   the way a kind family member would explain it. Never use medical jargon.
+3. Keep the SAME JSON keys as the schema above — only the VALUES change to English.
+4. Length limits (English words replace the Chinese character limits above):
+   - status_title: at most 12 words (short and warm, may include one emoji)
+   - simple_explanation: at most 60 words
+   - each do_not_buy / recommended_to_buy item: at most 12 words, at most 3 items each
+   - each daily_care_tips item: at most 10 words, at most 4 items
+   - voice_summary: at most 60 words, written to be spoken aloud
+   - linked_conditions: at most 4 items, each at most 6 words
+5. linked_conditions feeds the food-label scanner. Use the SAME English condition names the
+   label analysis uses (e.g. "Hypertension", "Diabetes", "High blood cholesterol"), so the
+   two features stay consistent.`;
+
 export const SYSTEM_INSTRUCTION_HEALTH_QA = `You are a warm, gentle, patient family doctor and loving grandchild speaking directly to an elderly grandfather or grandmother (阿公/阿婆, aged 65-85).
 The senior is asking a common health or diet question (e.g., "我有高血壓，喝咖啡可以嗎？", "血糖高可以吃香蕉嗎？", "吃降血壓藥可以吃柚子嗎？", "痛風可以吃豆腐嗎？").
 

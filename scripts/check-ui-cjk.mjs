@@ -288,6 +288,41 @@ try {
     await sleep(600);
   }
 
+  /* ── 生理指標的 AI 分析區塊 ────────────────────────────────────
+   * 它收合在「日常生理指標」手風琴裡，預設看不到 ——
+   * 不展開就掃不到，等於整塊沒有被驗證過。
+   * 這裡展開後截圖，讓「有沒有正確渲染」有憑據。
+   */
+  console.log('\n── 生理指標 AI 分析區塊 ──────────────');
+  await openMenu();
+  await sleep(900);
+  await clickByText('Health settings');
+  await sleep(1500);
+  const vitalsOpen = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('button, summary, [role="button"]')].find(e =>
+        /Daily health measurements|日常生理指標/i.test(e.textContent || ''));
+      if (!el) return false;
+      el.click();
+      return true;
+    })()
+  `);
+  await sleep(1500);
+  if (!vitalsOpen) console.log('  ⚠️  找不到「Daily health measurements」區塊');
+  // 捲到 AI 分析區塊（它在四張指標卡下方，不捲看不到）
+  const scrolled = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('span, p, h3, div')].find(e =>
+        /Let the AI take a closer look|讓 AI 幫您深入看一次/i.test(e.textContent || ''));
+      if (!el) return false;
+      el.scrollIntoView({ block: 'center' });
+      return true;
+    })()
+  `);
+  await sleep(1200);
+  if (!scrolled) console.log('  ⚠️  找不到「AI 深入分析」區塊 —— 可能沒有渲染出來');
+  await capture('04b-vitals-ai');
+
   // ── 示範標籤（會走完整的「前端 OCR → 後端分析 → 結果頁」流程）────
   console.log('\n── 示範標籤（完整分析流程）──────────────');
   // 示範按鈕在「拍照辨識」分頁上

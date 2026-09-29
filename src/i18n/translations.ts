@@ -256,6 +256,23 @@ const zhTW = {
   'vitals.extra.cholNormal': '正常',
   'vitals.extra.cholHigh': '稍高/偏高',
 
+  // ── AI 深入分析（2026-09-29 接回）──────────────────────────────
+  'vitals.ai.title': '🤖 讓 AI 幫您深入看一次',
+  'vitals.ai.hint':
+    '上面的評估是用固定標準算的。按下按鈕，AI 會把您今天量到的數字、勾選的症狀一起看過，給您更完整的解釋與超市買菜建議。',
+  'vitals.ai.button': '開始 AI 深入分析',
+  'vitals.ai.busy': 'AI 正在看您的數字…',
+  'vitals.ai.readAloud': '唸給我聽',
+  'vitals.ai.resultTitle': 'AI 的分析結果',
+  'vitals.ai.doNotBuy': '🛒 超市千萬不要買',
+  'vitals.ai.recommended': '✅ 超市可以安心買',
+  'vitals.ai.tips': '💡 生活貼心小叮嚀',
+  'vitals.ai.linked': '🔗 已同步到食品標籤掃描',
+  'vitals.ai.linkedNote': '下次掃食品標籤時，會特別幫您盯這些項目。',
+  'vitals.ai.modeCloud': '☁️ 雲端 AI 分析',
+  'vitals.ai.modeLocal': '📴 離線分析（目前沒有連線，用內建規則給您建議）',
+  'vitals.ai.error': '目前連不上 AI，請稍後再試一次。',
+
   /* 語音朗讀用的單位（拼接給 TTS，不是畫面文字） */
   'vitals.speech.unitMmol': '毫摩爾每升',
   'vitals.speech.unitMgdl': '毫克每分升',
@@ -707,6 +724,24 @@ const en: Record<TranslationKey, string> = {
   'vitals.extra.cholesterol': 'Blood lipids / cholesterol',
   'vitals.extra.cholNormal': 'Normal',
   'vitals.extra.cholHigh': 'Slightly high / high',
+
+  // ── AI in-depth analysis (restored 2026-09-29) ──────────────────
+  'vitals.ai.title': '🤖 Let the AI take a closer look',
+  'vitals.ai.hint':
+    'The assessment above uses fixed thresholds. Tap the button and the AI will read today\u2019s numbers together with the symptoms you ticked, and give you a fuller explanation plus supermarket advice.',
+  'vitals.ai.button': 'Start AI analysis',
+  'vitals.ai.busy': 'The AI is reading your numbers\u2026',
+  'vitals.ai.readAloud': 'Read this to me',
+  'vitals.ai.resultTitle': 'AI analysis result',
+  'vitals.ai.doNotBuy': '🛒 Do not buy at the supermarket',
+  'vitals.ai.recommended': '✅ Safe to buy',
+  'vitals.ai.tips': '💡 Daily care tips',
+  'vitals.ai.linked': '🔗 Also watched in label scanning',
+  'vitals.ai.linkedNote': 'Next time you scan a food label, these are the things it will watch for you.',
+  'vitals.ai.modeCloud': '☁️ Analysed by cloud AI',
+  'vitals.ai.modeLocal':
+    '📴 Offline analysis (no connection right now, so built-in rules are advising you)',
+  'vitals.ai.error': 'Cannot reach the AI right now. Please try again in a moment.',
 
   'vitals.speech.unitMmol': 'mmol/L',
   'vitals.speech.unitMgdl': 'mg/dL',
