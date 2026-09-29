@@ -8,6 +8,10 @@ bun.lock
 .env*
 !.env.example
 
+# 臨時檔案（除錯腳本、API 測試用的請求 body、commit message 草稿等）
+# ⚠️ 用 .tmp- 開頭是本專案的約定；曾經不小心把 commit message 草稿提交進去過。
+.tmp-*
+
 # Cloudflare Workers 本機開發用的環境變數（含 API 金鑰）
 # wrangler dev 會自動讀這個檔案；正式環境的金鑰用 `wrangler secret put` 設定。
 .dev.vars

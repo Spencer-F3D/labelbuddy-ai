@@ -48,6 +48,10 @@ import { buildRecognitionResult, type OcrRecognitionResult } from './labelParser
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
+// 本機引擎的英文對照表。公開 translateLocalText 是為了讓「食育欄位備援」
+// 也能用同一份對照，而不是在 core.ts 另維護一份（兩份遲早會漂移）。
+// ⚠️ localEngineEn.ts 不 import 任何 Node 模組，所以 Worker 也能安全使用。
+import { translateLocalText } from './localEngineEn';
 import {
   SeniorPhysicalIndicators,
   NutrientFact,
@@ -940,11 +944,22 @@ export function normalizeNutrientFacts(
  *
  * 三條路徑（雲端成功／快取命中／本機備援）都必須呼叫。
  */
-export function ensureEducationFields(data: any, facts: NutrientFact[]): void {
+export function ensureEducationFields(
+  data: any,
+  facts: NutrientFact[],
+  /**
+   * 輸出語言。
+   * ⚠️ 這裡的備援內容來自**本機引擎**（確定性產生，不是 AI 回的），
+   *    所以一定是中文。雲端模式下模型漏給食育欄位時就會補上中文 ——
+   *    英文介面因此漏出中文（實測抓到）。
+   *    帶語言後，英文模式會把備援內容過一次對照表。
+   */
+  language: 'zh-TW' | 'en' = 'zh-TW'
+): void {
   const fallback = buildEducationFields(facts);
   for (const key of ['knowledge_point', 'label_reading_tip', 'daily_limit_context'] as const) {
     if (typeof data[key] !== 'string' || data[key].trim().length === 0) {
-      data[key] = fallback[key];
+      data[key] = language === 'en' ? translateLocalText(fallback[key]) : fallback[key];
     }
   }
 }
@@ -959,15 +974,24 @@ export function ensureEducationFields(data: any, facts: NutrientFact[]): void {
  */
 export function buildOcrFailedResult(
   learnerProfile: LearnerProfile,
-  ocr: Pick<OcrRecognitionResult, 'matchedFields'>
+  ocr: Pick<OcrRecognitionResult, 'matchedFields'>,
+  /**
+   * 輸出語言。⚠️ 這條路徑**兩條模式都會走到**（雲端／本機），
+   * 而且它不經過 AI，是後端直接寫死的字串 ——
+   * 漏帶語言的話，英文介面會整段中文（這是實測抓到的洩漏）。
+   */
+  language: 'zh-TW' | 'en' = 'zh-TW'
 ): LabelAnalysisResult {
+  const en = language === 'en';
   return {
     risk_level: 'yellow',
-    warning_title: '🔍 看不清楚標籤數字',
-    plain_summary:
-      '不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？',
-    alternative_advice:
-      '拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。',
+    warning_title: en ? '🔍 Cannot read the label numbers' : '🔍 看不清楚標籤數字',
+    plain_summary: en
+      ? 'Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the "Nutrition Facts" table, and take another photo in better light?'
+      : '不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？',
+    alternative_advice: en
+      ? 'Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.'
+      : '拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。',
     ingredients_detected: [],
     nutrition_concerns: [],
     matched_conditions: [],
@@ -977,7 +1001,10 @@ export function buildOcrFailedResult(
     ocr_matched_fields: ocr.matchedFields,
     analysis_mode: 'local_fallback',
     learner_profile_id: learnerProfile.id,
-    learner_profile_name: learnerProfile.name,
+    // ⚠️ 後端也要輸出對應語言的身分名稱。
+    //    前端目前用自己的 state 顯示（已本地化），但 API 回應本身
+    //    不該在中英文模式下都回中文 —— 那等於埋一顆地雷給下一個接手的人。
+    learner_profile_name: profileName(learnerProfile.id, learnerProfile.name, language),
   };
 }
 

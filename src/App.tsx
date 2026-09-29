@@ -76,6 +76,7 @@ import {
   profileName as localizedProfileName,
   conditionName as localizedConditionName,
   nutrientName as localizedNutrientName,
+  RISK_LABEL_EN,
 } from './data/bilingual';
 // 慢性病與身分的「顯示用」英文對照（2026-09-28 第三階段）。
 // 與 bilingual.ts 的分工：bilingual.ts 給後端提示詞用，這份給畫面用。
@@ -83,9 +84,10 @@ import {
   conditionBadge as localizedConditionBadge,
   conditionDescription as localizedConditionDescription,
   categoryName as localizedCategoryName,
+  profileDisplayName as localizedProfileDisplayName,
 } from './data/bilingualContent';
 import { speakText, stopSpeech } from './utils/tts';
-import { generateSampleLabelDataUrl } from './data/samples';
+import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { getInitialDietRecords } from './data/initialDietRecords';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
@@ -707,28 +709,16 @@ export default function App() {
       } catch {}
     }
 
-    let sampleDataUrl = '';
-    if (sampleType === 'ramen') {
-      sampleDataUrl = generateSampleLabelDataUrl('【超重鹹】特濃紅燒牛肉泡麵', {
-        serving: '100公克 (每包一份)',
-        calories: '495 大卡',
-        sodium: '2,350 毫克 (⚠️ 高達一日上限 118%)',
-        sugar: '8.5 公克',
-        carbs: '62.0 公克',
-        allergens: '本產品含有小麥、大豆、花生油及牛肉成分。',
-        ingredients: '油炸麵條、棕櫚油、精鹽、味精、醬油粉、辣椒粉、花生油香料、防腐劑。',
-      });
-    } else {
-      sampleDataUrl = generateSampleLabelDataUrl('【高纖健康】純天然有機大燕麥片', {
-        serving: '50公克 (每包一份)',
-        calories: '185 大卡',
-        sodium: '2 毫克 (✅ 幾乎無鈉)',
-        sugar: '0.6 公克 (✅ 無添加精緻糖)',
-        carbs: '33.5 公克 (含豐富β-葡聚醣膳食纖維)',
-        allergens: '本產品含有燕麥。生產線無花生等過敏原。',
-        ingredients: '100% 純天然全粒大燕麥片。',
-      });
-    }
+    // ⚠️ 示範標籤會被「畫成圖片」，所以語言要在這裡就決定 ——
+    //    Canvas 拿不到 React context，畫完就固定了。
+    //    內容來自 samples.ts 的 DEMO_LABELS（中英各一份）。
+    const demo = DEMO_LABELS[language === 'en' ? 'en' : 'zh-TW'];
+    const sample = sampleType === 'ramen' ? demo.ramen : demo.oatmeal;
+    const sampleDataUrl = generateSampleLabelDataUrl(
+      sample.title,
+      sample.details,
+      language === 'en' ? 'en' : 'zh-TW'
+    );
 
     setPreviewImage(sampleDataUrl);
     await sendImageForAnalysis(sampleDataUrl);
@@ -1328,7 +1318,7 @@ export default function App() {
                     {t('home.currentProfile')}
                   </span>
                   <span className="block text-[19px] font-black text-slate-950 leading-tight">
-                    {learnerProfile.name}
+                    {localizedProfileDisplayName(learnerProfile.id, learnerProfile.name, language)}
                   </span>
                 </span>
                 <ArrowRight className="w-[24px] h-[24px] text-slate-500 shrink-0" />
@@ -1431,7 +1421,7 @@ export default function App() {
                     <div className="flex flex-col min-w-0">
                       <span className="text-[16px] font-bold text-slate-600">{t('home.currentProfile')}</span>
                       <span className="text-[20px] font-black text-slate-900 truncate">
-                        {learnerProfile.name}
+                        {localizedProfileDisplayName(learnerProfile.id, learnerProfile.name, language)}
                       </span>
                     </div>
                   </div>
@@ -1643,7 +1633,9 @@ export default function App() {
 
               const riskHeadline =
                 stripLeadingEmoji(analysisResult.warning_title || '') ||
-                RISK_LABEL[analysisResult.risk_level];
+                // ⚠️ 這裡是「AI 沒給標題」時的後備文字，所以一定要跟著語言走。
+                //    只查中文表的話，英文模式在 AI 回空字串時會冒出中文標題。
+                (language === 'en' ? RISK_LABEL_EN : RISK_LABEL)[analysisResult.risk_level];
               const riskSubline =
                 analysisResult.risk_level === 'red'
                   ? t('risk.red')
@@ -2121,7 +2113,13 @@ export default function App() {
               id="settings-profile"
               icon={<UsersIcon className="w-[26px] h-[26px]" />}
               title={t('settings.profile.title')}
-              summary={`${learnerProfile.emoji} ${learnerProfile.name}`}
+              /* ⚠️ 收合時顯示目前身分 —— 這裡也要本地化，
+                 否則英文介面的摺疊標題會直接露出中文身分名稱。 */
+              summary={`${learnerProfile.emoji} ${localizedProfileDisplayName(
+                learnerProfile.id,
+                learnerProfile.name,
+                language
+              )}`}
             >
               <LearnerProfilePicker
                 selectedId={learnerProfileId}

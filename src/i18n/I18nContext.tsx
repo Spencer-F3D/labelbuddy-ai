@@ -76,14 +76,18 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * 同步 `<html lang>`。
+   * 同步 `<html lang>` 與**瀏覽器分頁標題**。
    *
    * 【為什麼重要】
-   *   螢幕閱讀器會依這個屬性決定發音（中文用中文語音、英文用英文語音）。
-   *   不設的話，英文介面會用中文語音朗讀，聽起來完全聽不懂。
+   *   - `<html lang>`：螢幕閱讀器依這個屬性決定發音
+   *     （中文用中文語音、英文用英文語音）。不設的話，英文介面會用中文語音朗讀。
+   *   - `document.title`：分頁標籤、書籤、分享預覽都會顯示它。
+   *     `index.html` 裡寫死的是中文，英文模式若不同步就會在分頁上漏出中文。
    */
   useEffect(() => {
     document.documentElement.lang = language === 'en' ? 'en' : 'zh-Hant';
+    const dict = TRANSLATIONS[language] ?? TRANSLATIONS[DEFAULT_LANGUAGE];
+    if (dict['app.documentTitle']) document.title = dict['app.documentTitle'];
   }, [language]);
 
   const t = useCallback<I18nValue['t']>(

@@ -33,6 +33,8 @@ export type Language = 'zh-TW' | 'en';
 const zhTW = {
   /* ── App 外框 ─────────────────────────────────────────────── */
   'app.name': 'LabelBuddy AI',
+  // 瀏覽器分頁／書籤的標題（由 I18nProvider 寫進 document.title）
+  'app.documentTitle': 'LabelBuddy AI - 您的超市健康小幫手',
   'app.tagline': '專為長者設計的超市食品健康放大鏡',
   'app.taglineEn': 'A supermarket food health magnifier for older adults',
   'app.statusCloud': '雲端 AI 辨識',
@@ -491,6 +493,7 @@ export type TranslationKey = keyof typeof zhTW;
  */
 const en: Record<TranslationKey, string> = {
   'app.name': 'LabelBuddy AI',
+  'app.documentTitle': 'LabelBuddy AI - Your supermarket health helper',
   'app.tagline': 'A supermarket food health magnifier for older adults',
   'app.taglineEn': 'A supermarket food health magnifier for older adults',
   'app.statusCloud': 'Cloud AI',

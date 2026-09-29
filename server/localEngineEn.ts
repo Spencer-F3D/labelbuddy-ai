@@ -100,22 +100,147 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
     '🟡 High in salt and contains phosphate additives: these quietly drain calcium from your body and make bones brittle.',
 
   // ── 食育教學：每個營養項目的「為什麼」────────────────────
-  鈉: 'The "sodium" on the label is salt. One pack of instant noodles often equals a whole day\'s limit, so it should not be a daily meal.',
-  添加糖:
+  // ⚠️⚠️ 這裡的**鍵必須是「完整句子」**，不是營養素名稱。
+  //      `translateOne()` 是拿 `knowledge_point` 的全文去查表，
+  //      而 `LOCAL_KNOWLEDGE_POINTS` 的值是整句話
+  //      （見 smartNutritionAnalyzer.ts）。
+  //      原本這幾條寫成 `鈉:` / `添加糖:` 這種「營養素名」，永遠查不到，
+  //      結果英文介面的食育卡片一直顯示中文 —— 而且不會報錯。
+  //      這是 2026-09-29 用 API 實測才抓到的。
+  '包裝上的「鈉」就是鹽分。一包泡麵的鈉常常就等於一整天的上限，所以不能天天當正餐。':
+    'The "sodium" on the label is salt. One pack of instant noodles often equals a whole day\'s limit, so it should not be a daily meal.',
+  '成分表上的「糖」是外加的精緻糖，不是食物天然的甜。一杯含糖飲料常等於好幾顆方糖。':
     'The "sugar" in the ingredient list is added refined sugar, not the natural sweetness of food. One sugary drink often equals several sugar cubes.',
-  飽和脂肪:
+  '飽和脂肪多來自動物油與棕櫚油，吃多了血液會變黏稠，心臟比較吃力。':
     'Saturated fat mostly comes from animal fat and palm oil. Too much makes your blood thicker and your heart work harder.',
-  熱量: 'Look at the calories for the WHOLE pack, not per serving. Many packages list per serving, but the pack actually holds several.',
-  蛋白質:
+  '熱量要看「整包」不是「每份」。很多包裝寫的是每份，整包其實是好幾份。':
+    'Look at the calories for the WHOLE pack, not per serving. Many packages list per serving, but the pack actually holds several.',
+  '蛋白質要看「蛋白質對熱量」的比例，不要只看正面的大字宣稱。':
     'Look at the ratio of protein to calories — do not just trust the big claim on the front of the package.',
-  膳食纖維:
+  '膳食纖維一天要 25 公克以上。成分表越短、越接近原型食物，纖維通常越多。':
     'You need at least 25 g of fibre a day. The shorter the ingredient list and the closer to whole food, the more fibre it usually has.',
-  鈣: 'Calcium is about bones. It is a completely different word from the sodium in salt — do not mix them up when reading a label.',
+  '鈣和骨頭有關，和鹽分的「鈉」是兩個完全不同的字，看標籤時不要看錯。':
+    'Calcium is about bones. It is a completely different word from the sodium in salt — do not mix them up when reading a label.',
   '先找「鈉」那一列看是幾毫克，再找「糖」那一列看是幾公克。這兩列就能判斷一大半。':
     'First find the "sodium" row and read the milligrams, then find the "sugar" row and read the grams. Those two rows tell you most of what you need.',
   '標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。':
     'Every row in the nutrition table is one number. If you can read just the "sodium" and "sugar" rows, you can judge most products.',
+
+  // ── 紅黃燈警告（nutrition_concerns）──────────────────────────
+  // ⚠️ 2026-09-29 補。這 8 條原本漏掉 ——
+  //    引擎直接 push 中文字串，而對照表沒有對應鍵，
+  //    於是 translateOne() 原樣回傳中文，英文介面就會看到紅字中文警告。
+  '🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，阿公阿嬤吃了血壓會一下子飆高、頭會暈！':
+    '🔴 Far too much salt: one serving already exceeds the whole day\'s limit. Blood pressure can spike and cause dizziness.',
+  '🟡 口味稍微偏鹹：鹽分有一點多，建議少喝裡面的湯汁，多喝兩杯溫開水排鹽。':
+    '🟡 A little on the salty side: skip the soup or sauce, and drink a couple of glasses of warm water to help flush the salt out.',
+  '🔴 白糖放得很多（太甜！）：吃了血糖會急速衝上去，容易口渴想喝水、人會疲倦！':
+    '🔴 Far too much sugar: blood sugar can shoot up quickly, leaving you thirsty and tired.',
+  '🟡 有加糖分：吃起來有甜味，如果想嚐味道吃一小口就好，不要整包吃光。':
+    '🟡 Contains added sugar: a small taste is fine — do not finish the whole pack.',
+  '🔴 油脂放太重（含有不好的油）：容易黏在心血管壁上、讓血液變黏稠，心臟很吃力！':
+    '🔴 Very heavy in fat (including unhealthy oils): this clogs blood vessels and thickens the blood, making the heart work hard.',
+  '🟡 油脂稍多：稍微偏油膩，平時要少吃動物油跟酥油，保護心臟血管。':
+    '🟡 A bit oily: go easy on animal fats and shortening to protect your heart and blood vessels.',
+  '🔴 湯頭太濃或肉精粉多：阿公阿嬤喝了腳趾頭跟關節容易發紅、腫痛發作！':
+    '🔴 Very rich broth or heavy meat extract: this can trigger red, swollen, painful joints.',
+  '🟡 甜糖漿放得多：身體代謝太甜的糖漿會讓尿酸排不出去，要少碰甜食。':
+    '🟡 Heavy in sweet syrup: too much syrup stops the body clearing uric acid — go easy on sweet foods.',
+
+  // ── 過敏原名稱 ────────────────────────────────────────────
+  小麥: 'Wheat',
+  大豆: 'Soy',
+  '甲殼類產線交叉污染': 'Shellfish (shared production line)',
+  花生: 'Peanuts',
+  牛奶製品: 'Milk products',
+  '小麥麩質': 'Wheat gluten',
+  '燕麥麩質': 'Oat gluten',
+
+  // ── 示範商品的成分表 ──────────────────────────────────────
+  水: 'Water',
+  '油炸麵條 (小麥粉、精煉棕櫚油、食用鹽、碳酸鈉、多磷酸鈉)':
+    'Fried noodles (wheat flour, refined palm oil, edible salt, sodium carbonate, sodium polyphosphate)',
+  '調味湯粉包 (味精/L-麩酸鈉、精鹽、麥芽糊精、牛肉精粉、酵母抽出物、香辛料)':
+    'Seasoning soup powder (MSG / monosodium glutamate, refined salt, maltodextrin, beef extract, yeast extract, spices)',
+  '調味油包 (精製牛油、棕櫚油、辣椒油、維生素E抗氧化劑)':
+    'Seasoning oil pack (refined beef tallow, palm oil, chilli oil, vitamin E antioxidant)',
+  '脫水蔬菜 (脫水青蔥、胡蘿蔔、高麗菜)':
+    'Dehydrated vegetables (dried spring onion, carrot, cabbage)',
+  '麵粉 (小麥粉)': 'Flour (wheat flour)',
+  '特級花生醬 (烘焙花生、植物油、食用鹽)':
+    'Premium peanut butter (roasted peanuts, vegetable oil, edible salt)',
+  '精緻白砂糖、蔗糖、高果糖玉米糖漿':
+    'Refined white sugar, sucrose, high-fructose corn syrup',
+  '精煉棕櫚油、人造酥油': 'Refined palm oil, artificial shortening',
+  '全脂奶粉、乳清粉': 'Whole milk powder, whey powder',
+  '膨脹劑 (碳酸氫鈉、酸性焦磷酸鈉)':
+    'Raising agents (sodium bicarbonate, acid sodium pyrophosphate)',
+  '特選非基因改造黃豆、黑豆': 'Selected non-GMO soybeans and black beans',
+  澳洲燕麥纖維: 'Australian oat fibre',
+  '碳酸鈣 (天然補鈣)': 'Calcium carbonate (natural calcium)',
 };
+
+/**
+ * 示範商品的英文名稱。
+ *
+ * 【為什麼需要獨立一張表】
+ *   白話摘要的樣板會把商品名「嵌進句子裡」（`Hello! This ${foodName} has…`），
+ *   所以字串比對對不上 —— 必須在樣板建構時就先把商品名換掉。
+ *
+ * 【查不到時的行為】
+ *   若商品名含中文又查不到（例如真實掃描到的中文包裝），
+ *   退回通用說法 `this product`，而**不是**原樣回傳中文。
+ *   理由是使用者要求「英文介面任何地方都不能出現中文」，
+ *   寧可少一點資訊，也不要讓中文漏出去。
+ */
+const FOOD_NAME_EN: Record<string, string> = {
+  '風味調味速食麵 / 醬料泡麵': 'instant flavoured noodles',
+  '香酥花生夾心餅乾 / 甜點酥餅': 'crunchy peanut sandwich biscuits',
+  '無加糖高纖高鈣豆奶 / 燕麥黑豆漿': 'unsweetened high-fibre soy milk',
+  '【超重鹹】特濃紅燒牛肉泡麵': 'extra-rich braised beef instant noodles',
+  '【高纖健康】純天然有機大燕麥片': 'pure organic wholegrain oats',
+  '紅燒牛肉風味泡麵 (高鈉重口味)': 'braised beef instant noodles (very high sodium)',
+  '濃郁香酥花生夾心餅 (高糖/過敏原)': 'rich crunchy peanut sandwich biscuits',
+};
+
+/** 商品名 → 英文；未知的中文名退回通用說法，確保不會漏中文。 */
+function foodNameEn(zh: string): string {
+  if (FOOD_NAME_EN[zh]) return FOOD_NAME_EN[zh];
+  return /[\u4e00-\u9fff]/.test(zh) ? 'this product' : zh;
+}
+
+/**
+ * 摘要句的主詞片語（含正確的單複數動詞）。
+ *
+ * 【為什麼需要這個】
+ *   樣板原本寫死「These ${名稱} have…」——
+ *   遇到「查不到商品名」的通用情況就會變成
+ *   `Hello! These this product have far too much…`，
+ *   文法明顯錯誤，而英文表達是比賽的評分項目之一。
+ *   這裡讓主詞與動詞一起決定，兩種情況都讀得順。
+ */
+function subjectClause(zhName: string): { text: string; verb: 'have' | 'has' } {
+  const named = FOOD_NAME_EN[zhName];
+  return named ? { text: `These ${named}`, verb: 'have' } : { text: 'This product', verb: 'has' };
+}
+
+/**
+ * 慢性病清單 → 英文。
+ *
+ * 【為什麼需要獨立處理】
+ *   白話摘要裡的慢性病是「`、` 串接的多項字串」，
+ *   例如「高血壓 (太鹹危險)、高血脂 (油太重警告)、痛風 (腳趾腫痛警報)」。
+ *   整串丟進 translateOne() 比對不到（對照表存的是單項），
+ *   於是原樣回傳中文 → 英文摘要裡就夾著中文清單。
+ *   這裡先依 `、` 切開，逐項翻譯後再接回去。
+ */
+function conditionListEn(text: string): string {
+  if (!text.includes('、')) return translateOne(text);
+  return text
+    .split('、')
+    .map((part) => translateOne(part.trim()))
+    .join(', ');
+}
 
 /**
  * 含變數的樣板字串。
@@ -133,32 +258,46 @@ const TEMPLATE_PATTERNS: Array<{ re: RegExp; build: (m: RegExpMatchArray) => str
   {
     // 紅燈 + 有勾選慢性病（拼接兩段）
     re: /^阿公、阿婆您好！這款【(.+?)】油鹽糖放得太多了。特別是您注意的【(.+?)】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。孫子建議您放回架上，不要買回家喔！$/,
-    build: (m) =>
-      `Hello! This ${m[1]} has far too much oil, salt and sugar. Especially for the conditions you selected — ${m[2]} — it is not good for you: it can spike your blood pressure or blood sugar. Best to put it back on the shelf and not take it home.`,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      return `Hello! ${s.text} ${s.verb} far too much oil, salt and sugar. Especially for the conditions you selected — ${conditionListEn(m[2])} — it is not good for you: it can spike your blood pressure or blood sugar. Best to put it back on the shelf and not take it home.`;
+    },
   },
   {
     // 紅燈 + 沒有勾選慢性病
     re: /^阿公、阿婆您好！這款【(.+?)】油鹽糖放得太多了。對老人家心血管跟血壓負擔比較大，建議換成天然清淡的食物比較健康喔！$/,
-    build: (m) =>
-      `Hello! This ${m[1]} has far too much oil, salt and sugar. It is a heavy load on an older person's heart and blood pressure — a plain, natural food would be healthier.`,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      return `Hello! ${s.text} ${s.verb} far too much oil, salt and sugar. It is a heavy load on an older person's heart and blood pressure — a plain, natural food would be healthier.`;
+    },
   },
   {
     // 黃燈
     re: /^長輩您好！這款【(.+?)】味道雖然香，但對您的身體（(.+?)）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！$/,
-    build: (m) =>
-      `Hello! This ${m[1]} smells good, but it still has a fair amount of oil, salt and sugar for your conditions (${m[2]}). A small taste is fine — do not finish the whole pack.`,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      const verb = s.verb === 'have' ? 'smell' : 'smells';
+      const they = s.verb === 'have' ? 'they still have' : 'it still has';
+      return `Hello! ${s.text} ${verb} good, but ${they} a fair amount of oil, salt and sugar for your conditions (${conditionListEn(m[2])}). A small taste is fine — do not finish the whole pack.`;
+    },
   },
   {
     // 綠燈
     re: /^阿公、阿婆請放一百個心！這款【(.+?)】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！$/,
-    build: (m) =>
-      `Rest easy! This ${m[1]} does not add too much salt, sugar or bad fats, and it matches the health conditions you selected. You can safely put it in your basket and enjoy it at home.`,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      const rest = s.verb === 'have' ? 'they match' : 'it matches';
+      const put = s.verb === 'have' ? 'them' : 'it';
+      return `Rest easy! ${s.text} ${s.verb === 'have' ? 'do' : 'does'} not add too much salt, sugar or bad fats, and ${rest} the health conditions you selected. You can safely put ${put} in your basket and enjoy ${put} at home.`;
+    },
   },
   {
     // 每日上限說明（有商品名稱）：「這包X的鈉是 2350 毫克，等於您一天上限的 118%。」
     re: /^這包(.+?)的(.+?)是 (.+?) (\S+)，等於您一天上限的 (\d+)%。$/,
-    build: (m) =>
-      `This ${m[1]} has ${m[3]} ${unitName(m[4], 'en')} of ${nutrientName(m[2], 'en')} — that is ${m[5]}% of your daily limit.`,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      return `${s.text} ${s.verb} ${m[3]} ${unitName(m[4], 'en')} of ${nutrientName(m[2], 'en')} — that is ${m[5]}% of your daily limit.`;
+    },
   },
   {
     // 每日上限說明（沒有商品名稱）
@@ -189,6 +328,20 @@ function translateOne(text: string): string {
 function translateList(list: string[] | undefined): string[] | undefined {
   if (!Array.isArray(list)) return list;
   return list.map((s) => (typeof s === 'string' ? translateOne(s) : s));
+}
+
+/**
+ * 對外的單句翻譯。
+ *
+ * 【為什麼需要公開這個】
+ *   本機引擎不是唯一會產生中文的來源 ——
+ *   `core.ts` 的 `ensureEducationFields()` 在「模型漏給食育欄位」時，
+ *   會用本機引擎的確定性內容補上，那些也是中文。
+ *   把翻譯器公開出去，讓那條路徑也能用同一份對照表，
+ *   而不是各自維護一份（兩份遲早會漂移）。
+ */
+export function translateLocalText(text: string): string {
+  return translateOne(text);
 }
 
 /**

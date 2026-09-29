@@ -171,10 +171,14 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
      *   提醒只跟「使用者勾了哪些病」有關，與照片內容無關，
      *   而且是由後端確定性產生的，不需要（也不該）佔用快取空間。
      *   每條回應路徑都直接算一次，成本近乎為零。
+     *
+     * ⚠️ 這裡**必須帶語言**：提醒是後端規則產生的，不經過 AI，
+     *    所以兩條路徑（雲端／本機）都會用到它。
+     *    漏帶的話英文介面會夾著中文病名與中文建議。
      */
     const attachReminders = (data: any) => ({
       ...data,
-      condition_reminders: buildConditionReminders(conditions),
+      condition_reminders: buildConditionReminders(conditions, language),
     });
 
     // ══════════════════════════════════════════════════════════════════
@@ -190,7 +194,7 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
       return res.json({
         success: true,
         data: attachReminders({
-          ...buildOcrFailedResult(learnerProfile, { matchedFields: 0 }),
+          ...buildOcrFailedResult(learnerProfile, { matchedFields: 0 }, language),
           data_handling: dataHandling,
         }),
       });
@@ -295,10 +299,10 @@ ${promptContext}`;
           cached: true,
           data_handling: 'cloud' as DataHandling,
           learner_profile_id: learnerProfile.id,
-          learner_profile_name: learnerProfile.name,
+          learner_profile_name: profileName(learnerProfile.id, learnerProfile.name, language),
         };
         // 舊快取可能沒有食育欄位，這裡一併補齊
-        ensureEducationFields(cachedData, cachedFacts);
+        ensureEducationFields(cachedData, cachedFacts, language);
         return res.json({ success: true, data: attachReminders(cachedData) });
       }
     } else {
@@ -334,9 +338,9 @@ ${promptContext}`;
         aiResult.data.ai_provider = aiResult.provider;
         aiResult.data.data_handling = 'cloud';
         aiResult.data.learner_profile_id = learnerProfile.id;
-        aiResult.data.learner_profile_name = learnerProfile.name;
+        aiResult.data.learner_profile_name = profileName(learnerProfile.id, learnerProfile.name, language);
         // 模型漏給食育欄位時用確定性內容補上（由真實 nutrient_facts 推導）
-        ensureEducationFields(aiResult.data, cloudFacts);
+        ensureEducationFields(aiResult.data, cloudFacts, language);
         writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
         console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
         return res.json({
@@ -386,7 +390,7 @@ ${promptContext}`;
       return res.json({
         success: true,
         data: attachReminders({
-          ...buildOcrFailedResult(learnerProfile, ocr),
+          ...buildOcrFailedResult(learnerProfile, ocr, language),
           data_handling: dataHandling,
         }),
       });
@@ -413,7 +417,7 @@ ${promptContext}`;
         analysis_mode: 'local_fallback',
         data_handling: dataHandling,
         learner_profile_id: learnerProfile.id,
-        learner_profile_name: learnerProfile.name,
+        learner_profile_name: profileName(learnerProfile.id, learnerProfile.name, language),
       }),
     });
   } catch (error: any) {

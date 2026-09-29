@@ -37,6 +37,13 @@
 - 版控：GitHub `Spencer-F3D/labelbuddy-ai`（Private）｜手機測試：Cloudflare Tunnel（`連線到手機.bat`，網址每次不同）
 - OCR：**前端執行**（`src/ocr/ocrBrowser.ts`）；APK 走 Capacitor ＋ ML Kit
 
+⚠️⚠️ **`git commit` 只是本機動作 —— 不會上 GitHub、更不會上線。**
+每個段落做完要主動做這三步，順序不能顛倒：
+1. `git push origin main`（沙箱內很慢，2–5 分鐘，用背景執行）
+2. `vite build` 到 `dist/`（`dist` 只有 12 檔，不會撞沙箱的 50 檔刪除門檻）
+3. `node node_modules/wrangler/bin/wrangler.js deploy`（只上傳變動檔，約 15 秒）
+驗證方式：線上首頁引用的 `assets/index-XXXX.js` 要與 `dist/assets/` 內的檔名一致。
+
 **後端結構（平台無關）**：`server/labelParser.ts`（純解析）／`server/ocrLabel.ts`（Node 專屬 OCR）／`server/core.ts`（共用邏輯，★不可 import Node 模組）／`server/handlers.ts`（6 個 handler）／`server.ts`（Express 轉接層 130 行）／`worker.ts`（Workers 入口）
 - 技巧：`makeRes()` 相容層包住 Express handler，`res.json()` **回傳「結果物件」**（不是 res），所以 `return res.json(...)` 原封不動可用
 - 伺服器端 OCR 用依賴注入 `CoreDeps.recognizeImage`；Worker 不提供 → 回 `OCR_NOT_AVAILABLE`
@@ -135,17 +142,60 @@
 - ⚠️ **本機引擎是預設路徑**（`cloudConsent` 預設 false）→ 英文介面要真的可用，本機引擎**必須**雙語
 - 本機引擎採「對照表 ＋ 事後轉換」（只轉輸出欄位），**比對關鍵字一行都不動**（翻了會讓比對失效）
 
-### 第三階段進度（2026-09-28）
+### 第三階段進度（2026-09-28 完成，09-29 收尾）
 | 頁面 | 狀態 |
 | --- | --- |
 | 健康設定頁（身分選擇／生理指標／慢性病清單） | ✅ 完成 |
-| 飲食紀錄頁（週報／分級／匯出彈窗） | ✅ 完成 |
-| 食育學堂 ＋ 食育教材 | ⏳ 未開始（教材約 5,100 字） |
+| 飲食紀錄頁（週報／分級／匯出彈窗／示範紀錄） | ✅ 完成 |
+| 食育學堂（外框 ＋ 21 張知識卡 ＋ 14 題測驗） | ✅ 完成 |
+| 示範標籤圖片（`samples.ts`） | ✅ **09-29 英文化**（使用者新規則：任何地方都不能有中文） |
 
 ★ **食育學堂的外框與教材必須一起做** —— 只翻外框會變成「英文外殼 + 中文內容」。
-★ 畫面用的英文對照放在 `src/data/bilingualContent.ts`（與後端用的 `bilingual.ts` 分工）。
-★ 兩個必記的坑：① 模組層函式只回傳**翻譯鍵**，由呼叫端 `t()` 解析
+★ 畫面用的英文對照：`src/data/bilingualContent.ts`（介面）＋
+  `src/data/educationContentEn.ts`（教材）；後端用的在 `src/data/bilingual.ts`。
+★ 三個必記的坑：
+  ① 模組層函式只回傳**翻譯鍵**，由呼叫端 `t()` 解析
   ② `useMemo` 的依賴要含 `t` 與 `language`，否則切語言時文字不會重算（不會報錯）
+  ③ **引入 `t` 之後，`.map((t) => ...)` 會遮蔽翻譯函式** → 參數要改名（如 `topic`）
+★ **示範紀錄在「渲染時」才轉語言，不要轉完存回 state** —— 存回 state 切語言不會變。
+
+### 🧪 i18n 驗證機制（2026-09-29 建立，**改動翻譯後必跑**）
+
+| 指令 | 作用 |
+| --- | --- |
+| `npm run check:i18n` | 實際執行本機引擎，掃描輸出物件的每個字串找 CJK（含 2 條不經 AI 的後端路徑 ＋ 英文標籤解析可用性） |
+| `node scripts/check-ui-cjk.mjs` | **真實 Chrome（CDP）** 走 6 個頁面掃描畫面文字 ＋ 截圖到 `shots-cjk/` |
+| `npm run verify:all` | `lint` ＋ `verify:conditions` ＋ `check:i18n` |
+
+★★ **靜態掃描（grep 原始碼）只能找線索，不能當驗收。** 理由：
+  - 分不出 `language === 'en' ? 'English' : '中文'` 條件分支 → **假警報**
+  - 抓不到執行時才組出來的字串（樣板、後端回傳）→ **漏報**
+  最終一定要用瀏覽器實際渲染。`check-ui-cjk.mjs` 抓到的東西裡，
+  `document.title`、OCR 失敗路徑、收合區塊摘要**都是靜態掃描看不到的**。
+
+★ `check-i18n-leaks.ts` 內建**假通過防護**：`checks === 0` 時 `exit 2`。
+  樣本 ID 打錯若印出綠色「通過」，比不檢查更危險。
+★ 兩支腳本都有**有理由的例外清單**（`ACCEPTED` / `ALLOWED`），不是無條件忽略。
+
+**已修掉的 7 類洩漏**（原本實測 95 處）：
+`nutrition_concerns` 缺 8 條 · `foodName` 嵌入樣板沒翻 · 慢性病清單 `、` 串接查不到 ·
+`condition_reminders` 沒帶語言（雲端本機都會用到）· `knowledge_point` 對照表**鍵寫錯** ·
+`buildOcrFailedResult` 寫死中文 · `ensureEducationFields` 中文備援
+
+### ⚠️ 三個反直覺的坑（09-29 實測）
+1. **`localEngineEn.ts` 的對照表鍵必須是「完整句子」**，不是營養素名。
+   `translateOne()` 拿 `knowledge_point` 全文查表；寫成 `鈉:` 永遠查不到，**且不報錯**。
+2. **`labelParser.ts` 的英文鍵不能有空白** —— `normalizeLine()` 會移除整行空白，
+   所以「Saturated Fat」比對時其實是「SaturatedFat」。
+   ★ 09-29 之前 `FIELD_RULES` **只有中文鍵**：中文標籤讀 6/6 欄位、**英文標籤讀 0/6**，
+   英文示範永遠顯示「看不清楚」。加英文鍵後中英都是 6/6。
+3. **`condition_reminders` 不經過 AI**，是後端規則產生 → **兩條路徑都要帶語言**。
+
+### 📌 已知限制（刻意接受）
+- **`ingredients_detected`** 是包裝原文（OCR 讀出）。真實澳門商品本來就是中文，
+  要翻譯得靠翻譯服務。目前唯一顯示它的 `ResultDisplay.tsx` 是**死檔**，畫面看不到。
+  → **若日後重新啟用 `ResultDisplay`，必須先處理這一項。**
+- `<meta name="description">` / `og:title` 為靜態中文，但**不顯示在頁面上**（社群預覽用）。
 
 ## 🎨 UI 與版面規則 → **見 `UI_RULES.md`**（同目錄）
 
@@ -173,8 +223,10 @@
   → 這個坑用「逐字元測試」找不到（純文字有完整 fallback 鏈），
     要用**前綴編譯二分法**（截斷檔案 + 補 `#good[結束]` 讓它還能編譯）才定位得到
 - 檢查字型的唯一可靠方法：讀 PDF 的 `/BaseFont`（`re.findall(rb"/BaseFont\s*/([A-Za-z0-9+\-]+)", data)`）
-- 桌面計劃文件有**兩份內容相同**的副本（`_20260925` 與 `_20260928`）；
-  檔名日期與內容日期不一致，建議只留 `_20260928`（待使用者決定）
+- 桌面計劃文件**現在只有一份**：`LabelBuddyAI_現況與規劃_20260928.typ/.pdf`
+  （舊的 `_20260925` 已於 2026-09-28 經使用者同意移除）
+- ⚠️ 刪檔時 `send2trash` 套件有 bug（組出 `\\?\C:/...` 正斜線路徑）；
+  改用 `ctypes` 直接呼叫 `shell32.SHFileOperationW` + `FOF_ALLOWUNDO`
 
 ## 使用者決策與節奏
 1. **孤立程式碼保留**：未引用的元件與端點暫不刪。
@@ -210,6 +262,15 @@
 | 章程（掃描版） | 專案根目錄 `2026全球青少年人工智能未來創新競賽...(1).pdf` |
 
 ## ⚠️ 已知死檔（未被任何地方引用，翻譯時可跳過）
+
 `CaptureSection`、`CameraViewfinderModal`、`ResultDisplay`、`SeniorHealthQASection`、
 `Header`、`SettingsModal`、`HealthSettings`、`FunctionSwitchBar`、`AnalysisStatus`、
 `UsageGuideModal`、`PhysicalIndicatorSection`（合計約 2,000 中文字；是否刪除待使用者決定）
+
+★ **可達性分析的用法**（09-29 實測有效）：從 `src/main.tsx` 走 import 圖，
+  真正可達的只有 **23 個檔案**。要判斷「某段程式碼會不會顯示在畫面上」時，
+  這比逐檔閱讀快得多，也能避免花時間翻譯永遠不會執行的程式碼。
+★ **連帶影響**：`/api/analyze-indicators` 只被 `PhysicalIndicatorSection`（死檔）呼叫，
+  `/api/ask-health-question` 只被 `SeniorHealthQASection`（死檔）呼叫
+  → `server/smartIndicatorAnalyzer.ts` 與 `server/smartHealthQA.ts` 在畫面上不可達，
+  **不需要雙語化**（但檔案仍在，屬於後端死路徑）。

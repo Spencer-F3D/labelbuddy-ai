@@ -131,20 +131,34 @@ function toExpectedUnit(
  * ⚠️ 順序即為「比對優先序」：飽和脂肪／反式脂肪必須排在「脂肪」之前，
  *    否則「飽和脂肪 9.8公克」會被當成一般脂肪讀走。
  *    這裡不追蹤總脂肪，因此只要確保糖與碳水不會被誤認即可。
+ *
+ * ⚠️⚠️ 英文鍵**不能有空白**：`normalizeLine()` 會先把整行空白拿掉，
+ *    所以「Saturated Fat」在比對時其實是「SaturatedFat」。
+ *    寫成 "Saturated Fat" 永遠比對不到（而且不會報錯，只會少讀一個欄位）。
+ *
+ * 【為什麼要加英文鍵】（2026-09-29）
+ *    示範標籤改成雙語後，英文標籤在**本機引擎**（預設路徑）下完全解析不出來：
+ *    實測中文標籤讀到 6 個欄位，英文標籤讀到 **0 個**，
+ *    於是英文模式永遠顯示「看不清楚標籤數字」—— 示範反而變成展示失敗。
+ *    過敏原規則本來就有英文（peanut／milk／wheat），只有這一張表漏了。
  */
 const FIELD_RULES: Array<{
   field: 'sodiumMg' | 'sugarG' | 'carbsG' | 'saturatedFatG' | 'transFatG' | 'calories';
   keys: string[];
   expected: Unit;
 }> = [
-  { field: 'saturatedFatG', keys: ['飽和脂肪', '饱和脂肪'], expected: 'g' },
-  { field: 'transFatG', keys: ['反式脂肪'], expected: 'g' },
-  { field: 'carbsG', keys: ['碳水化合物', '碳水'], expected: 'g' },
-  { field: 'calories', keys: ['熱量', '热量'], expected: 'kcal' },
+  { field: 'saturatedFatG', keys: ['飽和脂肪', '饱和脂肪', 'saturatedfat'], expected: 'g' },
+  { field: 'transFatG', keys: ['反式脂肪', 'transfat'], expected: 'g' },
+  {
+    field: 'carbsG',
+    keys: ['碳水化合物', '碳水', 'carbohydrate', 'totalcarbohydrate'],
+    expected: 'g',
+  },
+  { field: 'calories', keys: ['熱量', '热量', 'calories', 'energy'], expected: 'kcal' },
   // 鈉與「納」形近，OCR 很常認錯，兩個都收
-  { field: 'sodiumMg', keys: ['鈉', '纳'], expected: 'mg' },
+  { field: 'sodiumMg', keys: ['鈉', '纳', 'sodium'], expected: 'mg' },
   // 糖放最後：避免「糖」在別的欄位名稱裡被先讀走
-  { field: 'sugarG', keys: ['糖'], expected: 'g' },
+  { field: 'sugarG', keys: ['糖', 'sugars', 'sugar'], expected: 'g' },
 ];
 
 const CORE_FIELDS = FIELD_RULES.map((r) => r.field);
@@ -158,7 +172,8 @@ function extractNutritionRegion(lines: string[]): { region: string[]; startIndex
 
   const rest = lines.slice(startIndex);
   const endRel = rest.findIndex(
-    (l, i) => i > 0 && /成分|Ingredients|過敏原|過敏源|淨重|保存|有效日期|注意事項/i.test(l)
+    (l, i) =>
+      i > 0 && /成分|Ingredients|過敏原|過敏源|Allergens|淨重|保存|有效日期|注意事項/i.test(l)
   );
   return {
     region: endRel > 0 ? rest.slice(0, endRel) : rest,
@@ -201,7 +216,7 @@ function extractIngredientLines(lines: string[]): string[] {
   for (let i = idx; i < lines.length && out.length < 8; i++) {
     const l = lines[i].trim();
     if (!l) continue;
-    if (i > idx && /淨重|保存|有效日期|營養標示|過敏原/i.test(l)) break;
+    if (i > idx && /淨重|保存|有效日期|營養標示|過敏原|Allergens/i.test(l)) break;
     out.push(l);
   }
   return out;
@@ -298,11 +313,16 @@ export function parseNutritionLabel(rawText: string): ParsedLabel {
   const found: Partial<Record<(typeof CORE_FIELDS)[number], number>> = {};
 
   for (const line of region) {
+    // ⚠️ 英文鍵一律轉小寫比對：OCR 對大小寫並不穩定，
+    //    同一張標籤可能讀成 Sodium / SODIUM / sodium。
+    //    中文沒有大小寫，所以這個轉換對中文路徑完全無害。
+    const lower = line.toLowerCase();
     for (const rule of FIELD_RULES) {
       // 同一行可能塞了多個項目（OCR 常把兩列併成一行），因此每個規則都獨立找
       for (const key of rule.keys) {
-        const at = line.indexOf(key);
+        const at = lower.indexOf(key);
         if (at < 0) continue;
+        // 用原始行讀數值（`line` 才是保留大小寫與符號的那一份）
         const read = readValueAfter(line, at + key.length);
         if (!read) continue;
         const value = toExpectedUnit(read.value, read.unit, rule.expected);
