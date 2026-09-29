@@ -34,6 +34,8 @@ import {
 import { AddressGender, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
+import { GenderPicker } from './GenderPicker';
+import { LegalNotice } from './LegalNotice';
 
 /**
  * 性別。
@@ -74,18 +76,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
   const [gender, setGender] = useState<Gender>('unspecified');
   const [cloudConsent, setCloudConsent] = useState(true);
+  /**
+   * 是否已勾選「我已閱讀並同意私隱條款與免責聲明」。
+   *
+   * ⚠️ 預設 **false**，而且沒勾就不能完成引導頁。
+   *    條款同意不能預先打勾 —— 預設打勾等於使用者沒看就同意了，
+   *    那不是有效的同意。
+   */
+  const [agreed, setAgreed] = useState(false);
+  /** 使用者按了「開始使用」卻還沒勾同意時，才顯示提醒（不一開始就紅字嚇人） */
+  const [showAgreeWarning, setShowAgreeWarning] = useState(false);
 
   const isLast = step === TOTAL_STEPS - 1;
 
   const finish = () => onComplete({ profileId, gender, cloudConsent });
-
-  // ⚠️ 用 `as const` 讓 key 成為字面型別 —— `t()` 只接受合法的翻譯鍵，
-  //    寫成 string 會編譯失敗（這正是型別強制同步的價值）。
-  const GENDER_OPTIONS = [
-    { id: 'male', key: 'onboard.genderMale', emoji: '👨' },
-    { id: 'female', key: 'onboard.genderFemale', emoji: '👩' },
-    { id: 'unspecified', key: 'onboard.genderNone', emoji: '🙂' },
-  ] as const;
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
@@ -127,37 +131,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               <LearnerProfilePicker selectedId={profileId} onSelect={setProfileId} />
 
               {/* 性別：只影響「怎麼稱呼您」，不影響任何營養判斷。
-                  ⚠️ 不要把它跟身分混在一起 —— 身分決定門檻，性別只決定稱謂。 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-3">
-                <div>
-                  <h2 className="text-[19px] font-black text-slate-950">
-                    {t('onboard.genderTitle')}
-                  </h2>
-                  <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
-                    {t('onboard.genderBody')}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {GENDER_OPTIONS.map((opt) => {
-                    const on = gender === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setGender(opt.id)}
-                        aria-pressed={on}
-                        className={`min-h-[52px] px-4 py-2 rounded-xl text-[18px] font-black flex items-center gap-2 cursor-pointer border-2 transition-all active:scale-[0.97] ${
-                          on
-                            ? 'bg-blue-900 border-blue-900 text-white'
-                            : 'bg-white border-slate-400 text-slate-900'
-                        }`}
-                      >
-                        <span aria-hidden="true">{opt.emoji}</span>
-                        {t(opt.key)}
-                      </button>
-                    );
-                  })}
-                </div>
+                  ⚠️ 不要把它跟身分混在一起 —— 身分決定門檻，性別只決定稱謂。
+                  ⚠️ 用共用元件（設定頁也用同一份），選項才不會兩邊漂移。 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
+                <GenderPicker value={gender} onChange={setGender} />
               </div>
             </>
           )}
@@ -288,6 +265,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   {t('onboard.modeChangeLater')}
                 </p>
               </div>
+
+              {/* 私隱條款與免責聲明 ＋ 明確同意（2026-09-29 使用者要求）
+                  ⚠️ 這一段的字級是 12px，是全站唯一的例外（見 LegalNotice.tsx）。
+                  ⚠️ 未勾選同意就不能完成引導頁。 */}
+              <LegalNotice
+                showAgree
+                agreed={agreed}
+                onAgreeChange={(next) => {
+                  setAgreed(next);
+                  if (next) setShowAgreeWarning(false);
+                }}
+                showAgreeWarning={showAgreeWarning}
+              />
             </>
           )}
         </div>
@@ -307,8 +297,23 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
           <button
             type="button"
-            onClick={() => (isLast ? finish() : setStep((s) => s + 1))}
-            className="flex-1 min-h-[48px] px-4 py-2 rounded-xl bg-blue-800 text-white text-[18px] font-black whitespace-nowrap cursor-pointer flex items-center justify-center gap-2"
+            onClick={() => {
+              if (!isLast) {
+                setStep((s) => s + 1);
+                return;
+              }
+              // ⚠️ 沒勾同意就不放行，但要「按下後才顯示原因」——
+              //    直接停用按鈕的話，使用者只會覺得按了沒反應。
+              if (!agreed) {
+                setShowAgreeWarning(true);
+                return;
+              }
+              finish();
+            }}
+            aria-disabled={isLast && !agreed}
+            className={`flex-1 min-h-[48px] px-4 py-2 rounded-xl text-white text-[18px] font-black whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+              isLast && !agreed ? 'bg-slate-400' : 'bg-blue-800'
+            }`}
           >
             {isLast ? t('onboard.start') : t('onboard.next')}
             <ArrowRight className="w-5 h-5" aria-hidden="true" />

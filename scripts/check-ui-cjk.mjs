@@ -253,8 +253,8 @@ try {
   `);
   if (onboardVisible) {
     await capture('00-onboarding-step1');
-    // 逐步按到底：下一步 ×2 → 開始使用
-    for (const label of ['Next', 'Next', 'Get started']) {
+    // 逐步按到底：下一步 ×2 →（勾同意）→ 開始使用
+    for (const label of ['Next', 'Next']) {
       await sleep(700);
       await cdp.eval(`
         (() => {
@@ -264,6 +264,27 @@ try {
         })()
       `);
     }
+    // ⚠️ 2026-09-29 起，引導頁最後一步有「我已閱讀並同意私隱條款與免責聲明」勾選框，
+    //    沒勾就按不動「開始使用」（按下只會顯示提醒，不會前進）。
+    //    所以這裡必須先勾選，否則整個引導頁會卡住、後面每個畫面都拍到引導頁。
+    await sleep(800);
+    const agreed = await cdp.eval(`
+      (() => {
+        const cb = document.querySelector('input[type="checkbox"]');
+        if (!cb) return false;
+        if (!cb.checked) cb.click();
+        return cb.checked;
+      })()
+    `);
+    if (!agreed) console.log('  ⚠️  找不到同意勾選框，引導頁可能無法完成');
+    await sleep(500);
+    await cdp.eval(`
+      (() => {
+        const b = [...document.querySelectorAll('button')].find(e =>
+          (e.textContent || '').trim() === 'Get started');
+        if (b) b.click();
+      })()
+    `);
     // 引導頁結束後 App 會整頁重繪，給它足夠時間再開始掃描，
     // 否則第一個畫面（選單尚未就緒）會間歇性抓不到
     await sleep(3000);
@@ -305,9 +326,12 @@ try {
   }
 
   // 側邊選單的英文標籤（來自 translations.ts 的 menu.* 鍵）
+  // ⚠️ 2026-09-29 起「健康問答」從設定搬到功能選單 → 這裡改成直接導覽過去，
+  //    不再需要「展開設定裡的手風琴」那套。
   const NAV = [
     ['02-history', 'History'],
     ['03-classroom', 'Learn'],
+    ['04c-health-qa', 'Health Q&A'],
     ['04-health-settings', 'Health settings'],
     ['05-scan', 'Scan a label'],
   ];
@@ -367,32 +391,61 @@ try {
   if (!scrolled) console.log('  ⚠️  找不到「AI 深入分析」區塊 —— 可能沒有渲染出來');
   await capture('04b-vitals-ai');
 
-  /* ── 健康問答區塊 ──────────────────────────────────────────────
-   * 同樣收合在健康設定頁裡，不展開就掃不到。
+  /* ── 健康問答：已搬到功能選單，上面的 NAV 迴圈已經拍過 04c-health-qa ──
+   * （2026-09-29 之前它收合在設定頁的手風琴裡，需要展開才掃得到；
+   *   搬出來之後直接導覽即可，程式碼更單純。）
    */
-  const qaOpen = await cdp.eval(`
+
+  /* ── 設定頁最下方：私隱條款 ＋ 免責聲明（12px）＋ 清除所有資料 ──
+   * 這兩塊在頁面最底，不捲到底掃不到 —— 不掃等於沒有被驗證過。
+   */
+  console.log('\n── 設定頁底部（條款與清除資料）──────────');
+  await openMenu();
+  await sleep(900);
+  await clickByText('Health settings');
+  await sleep(1800);
+  const scrolledToLegal = await cdp.eval(`
     (() => {
-      const el = [...document.querySelectorAll('button, [role="button"]')].find(e =>
-        /Ask a health question|問健康問題/i.test(e.textContent || ''));
-      if (!el) return false;
-      el.click();
-      return true;
-    })()
-  `);
-  await sleep(1500);
-  if (!qaOpen) console.log('  ⚠️  找不到「Ask a health question」區塊');
-  const qaScrolled = await cdp.eval(`
-    (() => {
-      const el = [...document.querySelectorAll('span')].find(e =>
-        /Questions people often ask|大家常問的問題/i.test(e.textContent || ''));
+      const el = [...document.querySelectorAll('h2')].find(e =>
+        /Privacy notice|私隱條款/i.test(e.textContent || ''));
       if (!el) return false;
       el.scrollIntoView({ block: 'start' });
       return true;
     })()
   `);
+  await sleep(1200);
+  if (!scrolledToLegal) console.log('  ⚠️  找不到「私隱條款」區塊 —— 可能沒有渲染出來');
+  await capture('04d-legal-and-clear');
+
+  // 開啟「清除所有資料」的第一級警告，確認彈窗本身也是英文
+  const clearOpened = await cdp.eval(`
+    (() => {
+      const b = document.getElementById('btn-clear-all-data');
+      if (!b) return false;
+      b.click();
+      return true;
+    })()
+  `);
+  await sleep(1200);
+  if (!clearOpened) console.log('  ⚠️  找不到「清除所有資料」按鈕');
+  await capture('04e-clear-warning-1');
+  // 進入第二級警告（不要真的按下刪除）
+  await cdp.eval(`
+    (() => {
+      const b = document.getElementById('btn-clear-stage1-continue');
+      if (b) b.click();
+    })()
+  `);
   await sleep(1000);
-  if (!qaScrolled) console.log('  ⚠️  找不到健康問答的常見問題區塊');
-  await capture('04c-health-qa');
+  await capture('04f-clear-warning-2');
+  // 關掉彈窗，避免殘留遮罩影響後面的示範標籤流程
+  await cdp.eval(`
+    (() => {
+      const b = document.getElementById('btn-clear-cancel');
+      if (b) b.click();
+    })()
+  `);
+  await sleep(800);
 
   // ── 示範標籤（會走完整的「前端 OCR → 後端分析 → 結果頁」流程）────
   console.log('\n── 示範標籤（完整分析流程）──────────────');

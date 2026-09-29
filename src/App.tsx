@@ -69,6 +69,16 @@ import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser'
 import { useI18n } from './i18n/I18nContext';
 import { LanguagePicker } from './i18n/LanguagePicker';
 import type { TranslationKey, Language } from './i18n/translations';
+// 需要「指定語言」的翻譯查表（紀錄的日期要跟隨標籤語言，不是介面語言）
+import { TRANSLATIONS } from './i18n/translations';
+// 本機規則引擎（2026-09-29）：飲食紀錄要「跟隨標籤語言」。
+// 當介面語言 ≠ 標籤語言時，需要就地用本機引擎在標籤語言重新產生文字。
+// ⚠️ 這三個模組都是**純函式**（不碰任何 Node API），所以可以直接在前端執行。
+//    它們與後端本機備援用的是**同一份程式碼** —— 共用才不會兩邊判斷不一致。
+import { buildRecognitionResult } from '../server/labelParser';
+import { analyzeNutritionWithIndicators } from '../server/smartNutritionAnalyzer';
+import { translateLocalResult } from '../server/localEngineEn';
+import { detectLabelLanguage as detectLabelLanguageImpl } from './utils/labelLanguage';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
 // 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
@@ -95,6 +105,9 @@ import { HealthQASection } from './components/HealthQASection';
 import { OnboardingFlow, type OnboardingResult, type Gender } from './components/OnboardingFlow';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
 import { LearnerProfilePicker } from './components/LearnerProfilePicker';
+import { GenderPicker } from './components/GenderPicker';
+import { LegalNotice } from './components/LegalNotice';
+import { ClearAllDataSection } from './components/ClearAllDataSection';
 import { NutrientFactBars } from './components/NutrientFactBars';
 import {
   DEFAULT_PROFILE_ID,
@@ -115,7 +128,7 @@ import {
 } from './theme';
 
 // 導航 Bar 頁面定義：拍照辨識、健康設定、飲食紀錄、食育學堂
-export type NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classroom';
+export type NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classroom' | 'qa';
 
 /**
  * 側邊選單的項目。
@@ -142,6 +155,14 @@ const MENU_ITEMS: Array<{
     labelKey: 'menu.classroom',
     hintKey: 'menu.classroom.hint',
     Icon: GraduationCap,
+  },
+  {
+    // 健康問答（2026-09-29 從「設定」搬到功能選單）
+    // ⚠️ 放在設定之前：它是「功能」不是「設定」，而且使用者每天都會用。
+    tab: 'qa',
+    labelKey: 'menu.qa',
+    hintKey: 'menu.qa.hint',
+    Icon: MessageCircleQuestion,
   },
   {
     tab: 'conditions',
@@ -210,6 +231,41 @@ const conditionName = (id: string, language: Language) => {
 
 /** id → 完整項目資料（給清單渲染用） */
 const conditionById = (id: string) => ALL_CONDITIONS.find((c) => c.id === id);
+
+/**
+ * 判斷「標籤本身」的語言。
+ *
+ * 【為什麼需要這個】
+ *   飲食紀錄要**跟隨標籤語言**，不是跟隨介面語言
+ *   （2026-09-29 使用者要求：「照片是什麼語言，紀錄就是什麼語言」）。
+ *
+ * ⚠️ 實作抽到 `src/utils/labelLanguage.ts` —— 寫在這裡的話，
+ *    測試腳本一 import App.tsx 就會拉起整個 React App，沒辦法單獨驗證。
+ */
+const detectLabelLanguage = detectLabelLanguageImpl;
+
+/**
+ * 依「指定語言」產生掃描時間字串。
+ *
+ * ⚠️ 不能用 `t()` —— `t()` 綁的是**當前介面語言**，
+ *    但紀錄的日期要跟著**標籤語言**。
+ *    所以直接查 `TRANSLATIONS[語言]` 並自己做 `{time}` 插值。
+ * ⚠️ 這裡沒有共用的插值工具（`t()` 的實作在 I18nContext 內），
+ *    所以是手寫的 replace。若日後模板改用別的佔位符，這裡要一起改。
+ */
+const formatScanTime = (lang: Language, d: Date): string => {
+  const dict = TRANSLATIONS[lang];
+  const hours = d.getHours();
+  const clock = `${String(hours % 12 || 12).padStart(2, '0')}:${String(d.getMinutes()).padStart(
+    2,
+    '0'
+  )}`;
+  const datePart = dict['history.dateFormat']
+    .replace('{m}', String(d.getMonth() + 1))
+    .replace('{d}', String(d.getDate()))
+    .replace('{ampm}', hours < 12 ? dict['history.am'] : dict['history.pm']);
+  return dict['history.justNow'].replace('{time}', `${datePart} ${clock}`);
+};
 
 /** 過敏原是「絕對不能吃」，慢性病是「少吃一點」——後果等級不同，所以徽章文字要分開。 */
 const ALLERGEN_SEVERITY: Record<string, 'critical' | 'mild'> = {
@@ -393,6 +449,25 @@ export default function App() {
 
     const next = getLearnerProfile(id);
     speakText(t('settings.profileSwitched', { name: localizedProfileName(next.id, next.name, language) }), { rate: 0.9, preferLanguage: ttsLangMandarin });
+  };
+
+  /**
+   * 切換稱謂性別（設定頁與引導頁共用同一份 localStorage 鍵）。
+   *
+   * ⚠️ 只影響「怎麼稱呼」，**不影響任何營養或風險判斷**。
+   *    所以這裡不需要重算分析結果，也不需要清快取 ——
+   *    快取存的是中性文字，稱謂是在輸出最後一步才插上去的。
+   */
+  const handleChangeGender = (next: Gender) => {
+    setGender(next);
+    try {
+      localStorage.setItem(STORAGE_GENDER_KEY, next);
+    } catch {}
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(60);
+      } catch {}
+    }
   };
 
   /**
@@ -985,7 +1060,7 @@ export default function App() {
         return;
       }
 
-      // 自動將本次掃描辨識結果存入「我的飲食健康紀錄」，以利一週統計與長者健康習慣養成
+      // 自動將本次掃描辨識結果存入「我的飲食健康紀錄」，以利一週統計與健康習慣養成
       const extractFoodName = (warningTitle?: string, plainSummary?: string) => {
         if (warningTitle && warningTitle.includes('【') && warningTitle.includes('】')) {
           const match = warningTitle.match(/【(.*?)】/);
@@ -1012,26 +1087,78 @@ export default function App() {
           : t('foodname.red');
       };
 
-      const now = new Date();
-      // 日期格式隨語言改變（中文「9月28日 下午」/ 英文「9/28 PM」）
-      const timeStr = `${t('history.dateFormat', {
-        m: now.getMonth() + 1,
-        d: now.getDate(),
-        ampm: now.getHours() < 12 ? t('history.am') : t('history.pm'),
-      })} ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+      // ── 紀錄一律使用「標籤本身的語言」（2026-09-29 使用者要求）──────────
+      const labelLanguage = detectLabelLanguage(ocr.text);
+
+      // 標籤二次解析：品名與（可能的）重新產生都要用，所以只做一次
+      let parsedLabel: ReturnType<typeof buildRecognitionResult> | null = null;
+      try {
+        parsedLabel = buildRecognitionResult(ocr.text);
+      } catch (e) {
+        console.warn('標籤二次解析失敗（不影響主要分析）:', e);
+      }
+
+      /**
+       * 品名：優先使用**標籤上真正讀到的品名**（labelParser 的 extractFoodName）。
+       *
+       * ⚠️ 舊做法是用 AI 文案的關鍵字去猜，只認得 5 種（泡麵／燕麥／豆漿／
+       *    蘇打餅／牛奶），其餘一律叫「健康安心選購食品」這類通用名 ——
+       *    使用者的抱怨就是「名稱常常不對」。
+       */
+      const labelFoodName = parsedLabel?.profile?.foodName?.trim() || null;
+
+      /**
+       * 紀錄文字一律用標籤語言。
+       *
+       * 【為什麼需要重新產生】
+       *   後端產生的分析文字是跟著**介面語言**走的。
+       *   英文介面 ＋ 中文標籤 → 後端回英文，但紀錄應該存中文。
+       *   這裡用本機規則引擎在標籤語言就地重跑一次 ——
+       *   引擎是純函式，**完全離線、不花任何 API 額度**。
+       *
+       * 【為什麼可以接受「雲端 AI 的措辭被換掉」】
+       *   只有在「介面語言 ≠ 標籤語言」時才會走到這裡；
+       *   同語言時完整保留 AI 原文。而紀錄清單本來就是摘要性質。
+       */
+      let recordText = {
+        warning_title: data.warning_title,
+        plain_summary: data.plain_summary,
+        alternative_advice: data.alternative_advice,
+      };
+      if (labelLanguage !== language && parsedLabel?.ok && parsedLabel.profile) {
+        try {
+          const localText = translateLocalResult(
+            analyzeNutritionWithIndicators(
+              parsedLabel.profile,
+              conditionNames,
+              learnerProfile.numericLimits,
+              labelLanguage
+            ),
+            labelLanguage
+          );
+          recordText = {
+            warning_title: localText.warning_title,
+            plain_summary: localText.plain_summary,
+            alternative_advice: localText.alternative_advice,
+          };
+        } catch (e) {
+          // 重新產生失敗就沿用分析結果 —— 寧可語言不一致，也不要讓紀錄消失
+          console.warn('紀錄文字重新產生失敗，沿用分析結果:', e);
+        }
+      }
 
       const newRecord: DietRecord = {
         id: `rec-${Date.now()}`,
         timestamp: Date.now(),
-        dateString: t('history.justNow', { time: timeStr }),
-        foodName: extractFoodName(data.warning_title, data.plain_summary),
+        // ⚠️ 日期也跟隨標籤語言，否則會出現「中文品名 ＋ 英文日期」的混雜
+        dateString: formatScanTime(labelLanguage, new Date()),
+        foodName: labelFoodName || extractFoodName(data.warning_title, data.plain_summary),
         risk_level: data.risk_level,
-        warning_title: data.warning_title,
-        plain_summary: data.plain_summary,
-        alternative_advice: data.alternative_advice,
+        warning_title: recordText.warning_title,
+        plain_summary: recordText.plain_summary,
+        alternative_advice: recordText.alternative_advice,
         matched_conditions: conditionNames,
+        lang: labelLanguage,
       };
 
       setDietRecords((prev) => {
@@ -2226,18 +2353,32 @@ export default function App() {
               id="settings-profile"
               icon={<UsersIcon className="w-[26px] h-[26px]" />}
               title={t('settings.profile.title')}
-              /* ⚠️ 收合時顯示目前身分 —— 這裡也要本地化，
+              /* ⚠️ 收合時顯示目前身分與稱謂 —— 這裡也要本地化，
                  否則英文介面的摺疊標題會直接露出中文身分名稱。 */
               summary={`${learnerProfile.emoji} ${localizedProfileDisplayName(
                 learnerProfile.id,
                 learnerProfile.name,
                 language
+              )} · ${t(
+                gender === 'male'
+                  ? 'gender.shortMale'
+                  : gender === 'female'
+                  ? 'gender.shortFemale'
+                  : 'gender.shortNone'
               )}`}
             >
-              <LearnerProfilePicker
-                selectedId={learnerProfileId}
-                onSelect={handleChangeProfile}
-              />
+              <div className="flex flex-col gap-5">
+                <LearnerProfilePicker
+                  selectedId={learnerProfileId}
+                  onSelect={handleChangeProfile}
+                />
+
+                {/* 稱謂性別：放在身分區塊內（2026-09-29 使用者要求「在身分的地方改性別」），
+                    與引導頁共用同一個元件與同一份 localStorage 鍵。 */}
+                <div className="pt-4 border-t-2 border-slate-200">
+                  <GenderPicker value={gender} onChange={handleChangeGender} />
+                </div>
+              </div>
             </SettingsSection>
 
             {/* 第二部分：日常生理指標量測（血壓、心跳、血糖等） */}
@@ -2262,16 +2403,8 @@ export default function App() {
               />
             </SettingsSection>
 
-            {/* 第三部分：健康問答（2026-09-29 接回）
-                放在生理指標之後 —— 問答會用到上面量到的數字當背景。 */}
-            <SettingsSection
-              id="settings-qa"
-              icon={<MessageCircleQuestion className="w-[26px] h-[26px]" />}
-              title={t('settings.qa.title')}
-              summary={t('settings.qa.summary')}
-            >
-              <HealthQASection indicators={physicalIndicators} gender={gender} />
-            </SettingsSection>
+            {/* 第三部分原本是「健康問答」——
+                2026-09-29 使用者要求搬到功能選單，因為它是功能不是設定。 */}
 
             {/* 第二部分：常見慢性病與過敏原把關清單 */}
             <SettingsSection
@@ -2630,6 +2763,16 @@ export default function App() {
               </button>
               </div>
             </SettingsSection>
+
+            {/* ── 設定頁最下方（2026-09-29 使用者要求）─────────────────
+                ① 私隱條款與免責聲明（12px，全站唯一例外）
+                ② 清除所有資料（兩級警告 → 清空 → 回引導頁）
+                放在最後是因為它們是「法律告知」與「危險操作」，
+                不該插在日常設定中間。 */}
+            <div className="pt-4 border-t-2 border-slate-300 flex flex-col gap-5">
+              <LegalNotice />
+              <ClearAllDataSection />
+            </div>
           </div>
         )}
 
@@ -2657,6 +2800,16 @@ export default function App() {
               profileId={learnerProfileId}
               onChangeProfile={handleChangeProfile}
             />
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 頁面 5：健康問答（HEALTH Q&A TAB）                        */}
+        {/* 2026-09-29 從「設定」搬到功能選單 —— 它是功能，不是設定。  */}
+        {/* ======================================================== */}
+        {activeTab === 'qa' && (
+          <div className="flex flex-col space-y-5">
+            <HealthQASection indicators={physicalIndicators} gender={gender} />
           </div>
         )}
       </main>
@@ -2829,6 +2982,19 @@ export default function App() {
           >
             <Camera className={FOOTER_CTA_ICON} />
             <span>📸 {t('footer.classroomTry')}</span>
+          </button>
+        ) : activeTab === 'qa' ? (
+          <button
+            type="button"
+            id="btn-qa-to-scan"
+            onClick={() => {
+              stopSpeech();
+              setActiveTab('scan');
+            }}
+            className={FOOTER_CTA_CLASS}
+          >
+            <Camera className={FOOTER_CTA_ICON} />
+            <span>📸 {t('footer.qaToScan')}</span>
           </button>
         ) : (
           <button

@@ -21,6 +21,7 @@
 
 import {
   analysisCache,
+  analysisCacheContent,
   applyHonorific,
   applyHonorificToFields,
   applyHonorificToIndicators,
@@ -295,19 +296,24 @@ ${promptContext}`
 ${promptContext}`;
 
     // 先查快取：同一張圖 + 同一組慢性病 + 同一個身分在 TTL 內不重複呼叫 API，
-    // 這是節省免費額度最有效的手段（長者常重複掃描同一件商品）。
+    // 這是節省免費額度最有效的手段。
     // 身分必須納入鍵值：同一包高蛋白粉，對健身族與腎臟病患者結論完全不同。
     // 處理模式也要納入鍵值：本機結果不該被拿去回答「已同意上傳」的請求，反之亦然。
     // ⚠️ 語言也必須納入鍵值（2026-09-28）：
     //    分析結果的文字是後端產生的，中英文快取若共用同一個鍵，
     //    切換語言後會拿到另一種語言的舊結果 —— 而且**不會報錯**，
     //    使用者只會覺得「切了語言怎麼沒變」。這是最難察覺的一種 bug。
-    const cacheKey = makeCacheKey(cleanBase64, [
-      ...conditions,
-      `profile:${learnerProfile.id}`,
-      `mode:${allowCloud ? 'cloud' : 'local'}`,
-      `lang:${isEnglish ? 'en' : 'zh'}`,
-    ]);
+    // ⚠️⚠️ 內容來源見 `analysisCacheContent()` —— 文字模式一定要用 ocrText，
+    //     否則所有商品會共用一個鍵（實測會把泡麵判成「非常適合長者食用」）。
+    const cacheKey = makeCacheKey(
+      analysisCacheContent({ isTextMode, ocrText, imageBase64: cleanBase64 }),
+      [
+        ...conditions,
+        `profile:${learnerProfile.id}`,
+        `mode:${allowCloud ? 'cloud' : 'local'}`,
+        `lang:${isEnglish ? 'en' : 'zh'}`,
+      ]
+    );
 
     if (allowCloud) {
       const cached = readCache(cacheKey);

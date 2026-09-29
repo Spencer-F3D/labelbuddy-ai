@@ -118,21 +118,21 @@ function ProfileCard({
             >
               {displayName}
             </span>
-            {isSelected && (
+            {/* ⚠️ 箭頭要**緊接在名稱右方**（2026-09-29 使用者要求），
+                不要放到卡片最右邊 —— 那會離名稱很遠，看不出是「這個名字可以點」。
+                已選中時改顯示「已選擇」徽章，兩者互斥。 */}
+            {isSelected ? (
               <span
                 className={`${accent.badge} text-white text-[16px] font-black px-2 py-0.5 rounded-full flex items-center gap-1`}
               >
                 <Check className="w-3.5 h-3.5" />
                 {t('profile.picker.selected')}
               </span>
+            ) : (
+              <ChevronRight className="w-6 h-6 text-slate-400 shrink-0" aria-hidden="true" />
             )}
           </div>
         </div>
-
-        {/* 未選中時顯示箭頭，提示可點擊 */}
-        {!isSelected && (
-          <ChevronRight className="w-6 h-6 text-slate-400 shrink-0 mt-1" />
-        )}
       </div>
     </button>
   );

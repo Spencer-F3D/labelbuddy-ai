@@ -55,6 +55,8 @@ const zhTW = {
   'menu.history.hint': '看過去的把關紀錄',
   'menu.classroom': '食育學堂',
   'menu.classroom.hint': '學怎麼吃得安心',
+  'menu.qa': '健康問答',
+  'menu.qa.hint': '問關於吃的健康問題',
   'menu.conditions': '健康設定',
   'menu.conditions.hint': '設定慢性病與過敏原',
 
@@ -74,6 +76,7 @@ const zhTW = {
   'footer.scanRetake': '重新拍照',
   'footer.goScan': '前往拍照辨識',
   'footer.classroomTry': '去超市試試看',
+  'footer.qaToScan': '拍照為食品把關',
   'footer.historyScan': '拍照為食品把關',
   'footer.retryScan': '再拍一次',
 
@@ -308,6 +311,10 @@ const zhTW = {
   'onboard.genderMale': '先生',
   'onboard.genderFemale': '小姐',
   'onboard.genderNone': '不用特別稱呼',
+  /* 設定頁收合標題用的短版稱謂（上面那三個太長，塞不進標題列） */
+  'gender.shortMale': '先生',
+  'gender.shortFemale': '小姐',
+  'gender.shortNone': '不指定',
   'onboard.howTitle': '這個 App 怎麼用',
   'onboard.how1Title': '① 拍照',
   'onboard.how1Body': '對著包裝背後的營養標籤拍一張，或從相簿選一張。',
@@ -334,6 +341,42 @@ const zhTW = {
   'onboard.next': '下一步',
   'onboard.back': '上一步',
   'onboard.start': '開始使用',
+
+  /* ── 私隱條款與免責聲明（設定底部 ＋ 引導頁共用）───────────────
+   * ⚠️ 這一段的字級刻意用 12px，是全站唯一的例外。
+   *    理由與風險見 src/components/LegalNotice.tsx 的檔頭註解。 */
+  'legal.privacy.title': '私隱條款',
+  'legal.privacy.1': '照片永遠不會離開你的裝置。標籤辨識（OCR）完全在你的瀏覽器內完成。',
+  'legal.privacy.2': '只有在你按下同意後，辨識出的「文字」才會送到雲端 AI 分析；照片本身從不上傳。',
+  'legal.privacy.3': '你勾選的慢性病、身體指標與飲食紀錄只存在你自己的裝置上，不會上傳，也不會與任何人共享。',
+  'legal.privacy.4': '本 App 沒有帳號、沒有廣告、沒有第三方追蹤，也不收集任何個人身分資料。',
+  'legal.privacy.5': '你隨時可以在設定中改回「只在本機分析」，或按「清除所有資料」把一切刪除。',
+  'legal.disclaimer.title': '免責聲明',
+  'legal.disclaimer.1': '本 App 提供的是一般飲食與營養參考，不是醫療診斷、治療或處方建議。',
+  'legal.disclaimer.2': '本 App 不能取代醫師、藥師或營養師的專業意見。任何用藥、停藥或飲食調整，請先諮詢專業醫療人員。',
+  'legal.disclaimer.3': 'AI 分析可能出錯。判斷結果僅供參考，請務必自行核對包裝上的營養標示與官方公告。',
+  'legal.disclaimer.4': '食品成分與相關法規可能隨時變動，請以產品包裝標示及主管機關公告為準。',
+  'legal.disclaimer.5': '若你依本 App 的資訊做出決定而產生任何後果，開發者不負法律責任。',
+  'legal.agreeLabel': '我已閱讀並同意上述私隱條款與免責聲明',
+  'legal.agreeRequired': '請先勾選「我已閱讀並同意」才能開始使用。',
+
+  /* ── 清除所有資料（設定頁最下方，兩級警告）───────────────────── */
+  'clear.title': '清除所有資料',
+  'clear.summary': '一鍵刪除本 App 存在這台裝置上的所有資料，並回到首次啟動的引導頁。',
+  'clear.button': '清除所有資料',
+  'clear.step1Title': '這會刪除什麼？',
+  'clear.step1Body': '以下資料會從這台裝置永久刪除，而且無法復原：',
+  'clear.item1': '身分與稱謂（先生／小姐）',
+  'clear.item2': '慢性病與過敏原設定',
+  'clear.item3': '身體指標（血壓、心跳、血糖）',
+  'clear.item4': '飲食紀錄與一週統計',
+  'clear.item5': '食育學堂的學習進度',
+  'clear.item6': '雲端分析同意設定與介面語言',
+  'clear.step2Title': '最後確認',
+  'clear.step2Body': '真的要刪除全部資料嗎？刪除後無法復原，App 會回到一開始的引導頁。',
+  'clear.continue': '我了解，繼續',
+  'clear.confirmDelete': '確定全部刪除',
+  'clear.cancel': '取消',
 
   /* 語音朗讀用的單位（拼接給 TTS，不是畫面文字） */
   'vitals.speech.unitMmol': '毫摩爾每升',
@@ -396,7 +439,7 @@ const zhTW = {
   'advice.yellow.advice':
     '這款食品建議偶爾嚐鮮即可，食用時分次少量、慢嚼細嚥，並搭配一杯溫水減少身體負擔！',
   'advice.yellow.habit': '長期小習慣：每餐吃七分飽，放慢進食速度，幫助腸胃消化吸收。',
-  'advice.green.badge': '天然安心・保持好習慣',
+  'advice.green.badge': '天然・保持好習慣',
   'advice.green.advice':
     '太棒了！這款食品成分單純無過多負擔，天天多攝取天然原型食物，身體元氣滿分！',
   'advice.green.habit': '長期小習慣：每天定時喝足溫開水、多吃五色蔬果，維持長壽活力。',
@@ -453,21 +496,21 @@ const zhTW = {
   'history.timesFood': '次食品',
   'history.stopSpeak': '停止播報',
   'history.speakWeekly': '🔊 朗讀週總結',
-  'history.greenLight': '安心綠燈',
-  'history.yellowLight': '留意黃燈',
-  'history.redLight': '避開紅燈',
+  'history.greenLight': '綠燈',
+  'history.yellowLight': '黃燈',
+  'history.redLight': '紅燈',
   'history.timesUnit': '次',
   'history.filterAll': '全部 ({n})',
-  'history.filterGreen': '安心級 ({n})',
-  'history.filterYellow': '留意級 ({n})',
-  'history.filterRed': '避開級 ({n})',
+  'history.filterGreen': '綠燈 ({n})',
+  'history.filterYellow': '黃燈 ({n})',
+  'history.filterRed': '紅燈 ({n})',
   'history.barGreen': '綠燈 {n}%',
   'history.barYellow': '黃燈 {n}%',
   'history.barRed': '紅燈 {n}%',
   'history.emptyFilter': '此分級目前暫無紀錄。',
-  'history.badgeGreen': '🟢 安心級',
-  'history.badgeYellow': '🟡 留意級',
-  'history.badgeRed': '🔴 避開級',
+  'history.badgeGreen': '🟢 綠燈',
+  'history.badgeYellow': '🟡 黃燈',
+  'history.badgeRed': '🔴 紅燈',
   'history.speakThisTitle': '語音播報此食品分析',
   'history.speakThis': '播報',
   'history.plainLabel': '💬 長者白話說明：',
@@ -510,14 +553,14 @@ const zhTW = {
   'history.report.postMeal': '飯後',
   'history.report.gradeHeader': '📊 過去一週飲食健康綜合評級：【評級 {letter} - {title}】',
   'history.report.total': '  • 總共把關：{n} 次食品',
-  'history.report.greenRow': '  • 🟢 安心推薦級：{n} 次 ({pct}%)',
-  'history.report.yellowRow': '  • 🟡 留意份量級：{n} 次 ({pct}%)',
-  'history.report.redRow': '  • 🔴 成功避開級：{n} 次 ({pct}%)',
+  'history.report.greenRow': '  • 🟢 綠燈：{n} 次 ({pct}%)',
+  'history.report.yellowRow': '  • 🟡 黃燈：{n} 次 ({pct}%)',
+  'history.report.redRow': '  • 🔴 紅燈：{n} 次 ({pct}%)',
   'history.report.itemsHeader': '🛒 近期把關食品明細摘要：',
   'history.report.item': '  {i}. 【{name}】 {tag}：{title}',
-  'history.report.itemGreen': '🟢安心級',
-  'history.report.itemYellow': '🟡留意級',
-  'history.report.itemRed': '🔴避開級',
+  'history.report.itemGreen': '🟢綠燈',
+  'history.report.itemYellow': '🟡黃燈',
+  'history.report.itemRed': '🔴紅燈',
   'history.report.noItems': '  （暫無掃描紀錄）',
   'history.report.tipsHeader': '💡 溫馨健康叮嚀：',
   'history.report.tip1': '  • 請保持每日充足水分攝取（約 1500~2000cc）。',
@@ -527,7 +570,7 @@ const zhTW = {
   'history.speech.empty':
     '您好！您過去一週尚未有掃描紀錄，只要點擊底部的拍照按鈕，就可以開始為您的健康飲食把關囉！',
   'history.speech.summary':
-    '您好！這是您過去一週的健康飲食評級：總共把關了 {total} 次食品，綜合評定為 {letter} 級！其中安心綠燈食品有 {green} 次，黃燈提醒 {yellow} 次，避開紅燈 {red} 次。您有細心照顧身體，繼續保持！',
+    '您好！這是您過去一週的健康飲食評級：總共把關了 {total} 次食品，綜合評定為 {letter} 級！其中綠燈食品有 {green} 次，黃燈提醒 {yellow} 次，紅燈 {red} 次。您有細心照顧身體，繼續保持！',
 
   /* ── 食育學堂（第三階段）───────────────────────────────────── */
   'classroom.title': '食育學堂',
@@ -589,6 +632,8 @@ const en: Record<TranslationKey, string> = {
   'menu.history.hint': 'See past checks',
   'menu.classroom': 'Learn',
   'menu.classroom.hint': 'Learn to eat safely',
+  'menu.qa': 'Health Q&A',
+  'menu.qa.hint': 'Ask a health question',
   'menu.conditions': 'Health settings',
   'menu.conditions.hint': 'Set conditions and allergens',
 
@@ -607,6 +652,7 @@ const en: Record<TranslationKey, string> = {
   'footer.scanRetake': 'Retake photo',
   'footer.goScan': 'Go to scanner',
   'footer.classroomTry': 'Try it at the store',
+  'footer.qaToScan': 'Check a product',
   'footer.historyScan': 'Check a product',
   'footer.retryScan': 'Take another photo',
 
@@ -839,6 +885,10 @@ const en: Record<TranslationKey, string> = {
   'onboard.genderMale': 'Mr',
   'onboard.genderFemale': 'Ms',
   'onboard.genderNone': 'No particular title',
+  /* Short forms for the collapsed settings header (the ones above are too long) */
+  'gender.shortMale': 'Mr',
+  'gender.shortFemale': 'Ms',
+  'gender.shortNone': 'Unspecified',
   'onboard.howTitle': 'How this app works',
   'onboard.how1Title': '① Take a photo',
   'onboard.how1Body':
@@ -867,6 +917,55 @@ const en: Record<TranslationKey, string> = {
   'onboard.next': 'Next',
   'onboard.back': 'Back',
   'onboard.start': 'Get started',
+
+  /* ── Privacy notice & disclaimer (settings bottom + onboarding) ──
+   * ⚠️ Deliberately 12px — the only exception to the 16px font-size floor.
+   *    See the header comment in src/components/LegalNotice.tsx. */
+  'legal.privacy.title': 'Privacy notice',
+  'legal.privacy.1':
+    'Your photo never leaves your device. Label recognition (OCR) runs entirely inside your browser.',
+  'legal.privacy.2':
+    'Only the recognised text is sent to the cloud AI, and only after you agree. The photo itself is never uploaded.',
+  'legal.privacy.3':
+    'The conditions you tick, your body measurements and your diet records stay on your own device. They are never uploaded or shared with anyone.',
+  'legal.privacy.4':
+    'This app has no accounts, no ads, no third-party tracking, and collects no personally identifying data.',
+  'legal.privacy.5':
+    'You can switch back to on-device analysis at any time in Settings, or press "Clear all data" to delete everything.',
+  'legal.disclaimer.title': 'Disclaimer',
+  'legal.disclaimer.1':
+    'This app provides general food and nutrition information. It is not medical diagnosis, treatment or prescribing advice.',
+  'legal.disclaimer.2':
+    'This app is not a substitute for a doctor, pharmacist or dietitian. Always consult a healthcare professional about medication or dietary changes.',
+  'legal.disclaimer.3':
+    'AI analysis can be wrong. Treat the result as a reference only and always check the nutrition panel on the packaging yourself.',
+  'legal.disclaimer.4':
+    'Ingredients and regulations can change. The product label and the competent authority\u2019s announcements take precedence.',
+  'legal.disclaimer.5':
+    'The developer accepts no legal liability for any consequence of decisions made using this app.',
+  'legal.agreeLabel': 'I have read and agree to the privacy notice and disclaimer above',
+  'legal.agreeRequired': 'Please tick "I have read and agree" before you start.',
+
+  /* ── Clear all data (bottom of Settings, two-stage warning) ─────── */
+  'clear.title': 'Clear all data',
+  'clear.summary':
+    'Delete everything this app has stored on this device in one tap, and return to the first-run setup.',
+  'clear.button': 'Clear all data',
+  'clear.step1Title': 'What will be deleted?',
+  'clear.step1Body':
+    'The following will be permanently deleted from this device and cannot be recovered:',
+  'clear.item1': 'Profile and title (Mr / Ms)',
+  'clear.item2': 'Chronic conditions and allergens',
+  'clear.item3': 'Body measurements (blood pressure, heart rate, blood sugar)',
+  'clear.item4': 'Diet records and weekly statistics',
+  'clear.item5': 'Food-education learning progress',
+  'clear.item6': 'Cloud-analysis consent setting and interface language',
+  'clear.step2Title': 'Final confirmation',
+  'clear.step2Body':
+    'Delete absolutely everything? This cannot be undone, and the app will return to the first-run setup.',
+  'clear.continue': 'I understand, continue',
+  'clear.confirmDelete': 'Delete everything',
+  'clear.cancel': 'Cancel',
 
   'vitals.speech.unitMmol': 'mmol/L',
   'vitals.speech.unitMgdl': 'mg/dL',
@@ -930,7 +1029,7 @@ const en: Record<TranslationKey, string> = {
     'Treat this one as an occasional taste. Eat it in small amounts, chew slowly, and have a glass of warm water alongside to lighten the load.',
   'advice.yellow.habit':
     'Long-term habit: stop eating at about 80% full and slow down — it helps digestion and absorption.',
-  'advice.green.badge': 'Naturally safe, keep it up',
+  'advice.green.badge': 'Natural — keep it up',
   'advice.green.advice':
     'Excellent — this product has simple ingredients with nothing extra weighing you down. Keep eating natural whole foods every day.',
   'advice.green.habit':
@@ -983,22 +1082,22 @@ const en: Record<TranslationKey, string> = {
   'history.timesFood': 'products',
   'history.stopSpeak': 'Stop reading',
   'history.speakWeekly': '🔊 Read the weekly summary',
-  'history.greenLight': 'Safe (green)',
-  'history.yellowLight': 'Caution (yellow)',
-  'history.redLight': 'Avoid (red)',
+  'history.greenLight': 'Green',
+  'history.yellowLight': 'Yellow',
+  'history.redLight': 'Red',
   /* 英文不需要「次」這個量詞，數字單獨放在標籤下即可 */
   'history.timesUnit': '',
   'history.filterAll': 'All ({n})',
-  'history.filterGreen': 'Safe ({n})',
-  'history.filterYellow': 'Caution ({n})',
-  'history.filterRed': 'Avoid ({n})',
+  'history.filterGreen': 'Green ({n})',
+  'history.filterYellow': 'Yellow ({n})',
+  'history.filterRed': 'Red ({n})',
   'history.barGreen': 'Green {n}%',
   'history.barYellow': 'Yellow {n}%',
   'history.barRed': 'Red {n}%',
   'history.emptyFilter': 'No records at this grade yet.',
-  'history.badgeGreen': '🟢 Safe',
-  'history.badgeYellow': '🟡 Caution',
-  'history.badgeRed': '🔴 Avoid',
+  'history.badgeGreen': '🟢 Green',
+  'history.badgeYellow': '🟡 Yellow',
+  'history.badgeRed': '🔴 Red',
   'history.speakThisTitle': 'Read this analysis aloud',
   'history.speakThis': 'Read',
   'history.plainLabel': '💬 In plain words:',
@@ -1042,14 +1141,14 @@ const en: Record<TranslationKey, string> = {
   'history.report.postMeal': 'after a meal',
   'history.report.gradeHeader': '📊 Overall grade for the past week: [Grade {letter} — {title}]',
   'history.report.total': '  • Products checked: {n}',
-  'history.report.greenRow': '  • 🟢 Safe: {n} ({pct}%)',
-  'history.report.yellowRow': '  • 🟡 Caution: {n} ({pct}%)',
-  'history.report.redRow': '  • 🔴 Avoided: {n} ({pct}%)',
+  'history.report.greenRow': '  • 🟢 Green: {n} ({pct}%)',
+  'history.report.yellowRow': '  • 🟡 Yellow: {n} ({pct}%)',
+  'history.report.redRow': '  • 🔴 Red: {n} ({pct}%)',
   'history.report.itemsHeader': '🛒 Recent products checked:',
   'history.report.item': '  {i}. [{name}] {tag}: {title}',
-  'history.report.itemGreen': '🟢 Safe',
-  'history.report.itemYellow': '🟡 Caution',
-  'history.report.itemRed': '🔴 Avoid',
+  'history.report.itemGreen': '🟢 Green',
+  'history.report.itemYellow': '🟡 Yellow',
+  'history.report.itemRed': '🔴 Red',
   'history.report.noItems': '  (no scans yet)',
   'history.report.tipsHeader': '💡 Friendly health reminders:',
   'history.report.tip1': '  • Drink enough water every day (about 1500-2000 ml).',
@@ -1061,7 +1160,7 @@ const en: Record<TranslationKey, string> = {
   'history.speech.empty':
     'Hello! You have not scanned anything in the past week. Tap the camera button at the bottom to start checking your food.',
   'history.speech.summary':
-    'Hello! Here is your food health grade for the past week: you checked {total} products and the overall grade is {letter}. You had {green} safe green-light products, {yellow} yellow-light reminders and {red} red lights avoided. You are taking good care of yourself — keep it up!',
+    'Hello! Here is your food health grade for the past week: you checked {total} products and the overall grade is {letter}. You had {green} green-light items, {yellow} yellow-light items and {red} red-light items. You are taking good care of yourself — keep it up!',
 
   'classroom.title': 'Food education',
   'classroom.intro':

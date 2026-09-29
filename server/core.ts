@@ -405,9 +405,44 @@ interface CacheEntry {
 
 export const analysisCache = new Map<string, CacheEntry>();
 
-export function makeCacheKey(imageBase64: string, conditions: string[]): string {
+/**
+ * 決定「這次請求要用什麼當快取鍵的內容來源」。
+ *
+ * ⚠️⚠️ **文字模式必須用 `ocrText`，絕對不能沿用 `imageBase64`。**
+ *
+ *   【為什麼】
+ *     新流程（前端 OCR）下照片從來沒上傳，`imageBase64` 是**空字串**。
+ *     若拿它當鍵，那麼「同一身分 ＋ 同一組慢性病 ＋ 同一模式 ＋ 同一語言」
+ *     的**所有商品會共用同一個快取鍵**。
+ *
+ *   【實際後果（2026-09-29 實測）】
+ *     先掃燕麥片（鈉 2mg）→ 再掃泡麵（鈉 2350mg，應該紅燈）
+ *     → 第二次回傳「✅ 非常適合長者食用」＋ `cached: true`。
+ *     這是**會害人的 bug**（該紅卻報綠），不是效能問題。
+ *
+ *   【為什麼要把這行抽成函式】
+ *     原本它散在 handler 裡，寫錯不會報錯、只會安靜地回錯商品。
+ *     抽出來才能被 `scripts/check-cache-key.ts` 釘住。
+ */
+export function analysisCacheContent(input: {
+  isTextMode: boolean;
+  ocrText?: string;
+  imageBase64?: string;
+}): string {
+  if (input.isTextMode) return `text:${input.ocrText ?? ''}`;
+  return `img:${input.imageBase64 ?? ''}`;
+}
+
+/**
+ * 產生快取鍵。
+ *
+ * @param content 這次請求的**唯一內容來源** —— 文字模式是 OCR 文字，
+ *                圖片模式是圖片的 base64。由 `analysisCacheContent()` 決定。
+ * @param conditions 使用者勾選的慢性病清單（會排序，順序不影響鍵值）。
+ */
+export function makeCacheKey(content: string, conditions: string[]): string {
   return createHash('sha256')
-    .update(imageBase64)
+    .update(content)
     .update('|')
     .update([...conditions].sort().join(','))
     .digest('hex');

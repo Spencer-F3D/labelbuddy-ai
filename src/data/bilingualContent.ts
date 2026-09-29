@@ -339,6 +339,17 @@ export const DIET_RECORD_EN: Record<
  */
 export function localizeDietRecord(record: DietRecord, language: Language): DietRecord {
   if (language !== 'en') return record;
+  /**
+   * ⚠️ 帶有 `lang` 的紀錄**一律不動**（2026-09-29 起）。
+   *
+   *   這類紀錄的文字是在掃描當下、依「**標籤本身的語言**」產生並固定的
+   *   （見 App.tsx 的 `detectLabelLanguage`）。使用者的要求是
+   *   「照片是什麼語言，紀錄就是什麼語言」，所以切換介面語言時
+   *   不能把它翻掉 —— 翻了就與他實際買的那包對不上。
+   *
+   *   下面的 ID 對照表只服務**內建的 6 筆示範資料**（它們沒有 `lang`）。
+   */
+  if (record.lang) return record;
   const text = DIET_RECORD_EN[record.id];
   if (!text) return record;
   return {
