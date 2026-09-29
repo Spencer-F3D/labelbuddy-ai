@@ -93,6 +93,7 @@ import { getInitialDietRecords } from './data/initialDietRecords';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
 import { HealthQASection } from './components/HealthQASection';
+import { OnboardingFlow, type OnboardingResult } from './components/OnboardingFlow';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
 import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { NutrientFactBars } from './components/NutrientFactBars';
@@ -174,6 +175,15 @@ const STORAGE_PROFILE_KEY = 'labelbuddy_learner_profile_v1';
  *    要提升準確度必須由使用者自己按下開關（見結果頁的隱私說明區）。
  */
 const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
+/**
+ * 是否已走過首次啟動引導頁。
+ *
+ * 沒有這個旗標就顯示引導頁 —— 它負責取得兩件必要的同意：
+ *   ① 身分（決定營養門檻）
+ *   ② AI 模式（雲端為主／只用本機）
+ * 所以它不能跳過，否則後面的分析沒有正確的基準。
+ */
+const STORAGE_ONBOARDED_KEY = 'labelbuddy_onboarded_v1';
 
 /** 全部可勾選的慢性病與過敏原（12 項，來源為共用資料檔） */
 const ALL_CONDITIONS = PHYSICAL_INDICATORS;
@@ -375,6 +385,31 @@ export default function App() {
 
     const next = getLearnerProfile(id);
     speakText(t('settings.profileSwitched', { name: localizedProfileName(next.id, next.name, language) }), { rate: 0.9, preferLanguage: ttsLangMandarin });
+  };
+
+  /**
+   * 走完首次啟動引導頁。
+   *
+   * 這裡是**唯一的**「預設同意雲端」入口 —— 使用者是在看過私隱說明
+   * （照片不離開裝置、只送文字）之後做的選擇，所以是有效的同意。
+   * 其他地方都不得擅自把 cloudConsent 改成 true。
+   */
+  const handleOnboardingComplete = ({ profileId, cloudConsent: consent }: OnboardingResult) => {
+    setLearnerProfileId(profileId);
+    setCloudConsent(consent);
+    setOnboarded(true);
+
+    try {
+      localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
+      localStorage.setItem(STORAGE_CLOUD_CONSENT_KEY, String(consent));
+      localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+    } catch (e) {
+      console.warn('儲存引導設定失敗:', e);
+    }
+
+    try {
+      navigator.vibrate([40, 60, 40]);
+    } catch {}
   };
 
   // 1. 個人慢性病設定：預設全選或讀取本地儲存
@@ -585,15 +620,36 @@ export default function App() {
    */
   const [loadingPhase, setLoadingPhase] = useState<'reading' | 'analyzing'>('analyzing');
   /**
-   * 是否同意把照片上傳雲端辨識。預設 false（不同意）。
+   * 是否同意把**讀出的文字**送雲端分析。
    *
-   * 【為什麼預設關】這是隱私優先的預設值：沒表態過的使用者，
-   * 照片一律只在本機用離線 OCR 處理。使用者若覺得本機結果不夠準，
-   * 可以在結果頁按下開關同意上傳，之後的掃描才會走雲端。
+   * 【2026-09-29 語意變更：本機從「預設」改為「斷網後備」】
+   *   舊：預設 false，使用者要自己按開關才會走雲端。
+   *   新：由**首次啟動引導頁**取得同意，雲端是主要路徑，
+   *       本機 OCR ＋ 規則引擎降級為**斷網或雲端失敗時的後備**。
+   *
+   * 【為什麼要改】
+   *   競賽章程明訂「僅以固定規則模擬 AI」可不予評審，而 AI 技術應用佔 25%。
+   *   本機規則引擎當主角，等於自己放棄那一項。
+   *
+   * ⚠️ 照片**永遠**不離開裝置 —— 這件事和 cloudConsent 無關。
+   *    本機 OCR 一直是唯一的路徑，這個旗標只決定「文字」要不要送出。
+   *
+   * ⚠️ 若使用者還沒走過引導頁，一律當作**未同意**（保守）。
+   *    引導頁會明確問過，那才是有效的同意。
    */
   const [cloudConsent, setCloudConsent] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(STORAGE_CLOUD_CONSENT_KEY) === 'true';
+      const stored = localStorage.getItem(STORAGE_CLOUD_CONSENT_KEY);
+      if (stored !== null) return stored === 'true';
+      return false;
+    } catch {
+      return false;
+    }
+  });
+  /** 是否已走完引導頁。false 時覆蓋整個畫面。 */
+  const [onboarded, setOnboarded] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_ONBOARDED_KEY) === 'true';
     } catch {
       return false;
     }
@@ -1044,6 +1100,18 @@ export default function App() {
 
   return (
     <>
+      {/* ======================================================== */}
+      {/* 首次啟動引導頁：還沒走過就覆蓋整個畫面                    */}
+      {/*   放在最前面，連背景舞台都不渲染 —— 第一次打開的人         */}
+      {/*   不該看到半成品的主介面閃過去。                           */}
+      {/* ======================================================== */}
+      {!onboarded && (
+        <OnboardingFlow
+          initialProfileId={learnerProfileId}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
+
       {/* ======================================================== */}
       {/* 桌機用的背景舞台：只在 ≥520px 顯示，讓手機框浮起來         */}
       {/* 手機（<520px）完全不顯示，不影響任何既有版面              */}

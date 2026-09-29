@@ -292,6 +292,40 @@ const zhTW = {
   'qa.modeLocal': '📴 離線回答（目前沒有連線，用內建知識回答）',
   'qa.error': '目前連不上 AI，請稍後再試一次。',
 
+  // ── 首次啟動引導頁（2026-09-29）──────────────────────────────
+  'onboard.stepOf': '第 {n} 步，共 {total} 步',
+  'onboard.welcomeTitle': '歡迎使用 LabelBuddy AI',
+  'onboard.welcomeBody': '拍一張食品包裝後面的營養標籤，我幫您看這個東西適不適合您吃。',
+  'onboard.identityTitle': '先問一下：您是誰？',
+  'onboard.identityBody':
+    '這個答案很重要。同一包食物，對不同的人結論可能完全相反 —— 例如高蛋白粉對健身的人是綠燈，對腎臟不好的人卻是紅燈。',
+  'onboard.howTitle': '這個 App 怎麼用',
+  'onboard.how1Title': '① 拍照',
+  'onboard.how1Body': '對著包裝背後的營養標籤拍一張，或從相簿選一張。',
+  'onboard.how2Title': '② 看結果',
+  'onboard.how2Body':
+    'AI 會用白話告訴您這個能不能買、為什麼，還會列出該注意的成分。看不懂可以按「唸給我聽」。',
+  'onboard.how3Title': '③ 沒網路也能用',
+  'onboard.how3Body':
+    '如果剛好沒有網路，App 會改用內建的規則給您建議，不會整個不能用。',
+  'onboard.privacyTitle': '私隱與 AI 使用方式',
+  'onboard.privacyPromiseTitle': '我們的承諾',
+  'onboard.privacy1': '您拍的照片**從頭到尾都不會離開這台手機**。',
+  'onboard.privacy2': 'App 在手機上把照片讀成文字，只把**文字**送出去分析。',
+  'onboard.privacy3': '雲端 AI 用您的文字給建議，不會收到您的照片。',
+  'onboard.privacyNote':
+    '您可以隨時在設定裡改成「只用本機」，那樣連文字也不會送出去。',
+  'onboard.modeTitle': '要用哪一種 AI？',
+  'onboard.modeBody': '兩種都可以隨時切換：',
+  'onboard.modeCloud': '雲端 AI（建議）',
+  'onboard.modeCloudNote': '答案最準、最完整。',
+  'onboard.modeLocal': '只用本機（完全不上網）',
+  'onboard.modeLocalNote': '最快也最私隱，但建議比較簡單。',
+  'onboard.modeChangeLater': '之後可以在設定裡隨時改，不用重來。',
+  'onboard.next': '下一步',
+  'onboard.back': '上一步',
+  'onboard.start': '開始使用',
+
   /* 語音朗讀用的單位（拼接給 TTS，不是畫面文字） */
   'vitals.speech.unitMmol': '毫摩爾每升',
   'vitals.speech.unitMgdl': '毫克每分升',
@@ -781,6 +815,43 @@ const en: Record<TranslationKey, string> = {
   'qa.modeCloud': '☁️ Answered by cloud AI',
   'qa.modeLocal': '📴 Offline answer (no connection right now, using built-in knowledge)',
   'qa.error': 'Cannot reach the AI right now. Please try again in a moment.',
+
+  // ── First-run onboarding (2026-09-29) ───────────────────────────
+  'onboard.stepOf': 'Step {n} of {total}',
+  'onboard.welcomeTitle': 'Welcome to LabelBuddy AI',
+  'onboard.welcomeBody':
+    'Take a photo of the nutrition label on the back of any food package, and I will tell you whether it suits you.',
+  'onboard.identityTitle': 'First, who are you?',
+  'onboard.identityBody':
+    'This answer matters. The same food can get opposite verdicts for different people \u2014 protein powder is a green light for a gym-goer but a red light for someone with kidney trouble.',
+  'onboard.howTitle': 'How this app works',
+  'onboard.how1Title': '① Take a photo',
+  'onboard.how1Body':
+    'Point at the nutrition label on the back of the package, or pick a photo from your album.',
+  'onboard.how2Title': '② Read the result',
+  'onboard.how2Body':
+    'The AI tells you in plain words whether you can buy it and why, and lists the ingredients to watch. Tap "Read this to me" if reading is tiring.',
+  'onboard.how3Title': '③ It works offline too',
+  'onboard.how3Body':
+    'If you happen to have no connection, the app switches to built-in rules instead of failing completely.',
+  'onboard.privacyTitle': 'Privacy and how the AI is used',
+  'onboard.privacyPromiseTitle': 'Our promise',
+  'onboard.privacy1': 'Your photo **never leaves this phone** \u2014 not at any point.',
+  'onboard.privacy2':
+    'The app reads the photo into text on your phone, and only the **text** is sent out.',
+  'onboard.privacy3': 'The cloud AI works from that text. It never receives your photo.',
+  'onboard.privacyNote':
+    'You can switch to "on-device only" in Settings at any time \u2014 then even the text stays on your phone.',
+  'onboard.modeTitle': 'Which AI would you like?',
+  'onboard.modeBody': 'You can switch between these at any time:',
+  'onboard.modeCloud': 'Cloud AI (recommended)',
+  'onboard.modeCloudNote': 'The most accurate and complete answers.',
+  'onboard.modeLocal': 'On-device only (no internet at all)',
+  'onboard.modeLocalNote': 'Fastest and most private, but simpler advice.',
+  'onboard.modeChangeLater': 'You can change this in Settings later \u2014 no need to start over.',
+  'onboard.next': 'Next',
+  'onboard.back': 'Back',
+  'onboard.start': 'Get started',
 
   'vitals.speech.unitMmol': 'mmol/L',
   'vitals.speech.unitMgdl': 'mg/dL',

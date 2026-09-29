@@ -326,33 +326,6 @@ try {
   await capture('04b-vitals-ai');
 
   /* ── 健康問答區塊 ──────────────────────────────────────────────
-   * 它也是收合的，而且按鈕文字是「常見問題」那排 —— 不展開就完全沒被驗證。
-   */
-  const qaOpen = await cdp.eval(`
-    (() => {
-      const el = [...document.querySelectorAll('button, [role="button"]')].find(e =>
-        /Got a question\\?|有問題想問/i.test(e.textContent || ''));
-      if (!el) return false;
-      el.click();
-      return true;
-    })()
-  `);
-  await sleep(1500);
-  if (!qaOpen) console.log('  ⚠️  找不到「Got a question?」區塊');
-  const qaScrolled = await cdp.eval(`
-    (() => {
-      const el = [...document.querySelectorAll('span')].find(e =>
-        /Common questions|常見問題/i.test(e.textContent || ''));
-      if (!el) return false;
-      el.scrollIntoView({ block: 'start' });
-      return true;
-    })()
-  `);
-  await sleep(1200);
-  if (!qaScrolled) console.log('  ⚠️  找不到問答的「常見問題」標題');
-  await capture('04c-health-qa');
-
-  /* ── 健康問答區塊 ──────────────────────────────────────────────
    * 同樣收合在健康設定頁裡，不展開就掃不到。
    */
   const qaOpen = await cdp.eval(`
