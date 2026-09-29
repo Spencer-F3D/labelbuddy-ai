@@ -24,7 +24,7 @@ import {
   Volume2,
   Sparkles,
 } from 'lucide-react';
-import { SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
+import { AddressGender, SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
 import { speakText, stopSpeech } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
@@ -33,6 +33,12 @@ interface VitalMetricsSectionProps {
   indicators: SeniorPhysicalIndicators;
   onChangeIndicators: (updated: SeniorPhysicalIndicators) => void;
   onSyncConditionsWithVitals?: () => void;
+  /**
+   * 稱謂用的性別（2026-09-29）。
+   * 只影響 AI 回饋與語音怎麼稱呼使用者（先生／小姐／您好），
+   * 不影響任何營養或風險判斷。未指定時後端一律用中性的「您好」。
+   */
+  gender?: AddressGender;
 }
 
 /** 評估結果：只帶翻譯鍵，字串在 render 時才解析 */
@@ -46,6 +52,7 @@ interface StatusResult {
 export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
   indicators,
   onChangeIndicators,
+  gender,
 }) => {
   const { t, language } = useI18n();
 
@@ -67,7 +74,8 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文結果
-        body: JSON.stringify({ indicators, language }),
+        // gender 只影響稱謂（先生／小姐／您好），不影響判斷
+        body: JSON.stringify({ indicators, language, gender }),
       });
       const payload = await response.json();
       if (!response.ok || !payload?.success) throw new Error('bad response');

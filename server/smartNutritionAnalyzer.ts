@@ -276,7 +276,7 @@ export function analyzeNutritionWithIndicators(
   const hasHypertension = selectedConditions.some((c) => c.includes('高血壓'));
   if (hasHypertension) {
     if (profile.sodiumMg >= 1200) {
-      concerns.push(`🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，阿公阿嬤吃了血壓會一下子飆高、頭會暈！`);
+      concerns.push(`🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，吃了血壓會一下子飆高、頭會暈！`);
       matchedConditions.push('高血壓 (太鹹危險)');
       riskScore += 3;
     } else if (profile.sodiumMg >= 400) {
@@ -318,7 +318,7 @@ export function analyzeNutritionWithIndicators(
   const hasGout = selectedConditions.some((c) => c.includes('痛風') || c.includes('尿酸'));
   if (hasGout) {
     if (profile.purineLevel === 'high') {
-      concerns.push('🔴 湯頭太濃或肉精粉多：阿公阿嬤喝了腳趾頭跟關節容易發紅、腫痛發作！');
+      concerns.push('🔴 湯頭太濃或肉精粉多：喝了腳趾頭跟關節容易發紅、腫痛發作！');
       matchedConditions.push('痛風 (腳趾腫痛警報)');
       riskScore += 3;
     } else if (profile.sugarG >= 15) {
@@ -332,7 +332,7 @@ export function analyzeNutritionWithIndicators(
   const hasKidney = selectedConditions.some((c) => c.includes('腎臟'));
   if (hasKidney) {
     if (profile.hasPhosphates || profile.sodiumMg >= 800) {
-      concerns.push('🔴 有加傷腎的化學膨脹粉（磷酸鹽）而且太鹹：老人家的腰子很難排泄出去，非常傷腎臟！');
+      concerns.push('🔴 有加傷腎的化學膨脹粉（磷酸鹽）而且太鹹：腎臟很難排泄出去，非常傷腎！');
       matchedConditions.push('慢性腎臟病 (傷腎化學粉警告)');
       riskScore += 3;
     } else if (profile.hasHighPotassium) {
@@ -400,7 +400,7 @@ export function analyzeNutritionWithIndicators(
   if (hasLactose) {
     const foundMilk = profile.allergens.some((a) => a.includes('牛奶') || a.includes('乳'));
     if (foundMilk) {
-      concerns.push('🟡 含有牛奶奶粉成分：長輩如果喝牛奶容易拉肚子、肚子脹氣，請避開這包！');
+      concerns.push('🟡 含有牛奶奶粉成分：喝牛奶容易拉肚子、肚子脹氣的人請避開這包！');
       matchedConditions.push('牛奶乳糖 (容易拉肚子)');
       riskScore += 2;
     }
@@ -426,24 +426,24 @@ export function analyzeNutritionWithIndicators(
   if (riskScore >= 3) {
     riskLevel = 'red';
     warningTitle = '⚠️ 紅燈警報！這包對身體負擔很大，不要買！';
-    plainSummary = `阿公、阿婆您好！這款【${profile.foodName}】油鹽糖放得太多了。`;
+    plainSummary = `您好！這款【${profile.foodName}】油鹽糖放得太多了。`;
 
     if (matchedConditions.length > 0) {
-      plainSummary += `特別是您注意的【${matchedConditions.slice(0, 3).join('、')}】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。孫子建議您放回架上，不要買回家喔！`;
+      plainSummary += `特別是您注意的【${matchedConditions.slice(0, 3).join('、')}】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。建議您放回架上，不要買回家喔！`;
     } else {
-      plainSummary += `對老人家心血管跟血壓負擔比較大，建議換成天然清淡的食物比較健康喔！`;
+      plainSummary += `對心血管跟血壓負擔比較大，建議換成天然清淡的食物比較健康喔！`;
     }
 
     alternativeAdvice = '建議在超市改買：新鮮豆腐、綠色蔬菜、清蒸魚、燕麥片或無糖豆漿，清淡又顧健康！';
   } else if (riskScore >= 1) {
     riskLevel = 'yellow';
     warningTitle = '🟡 黃燈提醒：嚐一兩口就好，不要吃太多';
-    plainSummary = `長輩您好！這款【${profile.foodName}】味道雖然香，但對您的身體（${matchedConditions.slice(0, 2).join('、')}）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！`;
+    plainSummary = `您好！這款【${profile.foodName}】味道雖然香，但對您的身體（${matchedConditions.slice(0, 2).join('、')}）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！`;
     alternativeAdvice = '吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。';
   } else {
     riskLevel = 'green';
     warningTitle = '✅ 綠燈安心！沒有太鹹太甜，很適合您';
-    plainSummary = `阿公、阿婆請放一百個心！這款【${profile.foodName}】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！`;
+    plainSummary = `請放心！這款【${profile.foodName}】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！`;
     alternativeAdvice = '平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！';
   }
 

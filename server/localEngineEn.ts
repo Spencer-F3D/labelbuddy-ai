@@ -88,13 +88,16 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
     '🔴 Contains chilli, chilli oil or fried food: this easily causes heartburn, with acid rising to your throat.',
   '🔴 太鹹又含有反式劣質油：心臟打血負擔會變很大，容易覺得胸口悶！':
     '🔴 Too salty and contains trans fats: this puts a heavy load on your heart and can make your chest feel tight.',
-  '🔴 有加傷腎的化學膨脹粉（磷酸鹽）而且太鹹：老人家的腰子很難排泄出去，非常傷腎臟！':
-    '🔴 Contains phosphate additives that harm the kidneys, and is too salty: older kidneys struggle to clear these out.',
+  '🔴 有加傷腎的化學膨脹粉（磷酸鹽）而且太鹹：腎臟很難排泄出去，非常傷腎！':
+    '🔴 Contains phosphate additives that harm the kidneys, and is too salty: the kidneys struggle to clear these out.',
   '🟡 含有天然黃豆鉀離子：如果醫生有交代要少吃高鉀食物，請跟醫生確認。':
     '🟡 Contains natural potassium from soybeans: if your doctor told you to limit high-potassium foods, please check with them.',
   '🟡 含有小麥麵粉成分：如果吃麵粉容易肚子脹氣或消化不良，請少吃一點。':
     '🟡 Contains wheat flour: if wheat gives you bloating or indigestion, eat only a little.',
-  '🟡 含有牛奶奶粉成分：長輩如果喝牛奶容易拉肚子、肚子脹氣，請避開這包！':
+  // ⚠️ 這條的鍵必須一字不差等於 smartNutritionAnalyzer.ts 的輸出
+  //    （2026-09-29 把「長輩如果喝牛奶…」改為中性說法時漏改這裡，
+  //     導致英文介面靜默退回中文，是 check:i18n 抓出來的）。
+  '🟡 含有牛奶奶粉成分：喝牛奶容易拉肚子、肚子脹氣的人請避開這包！':
     '🟡 Contains milk powder: if milk gives you diarrhea or bloating, avoid this pack.',
   '🟡 鹽巴多又含化學粉：會把身體裡的鈣質偷偷帶走，骨頭容易變脆、怕跌倒骨折！':
     '🟡 High in salt and contains phosphate additives: these quietly drain calcium from your body and make bones brittle.',
@@ -130,7 +133,7 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
   // ⚠️ 2026-09-29 補。這 8 條原本漏掉 ——
   //    引擎直接 push 中文字串，而對照表沒有對應鍵，
   //    於是 translateOne() 原樣回傳中文，英文介面就會看到紅字中文警告。
-  '🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，阿公阿嬤吃了血壓會一下子飆高、頭會暈！':
+  '🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，吃了血壓會一下子飆高、頭會暈！':
     '🔴 Far too much salt: one serving already exceeds the whole day\'s limit. Blood pressure can spike and cause dizziness.',
   '🟡 口味稍微偏鹹：鹽分有一點多，建議少喝裡面的湯汁，多喝兩杯溫開水排鹽。':
     '🟡 A little on the salty side: skip the soup or sauce, and drink a couple of glasses of warm water to help flush the salt out.',
@@ -142,7 +145,7 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
     '🔴 Very heavy in fat (including unhealthy oils): this clogs blood vessels and thickens the blood, making the heart work hard.',
   '🟡 油脂稍多：稍微偏油膩，平時要少吃動物油跟酥油，保護心臟血管。':
     '🟡 A bit oily: go easy on animal fats and shortening to protect your heart and blood vessels.',
-  '🔴 湯頭太濃或肉精粉多：阿公阿嬤喝了腳趾頭跟關節容易發紅、腫痛發作！':
+  '🔴 湯頭太濃或肉精粉多：喝了腳趾頭跟關節容易發紅、腫痛發作！':
     '🔴 Very rich broth or heavy meat extract: this can trigger red, swollen, painful joints.',
   '🟡 甜糖漿放得多：身體代謝太甜的糖漿會讓尿酸排不出去，要少碰甜食。':
     '🟡 Heavy in sweet syrup: too much syrup stops the body clearing uric acid — go easy on sweet foods.',
@@ -249,7 +252,7 @@ function conditionListEn(text: string): string {
  *   這些字串含有商品名稱或慢性病清單，每次內容都不同，無法精確比對。
  *
  * 【⚠️ 踩過的坑：白話摘要是「拼接」出來的】
- *   引擎先寫「阿公、阿婆您好！這款【X】油鹽糖放得太多了。」
+ *   引擎先寫「您好！這款【X】油鹽糖放得太多了。」
  *   再依情況 += 「特別是您注意的【Y】，…」或「對老人家心血管…」。
  *   所以要比對的是**拼接後的完整句子**，不是單一句型。
  *   一開始只寫單一句型，結果完全對不上（畫面仍顯示中文）。
@@ -257,7 +260,7 @@ function conditionListEn(text: string): string {
 const TEMPLATE_PATTERNS: Array<{ re: RegExp; build: (m: RegExpMatchArray) => string }> = [
   {
     // 紅燈 + 有勾選慢性病（拼接兩段）
-    re: /^阿公、阿婆您好！這款【(.+?)】油鹽糖放得太多了。特別是您注意的【(.+?)】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。孫子建議您放回架上，不要買回家喔！$/,
+    re: /^您好！這款【(.+?)】油鹽糖放得太多了。特別是您注意的【(.+?)】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。建議您放回架上，不要買回家喔！$/,
     build: (m) => {
       const s = subjectClause(m[1]);
       return `Hello! ${s.text} ${s.verb} far too much oil, salt and sugar. Especially for the conditions you selected — ${conditionListEn(m[2])} — it is not good for you: it can spike your blood pressure or blood sugar. Best to put it back on the shelf and not take it home.`;
@@ -265,15 +268,15 @@ const TEMPLATE_PATTERNS: Array<{ re: RegExp; build: (m: RegExpMatchArray) => str
   },
   {
     // 紅燈 + 沒有勾選慢性病
-    re: /^阿公、阿婆您好！這款【(.+?)】油鹽糖放得太多了。對老人家心血管跟血壓負擔比較大，建議換成天然清淡的食物比較健康喔！$/,
+    re: /^您好！這款【(.+?)】油鹽糖放得太多了。對心血管跟血壓負擔比較大，建議換成天然清淡的食物比較健康喔！$/,
     build: (m) => {
       const s = subjectClause(m[1]);
-      return `Hello! ${s.text} ${s.verb} far too much oil, salt and sugar. It is a heavy load on an older person's heart and blood pressure — a plain, natural food would be healthier.`;
+      return `Hello! ${s.text} ${s.verb} far too much oil, salt and sugar. It is a heavy load on your heart and blood pressure — a plain, natural food would be healthier.`;
     },
   },
   {
     // 黃燈
-    re: /^長輩您好！這款【(.+?)】味道雖然香，但對您的身體（(.+?)）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！$/,
+    re: /^您好！這款【(.+?)】味道雖然香，但對您的身體（(.+?)）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！$/,
     build: (m) => {
       const s = subjectClause(m[1]);
       const verb = s.verb === 'have' ? 'smell' : 'smells';
@@ -283,7 +286,7 @@ const TEMPLATE_PATTERNS: Array<{ re: RegExp; build: (m: RegExpMatchArray) => str
   },
   {
     // 綠燈
-    re: /^阿公、阿婆請放一百個心！這款【(.+?)】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！$/,
+    re: /^請放心！這款【(.+?)】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！$/,
     build: (m) => {
       const s = subjectClause(m[1]);
       const rest = s.verb === 'have' ? 'they match' : 'it matches';

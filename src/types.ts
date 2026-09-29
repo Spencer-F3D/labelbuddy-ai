@@ -10,7 +10,6 @@ export interface ChronicCondition {
   name: string;
   category: ConditionCategory;
   description: string;
-  badge: string;
   targetNutrients: string[];
   defaultChecked: boolean;
 }
@@ -28,6 +27,15 @@ export type RiskLevel = 'red' | 'yellow' | 'green';
  *   - `local_only` ：照片完全沒有離開本機，由內建離線 OCR 引擎處理
  */
 export type DataHandling = 'cloud' | 'local_only';
+
+/**
+ * 稱謂用的性別。
+ *
+ * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
+ *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
+ * ⚠️ 必須與後端 `server/core.ts` 的 `AddressGender` 保持一致。
+ */
+export type AddressGender = 'male' | 'female' | 'unspecified';
 
 /**
  * 單一慢性病的專屬提醒。
@@ -172,7 +180,7 @@ export interface SeniorPhysicalIndicators {
  */
 export interface SeniorIndicatorAnalysis {
   status_level: 'green' | 'yellow' | 'red';
-  status_title: string;          // 簡單大字標題，如「阿公，您今天的血壓跟血糖稍微偏高喔！」
+  status_title: string;          // 簡單大字標題，如「您今天的血壓跟血糖稍微偏高喔！」
   simple_explanation: string;    // 100% 大白話解釋，無艱澀名詞
   supermarket_rules: {
     do_not_buy: string[];        // 超市千萬不要買（白話解釋原因）
@@ -188,7 +196,7 @@ export interface SeniorIndicatorAnalysis {
  * 長者健康問題即時解答介面
  */
 export interface HealthQuestionAnswer {
-  question: string;              // 長輩提問的問題
+  question: string;              // 使用者提問的問題
   key_takeaway: string;          // 一句話大白話結論 (例如：可以適量喝淡咖啡，但每天不超過一杯！)
   answer: string;                // 溫馨通俗大白話解說
   safe_tips: string[];           // 實用安心小叮嚀
@@ -223,10 +231,8 @@ export type LearnerProfileId = 'senior' | 'child' | 'teen' | 'student' | 'fitnes
 /** 學習者身分定義（供 AI 提示詞組裝與教學內容篩選） */
 export interface LearnerProfile {
   id: LearnerProfileId;
-  /** 身分名稱，如「長者三高」 */
+  /** 身分名稱，如「長者」 */
   name: string;
-  /** 一句話說明適用對象 */
-  audience: string;
   /** 顯示用圖示（emoji） */
   emoji: string;
   /** 卡片主色（Tailwind class 片段） */

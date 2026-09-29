@@ -2,7 +2,7 @@ import { DietRecord } from '../types';
 
 /**
  * 預設長者過去一週的真實超市食品掃描紀錄（7 天內）
- * 幫助長輩一進來就能看到本週的健康飲食分析與習慣追蹤反饋
+ * 幫助使用者一進來就能看到本週的健康飲食分析與習慣追蹤反饋
  */
 export function getInitialDietRecords(): DietRecord[] {
   const now = Date.now();
@@ -16,7 +16,7 @@ export function getInitialDietRecords(): DietRecord[] {
       foodName: '純天然高纖大燕麥片',
       risk_level: 'green',
       warning_title: '✅ 適合食用：高纖無鈉，保護血管',
-      plain_summary: '長輩您好！這款燕麥片幾乎沒有添加鈉和砂糖，膳食纖維非常豐富，對您的血壓和腸胃都很有幫助，可以放心每天當早餐吃！',
+      plain_summary: '您好！這款燕麥片幾乎沒有添加鈉和砂糖，膳食纖維非常豐富，對您的血壓和腸胃都很有幫助，可以放心每天當早餐吃！',
       alternative_advice: '煮的時候可以加一點溫熱的無糖黑豆漿，營養更全面更香濃。',
       matched_conditions: ['高血壓', '糖尿病'],
     },
@@ -60,7 +60,7 @@ export function getInitialDietRecords(): DietRecord[] {
       foodName: '無加糖全脂鮮牛奶',
       risk_level: 'green',
       warning_title: '✅ 適合食用：天然高鈣，骨質強健',
-      plain_summary: '100% 純生乳製成，無任何化學防腐劑或外加糖精，豐富優質鈣質對長輩骨骼保養特別好！',
+      plain_summary: '100% 純生乳製成，無任何化學防腐劑或外加糖精，豐富優質鈣質對骨骼保養特別好！',
       alternative_advice: '早起飯後喝一杯溫牛奶，吸收效果最好。',
       matched_conditions: ['高血壓'],
     },

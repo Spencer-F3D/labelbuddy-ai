@@ -5,7 +5,7 @@
  * ============================================================================
  * 長者身體指標大白話分析引擎 (Senior Physical Indicator Smart Analyzer)
  * ============================================================================
- * 專為長者設計：堅決不用艱深醫學名詞，100% 轉換為阿公阿嬤聽得懂的大白話！
+ * 專為長者設計：堅決不用艱深醫學名詞，100% 轉換為大家聽得懂的大白話！
  * 同步產出超市買菜指南（什麼千萬不能買、什麼可以安心買）與親切語音朗讀文稿。
  */
 
@@ -42,7 +42,7 @@ const STATIC_EN: Record<string, string> = {
   '❌ 過甜的高果糖冰飲與罐裝汽水':
     '❌ Overly sweet iced drinks and canned soft drinks',
   // ── 安心買 ──
-  '✅ 新鮮大番茄、空心菜、綠花椰菜（含有天然鉀離子，幫阿公阿嬤把多餘鹽分排出來）':
+  '✅ 新鮮大番茄、空心菜、綠花椰菜（含有天然鉀離子，幫您把多餘鹽分排出來）':
     '✅ Fresh tomatoes, water spinach and broccoli (natural potassium helps flush out extra salt)',
   '✅ 傳統板豆腐、清蒸白身魚（清淡少油，優質蛋白質顧體力）':
     '✅ Traditional firm tofu and steamed white fish (light, low in oil, good-quality protein)',
@@ -153,7 +153,7 @@ export function analyzeSeniorPhysicalIndicators(
   if (statusLevel === 'red') {
     statusTitle = isEn
       ? "⚠️ Please take note — some of today's numbers are a little high"
-      : '⚠️ 阿公阿嬤注意喔！今天量到的指標有稍微偏高';
+      : '⚠️ 請注意！今天量到的指標有稍微偏高';
   } else if (statusLevel === 'yellow') {
     statusTitle = isEn
       ? '🟡 Things look mostly fine — go a little lighter on salt and sugar this week'
@@ -161,7 +161,7 @@ export function analyzeSeniorPhysicalIndicators(
   } else {
     statusTitle = isEn
       ? "✅ Great news — today's numbers look really good!"
-      : '✅ 太棒了！阿公阿嬤今天的身體數字維持得很漂亮！';
+      : '✅ 太棒了！今天的身體數字維持得很漂亮！';
   }
 
   // 產生通俗大白話解釋 (絕無艱澀名詞)
@@ -222,7 +222,7 @@ export function analyzeSeniorPhysicalIndicators(
     explanations.push(
       isEn
         ? `[Joints and uric acid] Do not drink long-simmered hotpot broth or bone stock. Go easy on seafood, and drink plenty of warm water to flush the uric acid out so your toes do not get red and painful.`
-        : `【關節與尿酸防護】：阿公阿嬤記得，熬很久的火鍋濃湯、排骨大骨高湯千萬別喝！吃海鮮要節制，多喝溫開水幫助把尿酸尿出來，腳趾頭才不會紅腫疼痛。`
+        : `【關節與尿酸防護】：記得，熬很久的火鍋濃湯、排骨大骨高湯千萬別喝！吃海鮮要節制，多喝溫開水幫助把尿酸尿出來，腳趾頭才不會紅腫疼痛。`
     );
   }
 
@@ -282,7 +282,7 @@ export function analyzeSeniorPhysicalIndicators(
 
   // 推薦買清單
   if (isBpHigh || isBpBorderline) {
-    recommendedToBuy.push('✅ 新鮮大番茄、空心菜、綠花椰菜（含有天然鉀離子，幫阿公阿嬤把多餘鹽分排出來）');
+    recommendedToBuy.push('✅ 新鮮大番茄、空心菜、綠花椰菜（含有天然鉀離子，幫您把多餘鹽分排出來）');
     recommendedToBuy.push('✅ 傳統板豆腐、清蒸白身魚（清淡少油，優質蛋白質顧體力）');
   }
   if (isSugarHigh || isSugarBorderline) {
@@ -305,20 +305,20 @@ export function analyzeSeniorPhysicalIndicators(
     '😴 晚上 10 點半前上床睡覺，睡飽 7 小時，血壓跟心臟才會舒服平穩。',
   ];
 
-  // 語音朗讀專用白話文（像孫子一樣溫柔對長輩講話）
+  // 語音朗讀專用白話文（溫柔、口語，但不預設對方年紀）
   let voiceSummary = '';
   if (statusLevel === 'red') {
     voiceSummary = isEn
       ? `Hello! I have just looked at today's numbers for you. Your blood pressure is ${systolic}, and your blood sugar is ${sugarDisplay} — a little on the high side. Cook lighter today, use one spoon less salt, and skip the sweet biscuits and drinks for now. When you shop, buy plenty of vegetables and tofu, and please do not buy instant noodles or sausages. Drink warm water and rest early!`
-      : `阿公、阿婆您好！剛剛幫您看了身體數字，上壓是 ${systolic}，血糖是 ${sugarDisplay}，稍微有些偏高喔。今天煮菜要清淡一點，鹽巴少放一匙，甜的餅乾跟飲料先不要吃。去超市買菜，記得多買青菜跟豆腐，泡麵跟香腸千萬不要買喔！有空多喝溫水，早點休息！`;
+      : `您好！剛剛幫您看了身體數字，上壓是 ${systolic}，血糖是 ${sugarDisplay}，稍微有些偏高喔。今天煮菜要清淡一點，鹽巴少放一匙，甜的餅乾跟飲料先不要吃。去超市買菜，記得多買青菜跟豆腐，泡麵跟香腸千萬不要買喔！有空多喝溫水，早點休息！`;
   } else if (statusLevel === 'yellow') {
     voiceSummary = isEn
       ? `Hello! Your numbers today are fairly steady — blood pressure ${systolic}, blood sugar ${sugarDisplay}. Just be careful not to eat too heavily seasoned. When you shop, choose whole foods that are low in oil and salt, and take a walk — your body will feel much lighter.`
-      : `長輩您好！今天的身體數字大致還算平穩，上壓 ${systolic}，血糖 ${sugarDisplay}。稍微注意不要吃太重口味，去超市買菜記得挑少油、少鹽的原形食物，散步走一走，身體就會很輕鬆喔！`;
+      : `您好！今天的身體數字大致還算平穩，上壓 ${systolic}，血糖 ${sugarDisplay}。稍微注意不要吃太重口味，去超市買菜記得挑少油、少鹽的原形食物，散步走一走，身體就會很輕鬆喔！`;
   } else {
     voiceSummary = isEn
       ? `Hello! Wonderful news — your blood pressure ${systolic} and blood sugar ${sugarDisplay} both look really healthy today. Please keep up your good habit of eating lightly, and I wish you health and happiness every day!`
-      : `阿公、阿婆您好！太棒了，您今天的血壓 ${systolic} 和血糖 ${sugarDisplay} 都非常漂亮又健康！請繼續保持清淡飲食的好習慣，祝您天天健康開心！`;
+      : `您好！太棒了，您今天的血壓 ${systolic} 和血糖 ${sugarDisplay} 都非常漂亮又健康！請繼續保持清淡飲食的好習慣，祝您天天健康開心！`;
   }
 
   // 同步連動至食品標籤掃描的關注重點

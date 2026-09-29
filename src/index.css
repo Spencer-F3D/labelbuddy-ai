@@ -4,6 +4,37 @@
   font-size: 20px;
 }
 
+/* ── 非長者身分的字級下調（2026-09-29 使用者要求）─────────────────────
+ *
+ * 【為什麼要這樣做】
+ *   16px 是為長者定的**可讀性下限**，對青少年、學生、健身族來說太大，
+ *   一頁塞不下幾行。所以身分不是「長者」時，整體字級下調 2px。
+ *
+ * 【為什麼用屬性選擇器，而不是改 Tailwind 設定】
+ *   全 App 的字級只有四種（實測 16/18/19/20px），而且都是硬寫的
+ *   `text-[16px]`。用 `[class~="..."]` 精準命中這四個 class，
+ *   不需要把整個專案改成 rem 或 CSS 變數，改動範圍最小。
+ *
+ * 【為什麼不需要 !important】
+ *   `html[data-density] [class~=...]` 的優先度（type + attr + class）
+ *   高於 Tailwind 的單一 class 工具類；而且這段是**未分層**的 CSS，
+ *   在 Tailwind v4 裡會蓋過 @layer 內的樣式。
+ *
+ * ⚠️ 若日後新增第五種字級，**必須回來補一行**，否則那個字級不會縮。
+ */
+html[data-density='compact'] [class~='text-[16px]'] {
+  font-size: 14px;
+}
+html[data-density='compact'] [class~='text-[18px]'] {
+  font-size: 16px;
+}
+html[data-density='compact'] [class~='text-[19px]'] {
+  font-size: 17px;
+}
+html[data-density='compact'] [class~='text-[20px]'] {
+  font-size: 18px;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;

@@ -35,8 +35,11 @@ const zhTW = {
   'app.name': 'LabelBuddy AI',
   // 瀏覽器分頁／書籤的標題（由 I18nProvider 寫進 document.title）
   'app.documentTitle': 'LabelBuddy AI - 您的超市健康小幫手',
-  'app.tagline': '專為長者設計的超市食品健康放大鏡',
-  'app.taglineEn': 'A supermarket food health magnifier for older adults',
+  // ⚠️ 不要在這裡寫「專為長者設計」。
+  //    本 App 有 6 種身分（長者／兒童／青少年／健身／年輕人／學生），
+  //    預設使用者不是長者。標語若預設對方是老人，等於一開始就稱呼錯。
+  'app.tagline': '看懂超市食品標籤的健康放大鏡',
+  'app.taglineEn': 'A health magnifier for supermarket food labels',
   'app.statusCloud': '雲端 AI 辨識',
   'app.statusLocal': '本機備援引擎',
   'app.menuTitle': '功能選單',
@@ -193,7 +196,7 @@ const zhTW = {
   'vitals.title': '日常身體量測指標',
   'vitals.subtitle': '血壓・心跳・血糖（點擊 ＋/－ 輕鬆調整）',
   'vitals.speak': '🔊 朗讀指標',
-  'vitals.quickPick': '長輩快選：',
+  'vitals.quickPick': '常用快選：',
 
   'vitals.bp.title': '🩸 血壓指標 (mmHg)',
   'vitals.bp.systolic': '上壓 (收縮壓)',
@@ -299,6 +302,12 @@ const zhTW = {
   'onboard.identityTitle': '先問一下：您是誰？',
   'onboard.identityBody':
     '這個答案很重要。同一包食物，對不同的人結論可能完全相反 —— 例如高蛋白粉對健身的人是綠燈，對腎臟不好的人卻是紅燈。',
+  'onboard.genderTitle': '要怎麼稱呼您？',
+  'onboard.genderBody':
+    '只影響我們跟您說話時的稱呼，不影響任何營養判斷。不想說也可以選「不用特別稱呼」。',
+  'onboard.genderMale': '先生',
+  'onboard.genderFemale': '小姐',
+  'onboard.genderNone': '不用特別稱呼',
   'onboard.howTitle': '這個 App 怎麼用',
   'onboard.how1Title': '① 拍照',
   'onboard.how1Body': '對著包裝背後的營養標籤拍一張，或從相簿選一張。',
@@ -488,7 +497,7 @@ const zhTW = {
   /* 匯出週報的純文字內容（逐行組裝，行與行之間用換行接起來） */
   'history.report.title': '【LabelBuddy AI 長者飲食健康概況週報】',
   'history.report.date': '📅 產出日期：{date}',
-  'history.report.vitalsHeader': '👵 長輩生理指標量測：',
+  'history.report.vitalsHeader': '🩺 生理指標量測：',
   'history.report.bp': '  • 血壓：{sys}/{dia} mmHg {comment}',
   'history.report.hr': '  • 心跳：{hr} bpm (正常區間 60~100)',
   'history.report.bs': '  • 血糖：{bs} {unit} ({timing})',
@@ -516,9 +525,9 @@ const zhTW = {
   'history.report.tip3': '  • 規律量測血壓與血糖，有助維持長久健康！',
   'history.report.noConditions': '無特殊慢性病史',
   'history.speech.empty':
-    '長輩您好！您過去一週尚未有掃描紀錄，只要點擊底部的拍照按鈕，就可以開始為您的健康飲食把關囉！',
+    '您好！您過去一週尚未有掃描紀錄，只要點擊底部的拍照按鈕，就可以開始為您的健康飲食把關囉！',
   'history.speech.summary':
-    '長輩您好！這是您過去一週的健康飲食評級：總共把關了 {total} 次食品，綜合評定為 {letter} 級！其中安心綠燈食品有 {green} 次，黃燈提醒 {yellow} 次，避開紅燈 {red} 次。您有細心照顧身體，繼續保持！',
+    '您好！這是您過去一週的健康飲食評級：總共把關了 {total} 次食品，綜合評定為 {letter} 級！其中安心綠燈食品有 {green} 次，黃燈提醒 {yellow} 次，避開紅燈 {red} 次。您有細心照顧身體，繼續保持！',
 
   /* ── 食育學堂（第三階段）───────────────────────────────────── */
   'classroom.title': '食育學堂',
@@ -564,8 +573,8 @@ export type TranslationKey = keyof typeof zhTW;
 const en: Record<TranslationKey, string> = {
   'app.name': 'LabelBuddy AI',
   'app.documentTitle': 'LabelBuddy AI - Your supermarket health helper',
-  'app.tagline': 'A supermarket food health magnifier for older adults',
-  'app.taglineEn': 'A supermarket food health magnifier for older adults',
+  'app.tagline': 'A health magnifier for supermarket food labels',
+  'app.taglineEn': 'A health magnifier for supermarket food labels',
   'app.statusCloud': 'Cloud AI',
   'app.statusLocal': 'On-device engine',
   'app.menuTitle': 'Menu',
@@ -824,6 +833,12 @@ const en: Record<TranslationKey, string> = {
   'onboard.identityTitle': 'First, who are you?',
   'onboard.identityBody':
     'This answer matters. The same food can get opposite verdicts for different people \u2014 protein powder is a green light for a gym-goer but a red light for someone with kidney trouble.',
+  'onboard.genderTitle': 'How should we address you?',
+  'onboard.genderBody':
+    'This only changes how we speak to you. It does not affect any nutrition judgement. If you would rather not say, choose "No particular title".',
+  'onboard.genderMale': 'Mr',
+  'onboard.genderFemale': 'Ms',
+  'onboard.genderNone': 'No particular title',
   'onboard.howTitle': 'How this app works',
   'onboard.how1Title': '① Take a photo',
   'onboard.how1Body':
@@ -1014,7 +1029,7 @@ const en: Record<TranslationKey, string> = {
 
   'history.report.title': '[LabelBuddy AI — Weekly food health summary]',
   'history.report.date': '📅 Date: {date}',
-  'history.report.vitalsHeader': '👵 Measured health indicators:',
+  'history.report.vitalsHeader': '🩺 Measured health indicators:',
   'history.report.bp': '  • Blood pressure: {sys}/{dia} mmHg {comment}',
   'history.report.hr': '  • Heart rate: {hr} bpm (normal range 60-100)',
   'history.report.bs': '  • Blood sugar: {bs} {unit} ({timing})',

@@ -281,7 +281,7 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
     }
   };
 
-  // 產生長輩大白話週總結語音文稿
+  // 產生大白話週總結語音文稿
   const weeklyVoiceScript = useMemo(() => {
     if (stats.total === 0) return t('history.speech.empty');
     return t('history.speech.summary', {

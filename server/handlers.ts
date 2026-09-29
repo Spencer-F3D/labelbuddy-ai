@@ -21,6 +21,10 @@
 
 import {
   analysisCache,
+  applyHonorific,
+  applyHonorificToFields,
+  applyHonorificToIndicators,
+  buildAddressRule,
   buildOcrFailedResult,
   buildSystemInstruction,
   callAiModel,
@@ -28,11 +32,14 @@ import {
   ensureEducationFields,
   getModelChain,
   getOpenRouterQuota,
+  honorificPrefix,
   isValidKey,
+  LABEL_TEXT_FIELDS,
   makeCacheKey,
   normalizeNutrientFacts,
   providerKeys,
   providerState,
+  QA_TEXT_FIELDS,
   readCache,
   rollDateIfNeeded,
   SYSTEM_INSTRUCTION_HEALTH_QA,
@@ -40,6 +47,7 @@ import {
   ENGLISH_OUTPUT_OVERRIDE_INDICATORS,
   ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA,
   writeCache,
+  type AddressGender,
   type ApiResult,
   type CoreDeps,
   type ProviderName,
@@ -93,6 +101,11 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
       profileId,
       localOnly = true,
       /**
+       * 稱謂用的性別（2026-09-29 新增）。只影響「怎麼稱呼使用者」，
+       * 不影響任何營養判斷。舊客戶端不帶 → 一律當 unspecified（中性「您好」）。
+       */
+      gender,
+      /**
        * 介面語言（2026-09-28 新增）。
        *
        * 【為什麼後端要知道語言】
@@ -107,6 +120,19 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     } = req.body;
     // 只有明確等於 'en' 才走英文，其餘（含 undefined、亂填）一律當繁體中文
     const isEnglish = language === 'en';
+    /**
+     * 稱謂前綴（'先生' / '小姐' / ''）。
+     *
+     * ⚠️ 這裡**刻意不把 gender 寫進快取鍵**。
+     *    快取裡存的是「中性」文字（模型不知道性別，開頭一律是「您好」），
+     *    稱謂是在**讀出結果的最後一步**才插上去的。
+     *    所以同一張圖的快取可以同時服務三種性別，不必存三份。
+     *    若日後有人改成「把稱謂寫進快取內容」，那就**必須**把 gender 加進鍵，
+     *    否則會發生「先生拿到小姐的稱謂」這種不會報錯的災難。
+     */
+    const addressGender: AddressGender =
+      gender === 'male' || gender === 'female' ? gender : 'unspecified';
+    const honorific = honorificPrefix(addressGender, isEnglish ? 'en' : 'zh-TW');
     console.log(`[LabelBuddy AI] 收到辨識請求（body 解析完成，耗時 ${Date.now() - handlerStart}ms）`);
 
     // ══════════════════════════════════════════════════════════════════
@@ -150,7 +176,7 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
 
     // 學習者身分：決定 AI 的判斷基準（每日參考值）。
-    // 傳入無效值時 getLearnerProfile 會安全退回「長者三高」，因此這裡不需額外防護。
+    // 傳入無效值時 getLearnerProfile 會安全退回「長者」，因此這裡不需額外防護。
     const learnerProfile = getLearnerProfile(profileId);
 
     // 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
@@ -305,6 +331,8 @@ ${promptContext}`;
         };
         // 舊快取可能沒有食育欄位，這裡一併補齊
         ensureEducationFields(cachedData, cachedFacts, language);
+        // 稱謂是最後一步才插上去（快取內容維持中性）
+        applyHonorificToFields(cachedData, honorific, LABEL_TEXT_FIELDS);
         return res.json({ success: true, data: attachReminders(cachedData) });
       }
     } else {
@@ -315,10 +343,11 @@ ${promptContext}`;
     // 只有使用者明確同意（allowCloud）才會走到這裡。
     if (allowCloud) {
       const aiResult = await callAiModel(req, {
-        systemInstruction: buildSystemInstruction(
-          learnerProfile.id,
-          isEnglish ? 'en' : 'zh-TW'
-        ),
+        systemInstruction:
+          buildSystemInstruction(
+            learnerProfile.id,
+            isEnglish ? 'en' : 'zh-TW'
+          ) + buildAddressRule(addressGender, language),
         userPrompt: userPromptText,
         // ⚠️ 文字模式下**絕對不傳圖片** —— 這是隱私承諾的核心：
         //    照片從來沒有離開使用者的裝置，雲端只看得到文字。
@@ -343,7 +372,10 @@ ${promptContext}`;
         aiResult.data.learner_profile_name = profileName(learnerProfile.id, learnerProfile.name, language);
         // 模型漏給食育欄位時用確定性內容補上（由真實 nutrient_facts 推導）
         ensureEducationFields(aiResult.data, cloudFacts, language);
+        // ⚠️ 順序：先寫快取（存**中性**文字），再插稱謂。
+        //    反過來的話，快取裡就會帶著第一位使用者的性別稱謂。
         writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
+        applyHonorificToFields(aiResult.data, honorific, LABEL_TEXT_FIELDS);
         console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
         return res.json({
           success: true,
@@ -389,10 +421,12 @@ ${promptContext}`;
     );
 
     if (!ocr.ok || !ocr.profile) {
+      const failed = buildOcrFailedResult(learnerProfile, ocr, language);
+      applyHonorificToFields(failed, honorific, LABEL_TEXT_FIELDS);
       return res.json({
         success: true,
         data: attachReminders({
-          ...buildOcrFailedResult(learnerProfile, ocr, language),
+          ...failed,
           data_handling: dataHandling,
         }),
       });
@@ -409,6 +443,8 @@ ${promptContext}`;
     );
     // 引擎內部的比對關鍵字維持中文，這裡只把**輸出欄位**轉成英文。
     const localizedResult = translateLocalResult(smartResult, language);
+    // 稱謂最後才插（在翻譯之後，所以不會影響 localEngineEn 的對照表鍵）
+    applyHonorificToFields(localizedResult, honorific, LABEL_TEXT_FIELDS);
 
     return res.json({
       success: true,
@@ -452,26 +488,32 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     // 介面語言（與標籤分析同一套規則：只有明確 'en' 才走英文）
     const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
     const isEnglish = language === 'en';
+    // 稱謂（只影響怎麼稱呼；舊客戶端不帶 → 中性）
+    const genderRaw = req.body.gender;
+    const addressGender: AddressGender =
+      genderRaw === 'male' || genderRaw === 'female' ? genderRaw : 'unspecified';
+    const honorific = honorificPrefix(addressGender, language);
 
     const sugarDisplay = indicators.bloodSugarUnit === 'mg/dL'
       ? `${indicators.bloodSugar} mg/dL`
       : `${indicators.bloodSugar} mmol/L (度)`;
 
-    const promptText = `請幫這位長輩分析他今天量到的身體健康指標：
+    const promptText = `請幫這位使用者分析他今天量到的身體健康指標：
 - 年齡區間：${indicators.ageGroup || '70-79歲長者'}
 - 血壓：上壓 ${indicators.systolicBp} mmHg，下壓 ${indicators.diastolicBp} mmHg
 - 血糖：${sugarDisplay}（狀態：${indicators.bloodSugarTiming === 'fasting' ? '早晨空腹' : '吃飽飯後'}）
 - 尿酸/關節狀況：${indicators.uricAcidStatus}
 - 血脂/膽固醇狀況：${indicators.cholesterolStatus}
 - 腎臟/腳部水腫狀況：${indicators.kidneyStatus}
-- 長輩自覺症狀感受：${(indicators.symptoms || []).join('、') || '無特別不舒服'}
+- 使用者自覺症狀感受：${(indicators.symptoms || []).join('、') || '無特別不舒服'}
 
-請用最通俗、最溫暖的「阿公阿嬤大白話」，清楚告訴他現在身體狀況如何，並給出超實用的「超市買菜指南（什麼不能買、什麼可以買）」與語音朗讀摘要。`;
+請用最通俗、最溫暖的「大白話」，清楚告訴他現在身體狀況如何，並給出超實用的「超市買菜指南（什麼不能買、什麼可以買）」與語音朗讀摘要。`;
 
     const aiResult = await callAiModel(req, {
-      systemInstruction: isEnglish
-        ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
-        : SYSTEM_INSTRUCTION_INDICATORS,
+      systemInstruction:
+        (isEnglish
+          ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
+          : SYSTEM_INSTRUCTION_INDICATORS) + buildAddressRule(addressGender, language),
       userPrompt: promptText,
       temperature: 0.3,
       maxTokens: 1200,
@@ -499,7 +541,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 
       return res.json({
         success: true,
-        data: aiResult.data,
+        data: applyHonorificToIndicators(aiResult.data, honorific),
       });
     }
 
@@ -508,7 +550,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     const smartAnalysis = analyzeSeniorPhysicalIndicators(indicators, language);
     return res.json({
       success: true,
-      data: smartAnalysis,
+      data: applyHonorificToIndicators(smartAnalysis, honorific),
     });
   } catch (error: any) {
     console.error('身體指標處理異常:', error);
@@ -529,7 +571,10 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     }, fallbackLanguage);
     return res.json({
       success: true,
-      data: fallback,
+      data: applyHonorificToIndicators(fallback, honorificPrefix(
+        req.body?.gender === 'male' || req.body?.gender === 'female' ? req.body.gender : 'unspecified',
+        fallbackLanguage
+      )),
     });
   }
   // 走到這裡代表 handler 沒有提早 return（例如 GET 端點直接 res.json）
@@ -546,7 +591,7 @@ export async function handleAskHealthQuestion(body: any, headers: Headers, deps:
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
       return res.status(400).json({
         error: 'INVALID_REQUEST',
-        message: '請輸入阿公阿嬤想問的健康問題喔！',
+        message: '請輸入您想問的健康問題喔！',
       });
     }
 
@@ -555,10 +600,15 @@ export async function handleAskHealthQuestion(body: any, headers: Headers, deps:
     // 介面語言（與標籤／指標同一套規則：只有明確 'en' 才走英文）
     const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
     const isEnglish = language === 'en';
+    // 稱謂（只影響怎麼稱呼；舊客戶端不帶 → 中性）
+    const genderRaw = req.body.gender;
+    const addressGender: AddressGender =
+      genderRaw === 'male' || genderRaw === 'female' ? genderRaw : 'unspecified';
+    const honorific = honorificPrefix(addressGender, language);
 
     let contextInfo = '';
     if (indicators) {
-      contextInfo = `長輩目前量到的身體指標背景：
+      contextInfo = `使用者目前量到的身體指標背景：
 - 血壓：上壓 ${indicators.systolicBp || 130} mmHg，下壓 ${indicators.diastolicBp || 80} mmHg
 - 血糖：${indicators.bloodSugar || 6.0} ${indicators.bloodSugarUnit || 'mmol/L'}（${indicators.bloodSugarTiming === 'fasting' ? '空腹' : '飯後'}）
 - 尿酸痛風：${indicators.uricAcidStatus || '正常'}
@@ -566,16 +616,17 @@ export async function handleAskHealthQuestion(body: any, headers: Headers, deps:
 - 自覺症狀：${(indicators.symptoms || []).join('、') || '無特殊不適'}`;
     }
 
-    const promptText = `長輩的問題是：「${cleanQuestion}」
+    const promptText = `使用者的問題是：「${cleanQuestion}」
 
 ${contextInfo}
 
-請針對長輩的提問與其體況數字，以 100% 通俗大白話、最孝順親切的口吻回答他。清楚說明到底「能不能吃/能不能做」、「為什麼」、「該怎麼吃才安全」，並提供一句話結論與語音朗讀文稿。`;
+請針對使用者的提問與其體況數字，以 100% 通俗大白話、親切但不過度裝熟的口吻回答他。清楚說明到底「能不能吃/能不能做」、「為什麼」、「該怎麼吃才安全」，並提供一句話結論與語音朗讀文稿。`;
 
     const aiResult = await callAiModel(req, {
-      systemInstruction: isEnglish
-        ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
-        : SYSTEM_INSTRUCTION_HEALTH_QA,
+      systemInstruction:
+        (isEnglish
+          ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
+          : SYSTEM_INSTRUCTION_HEALTH_QA) + buildAddressRule(addressGender, language),
       userPrompt: promptText,
       temperature: 0.3,
       maxTokens: 1000,
@@ -583,22 +634,26 @@ ${contextInfo}
 
     if (aiResult) {
       const parsed = aiResult.data;
+      const qaData: any = {
+        question: cleanQuestion,
+        key_takeaway: parsed.key_takeaway,
+        answer: parsed.answer,
+        safe_tips: parsed.safe_tips || [],
+        voice_script: parsed.voice_script || parsed.answer,
+        source: 'cloud_ai',
+      };
+      // ⚠️ QA_TEXT_FIELDS 不含 `question` —— 那是**使用者自己的話**，不能改。
+      applyHonorificToFields(qaData, honorific, QA_TEXT_FIELDS);
       return res.json({
         success: true,
-        data: {
-          question: cleanQuestion,
-          key_takeaway: parsed.key_takeaway,
-          answer: parsed.answer,
-          safe_tips: parsed.safe_tips || [],
-          voice_script: parsed.voice_script || parsed.answer,
-          source: 'cloud_ai',
-        },
+        data: qaData,
       });
     }
 
     // 降級：備用大白話長者問答引擎
     console.log('[LabelBuddy AI] 健康問答啟動本機守護引擎');
     const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators, language);
+    applyHonorificToFields(fallbackAnswer as any, honorific, QA_TEXT_FIELDS);
     return res.json({
       success: true,
       data: fallbackAnswer,
@@ -611,6 +666,14 @@ ${contextInfo}
       req.body?.question || '常見健康保養',
       req.body?.indicators,
       qaFallbackLanguage
+    );
+    applyHonorificToFields(
+      fallbackAnswer as any,
+      honorificPrefix(
+        req.body?.gender === 'male' || req.body?.gender === 'female' ? req.body.gender : 'unspecified',
+        qaFallbackLanguage
+      ),
+      QA_TEXT_FIELDS
     );
     return res.json({
       success: true,

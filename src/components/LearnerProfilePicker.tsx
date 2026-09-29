@@ -21,12 +21,7 @@ import { getAllLearnerProfiles } from '../data/learnerProfiles';
 // 這裡只負責「取值」與介面文字，翻譯資料本身集中在 data/bilingualContent.ts。
 import { useI18n } from '../i18n/I18nContext';
 import { nutrientName } from '../data/bilingual';
-import {
-  profileDisplayName,
-  profileAudience,
-  targetText,
-  targetNote,
-} from '../data/bilingualContent';
+import { profileDisplayName, targetText, targetNote } from '../data/bilingualContent';
 
 interface LearnerProfilePickerProps {
   /** 目前選定的身分 */
@@ -132,9 +127,6 @@ function ProfileCard({
               </span>
             )}
           </div>
-          <p className="text-[16px] text-slate-700 leading-snug mt-1">
-            {profileAudience(profile.id, profile.audience, language)}
-          </p>
         </div>
 
         {/* 未選中時顯示箭頭，提示可點擊 */}

@@ -72,7 +72,7 @@ import type { TranslationKey, Language } from './i18n/translations';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
 // 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
-// 英文介面要換成英文，否則長條圖下方會寫「依『長者三高』的每日參考值計算」。
+// 英文介面要換成英文，否則長條圖下方會寫「依『長者』的每日參考值計算」。
 import {
   profileName as localizedProfileName,
   conditionName as localizedConditionName,
@@ -82,7 +82,6 @@ import {
 // 慢性病與身分的「顯示用」英文對照（2026-09-28 第三階段）。
 // 與 bilingual.ts 的分工：bilingual.ts 給後端提示詞用，這份給畫面用。
 import {
-  conditionBadge as localizedConditionBadge,
   conditionDescription as localizedConditionDescription,
   categoryName as localizedCategoryName,
   profileDisplayName as localizedProfileDisplayName,
@@ -93,7 +92,7 @@ import { getInitialDietRecords } from './data/initialDietRecords';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
 import { HealthQASection } from './components/HealthQASection';
-import { OnboardingFlow, type OnboardingResult } from './components/OnboardingFlow';
+import { OnboardingFlow, type OnboardingResult, type Gender } from './components/OnboardingFlow';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
 import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { NutrientFactBars } from './components/NutrientFactBars';
@@ -184,6 +183,15 @@ const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
  * 所以它不能跳過，否則後面的分析沒有正確的基準。
  */
 const STORAGE_ONBOARDED_KEY = 'labelbuddy_onboarded_v1';
+
+/**
+ * 稱謂用的性別。
+ *
+ * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
+ *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
+ *    沒存過或存了無效值 → `unspecified`，一律用中性的「您好」。
+ */
+const STORAGE_GENDER_KEY = 'labelbuddy_gender_v1';
 
 /** 全部可勾選的慢性病與過敏原（12 項，來源為共用資料檔） */
 const ALL_CONDITIONS = PHYSICAL_INDICATORS;
@@ -353,7 +361,7 @@ export default function App() {
 
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
-   *    未選擇或儲存值損毀時，安全退回「長者三高」，與舊版行為一致。
+   *    未選擇或儲存值損毀時，安全退回「長者」，與舊版行為一致。
    */
   const [learnerProfileId, setLearnerProfileId] = useState<LearnerProfileId>(() => {
     if (typeof window !== 'undefined') {
@@ -394,13 +402,19 @@ export default function App() {
    * （照片不離開裝置、只送文字）之後做的選擇，所以是有效的同意。
    * 其他地方都不得擅自把 cloudConsent 改成 true。
    */
-  const handleOnboardingComplete = ({ profileId, cloudConsent: consent }: OnboardingResult) => {
+  const handleOnboardingComplete = ({
+    profileId,
+    gender: chosenGender,
+    cloudConsent: consent,
+  }: OnboardingResult) => {
     setLearnerProfileId(profileId);
+    setGender(chosenGender);
     setCloudConsent(consent);
     setOnboarded(true);
 
     try {
       localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
+      localStorage.setItem(STORAGE_GENDER_KEY, chosenGender);
       localStorage.setItem(STORAGE_CLOUD_CONSENT_KEY, String(consent));
       localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
     } catch (e) {
@@ -654,6 +668,32 @@ export default function App() {
       return false;
     }
   });
+  /** 稱謂用性別（只影響怎麼稱呼，不影響營養判斷） */
+  const [gender, setGender] = useState<Gender>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_GENDER_KEY);
+      if (stored === 'male' || stored === 'female') return stored;
+      return 'unspecified';
+    } catch {
+      return 'unspecified';
+    }
+  });
+
+  /**
+   * 非長者身分 → 整體字級下調 2px。
+   *
+   * 【為什麼寫在 <html> 上而不是包一層 div】
+   *   縮放規則要蓋過全 App 的字級工具類，寫在根元素最不容易漏掉
+   *   （側邊選單、彈窗、引導頁都是 fixed 定位，包 div 蓋不到）。
+   *   實際的 px 對應在 index.css，這裡只負責切換屬性。
+   *
+   * ⚠️ 這裡刻意**只依身分**，不看年齡 —— 我們沒有使用者的年齡資料，
+   *    而「長者」這個身分本身就代表需要大字。
+   */
+  useEffect(() => {
+    const compact = learnerProfileId !== 'senior';
+    document.documentElement.setAttribute('data-density', compact ? 'compact' : 'comfortable');
+  }, [learnerProfileId]);
   const latencyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTickRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -890,6 +930,9 @@ export default function App() {
           // 介面語言（2026-09-28）：分析結果的文字由後端產生，
           // 不傳的話切到英文後會看到「英文介面 + 中文結論」。
           language,
+          // 稱謂（2026-09-29）：只影響後端要怎麼稱呼使用者（先生／小姐／您好），
+          // 不影響任何營養判斷，也不會改變快取（快取存的是中性文字）。
+          gender,
           // 【隱私優先】預設 true → 完全不呼叫雲端，由本機規則引擎判斷。
           // 只有使用者自己打開同意開關（cloudConsent）才會把**文字**送給雲端 AI。
           localOnly: !cloudConsent,
@@ -2215,6 +2258,7 @@ export default function App() {
               <VitalMetricsSection
                 indicators={physicalIndicators}
                 onChangeIndicators={handleUpdateIndicators}
+                gender={gender}
               />
             </SettingsSection>
 
@@ -2226,7 +2270,7 @@ export default function App() {
               title={t('settings.qa.title')}
               summary={t('settings.qa.summary')}
             >
-              <HealthQASection indicators={physicalIndicators} />
+              <HealthQASection indicators={physicalIndicators} gender={gender} />
             </SettingsSection>
 
             {/* 第二部分：常見慢性病與過敏原把關清單 */}
@@ -2330,13 +2374,6 @@ export default function App() {
                                   }`}
                                 >
                                   {conditionName(cond.id, language)}
-                                </span>
-                                <span
-                                  className={`text-[16px] font-black px-[8px] py-[2px] rounded-full whitespace-nowrap shrink-0 ${
-                                    isAllergen ? 'bg-[#A32D2D] text-white' : 'bg-blue-900 text-white'
-                                  }`}
-                                >
-                                  {localizedConditionBadge(cond.id, cond.badge, language)}
                                 </span>
                               </div>
                               {/* 44px checkbox：純視覺，不可點（整列已是 tap target） */}
@@ -2470,17 +2507,6 @@ export default function App() {
                                     }`}
                                   >
                                     {conditionName(cond.id, language)}
-                                  </span>
-                                  <span
-                                    className={`text-[16px] font-black px-[8px] py-[2px] rounded-full whitespace-nowrap shrink-0 ${
-                                      isAllergen
-                                        ? severity === 'mild'
-                                          ? 'bg-[#FAEEDA] text-[#412402] border border-[#854F0B]'
-                                          : 'bg-[#A32D2D] text-white'
-                                        : 'bg-slate-200 text-slate-700'
-                                    }`}
-                                  >
-                                    {localizedConditionBadge(cond.id, cond.badge, language)}
                                   </span>
                                 </div>
                                 {/* 後果等級用文字明說，避免長者以為過敏原只是「注意一下」 */}

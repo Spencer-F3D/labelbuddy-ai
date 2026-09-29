@@ -32,35 +32,24 @@ import type { DietRecord, KnowledgeTopic, LearnerProfileId } from '../types';
  * 一、學習者身分
  * ========================================================================= */
 
-/** 身分名稱與對象說明（畫面用） */
-export const PROFILE_UI_EN: Record<string, { name: string; audience: string }> = {
-  senior: {
-    name: 'Senior (3 highs)',
-    audience:
-      'Older adults with high blood pressure, blood sugar or cholesterol, and family members helping them watch sodium and sugar',
-  },
-  child: {
-    name: 'Child',
-    audience: 'Children aged 6 to 12 who are still growing, and parents choosing snacks for them',
-  },
-  teen: {
-    name: 'Teenager',
-    audience:
-      'Secondary students aged 13 to 18 who eat out often, drink sweetened drinks and stay up late',
-  },
-  fitness: {
-    name: 'Muscle building',
-    audience: 'People who lift weights and want to gain muscle or keep body fat down',
-  },
-  takeout: {
-    name: 'Frequent takeout',
-    audience:
-      'Office workers who mostly eat delivery and convenience-store food, with little time to cook',
-  },
-  student: {
-    name: 'Student',
-    audience: 'Students on a limited budget who often eat snacks and sugary drinks',
-  },
+/**
+ * 身分名稱（畫面用）
+ *
+ * ⚠️ 這裡**只有名稱，沒有說明**。
+ *    原本每個身分下方還有一句「適用對象」說明，已於 2026-09-29 依使用者要求移除：
+ *    名稱本身已經夠清楚，多那一行只是讓卡片變長、要滑更久。
+ *
+ * ⚠️ 名稱措辭是**使用者明確要求**的，不要自行「補回」：
+ *    - `senior` 不得寫成「Senior (3 highs)」—— 把長者貼上「三高」標籤不禮貌。
+ *    - `takeout` 是「年輕人」，不是「外食族」（原文 Frequent takeout 已改）。
+ */
+export const PROFILE_UI_EN: Record<string, { name: string }> = {
+  senior: { name: 'Senior' },
+  child: { name: 'Child' },
+  teen: { name: 'Teenager' },
+  fitness: { name: 'Muscle building' },
+  takeout: { name: 'Young adult' },
+  student: { name: 'Student' },
 };
 
 /** 取身分名稱（畫面用）。找不到時退回中文原名。 */
@@ -71,16 +60,6 @@ export function profileDisplayName(
 ): string {
   if (language !== 'en') return fallback;
   return PROFILE_UI_EN[profileId]?.name ?? fallback;
-}
-
-/** 取身分的對象說明。找不到時退回中文原文。 */
-export function profileAudience(
-  profileId: string,
-  fallback: string,
-  language: Language
-): string {
-  if (language !== 'en') return fallback;
-  return PROFILE_UI_EN[profileId]?.audience ?? fallback;
 }
 
 /* ===========================================================================
@@ -175,24 +154,15 @@ export function targetNote(zh: string, language: Language): string {
 }
 
 /* ===========================================================================
- * 三、慢性病與過敏原（畫面用：徽章 + 說明）
+ * 三、慢性病與過敏原（畫面用：說明）
+ *
+ * ⚠️ 原本每個項目名稱後面還有一個「徽章短標」（嚴控高鈉／溫和不刺激／
+ *    過敏原警示…），已於 2026-09-29 依使用者要求**整組移除**：
+ *    那些字是我們自己貼上去的評語，不是食品本身的資訊，
+ *    放在名稱旁邊只會讓列變擠、還要為 320px 窄機犧牲字級。
+ *    所以 `badge` 欄位、`CONDITION_BADGE_EN`、`conditionBadge()` 一併刪除。
+ *    **不要因為「少了什麼」而把它加回來。**
  * ========================================================================= */
-
-/** 徽章短標（4～5 字，必須塞得進膠囊裡） */
-export const CONDITION_BADGE_EN: Record<string, string> = {
-  hypertension: 'Strict sodium control',
-  diabetes: 'Strict sugar control',
-  hyperlipidemia: 'Watch saturated fat',
-  gout: 'Avoid purines',
-  kidney_disease: 'Low sodium, low potassium',
-  cardiovascular: 'Heart-friendly',
-  gerd: 'Mild, non-irritating',
-  osteoporosis: 'Protect calcium',
-  peanut_allergy: 'Allergen alert',
-  seafood_allergy: 'Seafood allergen',
-  lactose_intolerance: 'Avoid dairy',
-  gluten_sensitivity: 'Gluten-free check',
-};
 
 /** 說明文字（卡片展開後顯示） */
 export const CONDITION_DESCRIPTION_EN: Record<string, string> = {
@@ -217,16 +187,6 @@ export const CONDITION_DESCRIPTION_EN: Record<string, string> = {
   lactose_intolerance: 'Checks for milk, whey protein, casein and butter',
   gluten_sensitivity: 'Checks for wheat, barley, rye and oat ingredients',
 };
-
-/** 取慢性病徽章。找不到英文時退回中文原文。 */
-export function conditionBadge(
-  conditionId: string,
-  fallback: string,
-  language: Language
-): string {
-  if (language !== 'en') return fallback;
-  return CONDITION_BADGE_EN[conditionId] ?? fallback;
-}
 
 /** 取慢性病說明。找不到英文時退回中文原文。 */
 export function conditionDescription(

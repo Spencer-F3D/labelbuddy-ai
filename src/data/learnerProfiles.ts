@@ -96,11 +96,10 @@ const TEEN_SUGAR: NutritionTarget = {
  * ------------------------------------------------------------------------- */
 
 const PROFILES: LearnerProfile[] = [
-  /* ======================= 1. 長者三高 ======================= */
+  /* ======================= 1. 長者 ======================= */
   {
     id: 'senior',
-    name: '長者三高',
-    audience: '有高血壓、高血糖或高血脂的長輩，以及需要控制鈉、糖攝取的家人',
+    name: '長者',
     emoji: '👴',
     accent: 'blue',
     focusSummary: '吃得安心、不要讓血壓血糖飆高，也不希望被複雜的數字搞混',
@@ -137,7 +136,6 @@ const PROFILES: LearnerProfile[] = [
   {
     id: 'child',
     name: '兒童',
-    audience: '6 到 12 歲、正在發育的孩子，以及幫孩子挑零食的家長',
     emoji: '🧒',
     accent: 'sky',
     focusSummary: '想知道這個零食會不會影響發育，糖和添加物多不多，能不能常吃',
@@ -180,7 +178,6 @@ const PROFILES: LearnerProfile[] = [
   {
     id: 'teen',
     name: '青少年',
-    audience: '13 到 18 歲的國高中生，外食多、愛喝手搖飲、常熬夜',
     emoji: '🧑‍🎓',
     accent: 'violet',
     focusSummary: '想知道手搖飲、泡麵、宵夜怎麼選負擔比較小，會不會影響精神與發育',
@@ -223,7 +220,6 @@ const PROFILES: LearnerProfile[] = [
   {
     id: 'fitness',
     name: '健身增肌',
-    audience: '有重量訓練習慣、想增加肌肉量或控制體脂的人',
     emoji: '💪',
     accent: 'orange',
     focusSummary: '想知道這個產品蛋白質夠不夠、糖和熱量會不會拖累體態',
@@ -260,11 +256,10 @@ const PROFILES: LearnerProfile[] = [
     preferredTopics: ['basics', 'profiles', 'dangers', 'shopping'],
   },
 
-  /* ======================= 5. 年輕外食 ======================= */
+  /* ======================= 5. 年輕人 ======================= */
   {
     id: 'takeout',
-    name: '年輕外食',
-    audience: '三餐多靠外送與便利商店解決、想吃得健康但沒時間煮飯的上班族',
+    name: '年輕人',
     emoji: '🍱',
     accent: 'emerald',
     focusSummary: '想知道便利商店與外送餐點裡，哪一個負擔比較小、怎麼搭配才均衡',
@@ -305,7 +300,6 @@ const PROFILES: LearnerProfile[] = [
   {
     id: 'student',
     name: '學生',
-    audience: '在學學生與青少年，預算有限、常吃零食與含糖飲料',
     emoji: '🎓',
     accent: 'purple',
     focusSummary: '想知道零食飲料怎麼選、會不會影響發育與上課精神，而且要在預算內',
@@ -356,7 +350,7 @@ const PROFILE_MAP: Record<LearnerProfileId, LearnerProfile> = PROFILES.reduce(
   {} as Record<LearnerProfileId, LearnerProfile>
 );
 
-/** 預設身分：未選擇時一律採長者三高（與舊版行為一致） */
+/** 預設身分：未選擇時一律採長者（與舊版行為一致） */
 export const DEFAULT_PROFILE_ID: LearnerProfileId = 'senior';
 
 /** 取得指定身分的完整定義；傳入無效值時安全退回預設身分 */

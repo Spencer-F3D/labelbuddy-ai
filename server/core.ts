@@ -709,7 +709,7 @@ export async function callAiModel(
 // 【設計說明】提示詞拆成「共用規則」與「身分段落」兩部分：
 //   - 共用規則（術語、字數上限、JSON schema、繁簡規範）與身分無關，全長共用一份。
 //   - 身分段落則由 buildSystemInstruction(profileId) 動態注入，
-//     讓同一個模型在「長者三高」與「健身增肌」兩種情境下給出不同的判斷基準。
+//     讓同一個模型在「長者」與「健身增肌」兩種情境下給出不同的判斷基準。
 //   這樣做的好處是新增身分時只要改 src/data/learnerProfiles.ts，提示詞自動跟上。
 
 /** 所有身分共用的規則段落（術語、語氣、長度限制、輸出格式） */
@@ -804,7 +804,7 @@ OUTPUT LANGUAGE: ENGLISH (this overrides rule 1 and rule 7 above)
 ════════════════════════════════════════════════════════════════
 1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
    anywhere in your output — not in titles, summaries, tips, ingredient names, or condition names.
-2. The user reading this is an older adult or a student, and the text is READ ALOUD to them.
+2. The text is READ ALOUD to the user.
    Use short, everyday words. Avoid medical jargon. Write the way a kind family member would explain it.
 3. The 鈉/鈣 (sodium/calcium) terminology trap described in rule 2 above does NOT apply in English —
    "sodium" and "calcium" are clearly different words. But DO be precise about which one you mean.
@@ -826,7 +826,7 @@ OUTPUT LANGUAGE: ENGLISH (this overrides rule 1 and rule 7 above)
 /**
  * 依學習者身分組裝完整的系統提示詞。
  *
- * @param profileId 前端傳來的學習者身分（可能為 undefined 或無效值，會安全退回「長者三高」）
+ * @param profileId 前端傳來的學習者身分（可能為 undefined 或無效值，會安全退回「長者」）
  * @returns 可直接送給模型的完整系統提示詞
  */
 export function buildSystemInstruction(
@@ -863,7 +863,6 @@ export function buildSystemInstruction(
   return `You are LabelBuddy AI, an expert, caring, and protective supermarket food label analyzer.
 
 【本次辨識的對象身分】${profileNameForPrompt}（${profile.emoji}）
-【這個身分是誰】${profile.audience}
 【他最在意的事】${profile.focusSummary}
 
 【你的角色語氣】${profile.aiPersona}
@@ -965,6 +964,148 @@ export function ensureEducationFields(
 }
 
 /**
+ * 稱謂用的性別。
+ *
+ * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
+ *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
+ */
+export type AddressGender = 'male' | 'female' | 'unspecified';
+
+/**
+ * 依性別與語言決定「招呼語前綴」。
+ *
+ * 【為什麼英文一律回空字串 —— 這不是漏做】
+ *   中文的「先生您好」是自然的招呼；英文把 "Mr" 接在 "Hello" 前面
+ *   （"Mr Hello!"）是錯的。英文的禮貌招呼本來就只有 "Hello"，
+ *   沒有對應的稱謂慣例。所以這裡**刻意**只讓中文生效。
+ */
+export function honorificPrefix(
+  gender: AddressGender | undefined | null,
+  language: 'zh-TW' | 'en'
+): string {
+  if (language === 'en') return '';
+  if (gender === 'male') return '先生';
+  if (gender === 'female') return '小姐';
+  // unspecified → 不加稱謂，維持中性的「您好」
+  return '';
+}
+
+/**
+ * 產生「怎麼稱呼使用者」的提示詞片段（雲端路徑用）。
+ *
+ * 【為什麼要寫進提示詞，不能只靠後處理】
+ *   後處理只能改「以『您好』開頭」的字串。實測發現免費模型有時
+ *   直接從結論開始寫（例如「咖啡因會讓心跳加快…」），整段沒有招呼語 ——
+ *   那樣後處理就無從插入稱謂，同一個使用者每次拿到的稱呼會**時有時無**。
+ *   寫進提示詞讓模型自然產出招呼語；`applyHonorific` 則當作最後保證。
+ *   兩者不會重複加：模型若已寫「先生您好」，後處理的 `^\s*您好` 就不會命中。
+ *
+ * 英文一律回空字串 —— 英文沒有「Mr + Hello」這種稱謂慣例（見 honorificPrefix）。
+ */
+export function buildAddressRule(
+  gender: AddressGender | undefined | null,
+  language: 'zh-TW' | 'en'
+): string {
+  if (language === 'en') return '';
+  if (gender === 'male') {
+    return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n使用者的稱謂是「先生」。你的**第一句話必須以「先生您好」開頭**。\n絕對不可以使用 阿公、阿伯、爺爺、奶奶 等任何長輩稱呼。\n「你」一律寫成「您」。`;
+  }
+  if (gender === 'female') {
+    return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n使用者的稱謂是「小姐」。你的**第一句話必須以「小姐您好」開頭**。\n絕對不可以使用 阿婆、阿嬤、奶奶、阿姨 等任何長輩稱呼。\n「你」一律寫成「您」。`;
+  }
+  return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n你不知道使用者的性別與稱謂，請用中性的「您好」，**不要加任何稱謂**（不要寫先生、小姐、阿公、阿婆）。\n「你」一律寫成「您」。`;
+}
+
+/**
+ * 把稱謂插進「開頭的第一個『您好』」。
+ *
+ * 【為什麼用字串後處理，而不是叫模型自己寫】
+ *   同一段文字有三條產生路徑（雲端 AI／快取命中／本機規則引擎），
+ *   格式各不相同。要求每一條都記得帶稱謂，遲早會漏一條 —— 而且**不會報錯**，
+ *   只會偶爾少一個稱謂，根本測不出來。
+ *   集中在結果輸出的最後一步做，三條路徑一次涵蓋。
+ *
+ * 【為什麼只認「開頭」的『您好』】
+ *   內文也可能出現「您好」（例如引述、例句）。
+ *   只改開頭那一個，才不會動到內文。
+ *
+ * 【不以「您好」開頭的字串一律不動】
+ *   例如「請注意！有在吃降血壓藥的話…」或「不好意思，這張照片看不清楚…」。
+ *   這正是使用者要的「不寫稱呼也可以」—— 硬塞稱謂反而突兀。
+ */
+export function applyHonorific(text: unknown, prefix: string): unknown {
+  if (!prefix || typeof text !== 'string') return text;
+  if (!/^\s*您好/.test(text)) return text;
+  return text.replace('您好', `${prefix}您好`);
+}
+
+/**
+ * 對結果物件的指定欄位套用稱謂（支援字串與字串陣列）。
+ *
+ * 【為什麼要明列欄位，而不是遞迴走訪整個物件】
+ *   遞迴會連**使用者自己的輸入**一起改（例如他的提問「您好，我想問…」
+ *   會變成「先生您好，我想問…」）—— 那是改到使用者的話，不能接受。
+ *   所以只動我們自己產生的欄位。
+ */
+export function applyHonorificToFields(
+  obj: Record<string, any> | null | undefined,
+  prefix: string,
+  fields: readonly string[]
+): void {
+  if (!prefix || !obj) return;
+  for (const f of fields) {
+    const v = obj[f];
+    if (typeof v === 'string') {
+      obj[f] = applyHonorific(v, prefix);
+    } else if (Array.isArray(v)) {
+      obj[f] = v.map((x) => applyHonorific(x, prefix));
+    }
+  }
+}
+
+/** 標籤分析結果中「後端產生、會被朗讀或顯示」的文字欄位 */export const LABEL_TEXT_FIELDS = [
+  'warning_title',
+  'plain_summary',
+  'alternative_advice',
+  'knowledge_point',
+  'label_reading_tip',
+  'daily_limit_context',
+  'nutrition_concerns',
+  'ingredients_detected',
+] as const;
+
+/** 生理指標分析結果的文字欄位（不含巢狀的 supermarket_rules，另外處理） */
+export const INDICATOR_TEXT_FIELDS = [
+  'status_title',
+  'simple_explanation',
+  'voice_summary',
+  'daily_care_tips',
+] as const;
+
+/** 健康問答結果的文字欄位 */
+export const QA_TEXT_FIELDS = ['key_takeaway', 'answer', 'safe_tips', 'voice_script'] as const;
+
+/**
+ * 生理指標結果的完整套用（含 supermarket_rules 的兩個陣列）。
+ *
+ * 獨立成一支是因為 supermarket_rules 是**巢狀物件**，
+ * 上面的通用函式只處理頂層欄位，不拆巢狀。
+ */
+export function applyHonorificToIndicators(data: Record<string, any>, prefix: string): Record<string, any> {
+  applyHonorificToFields(data, prefix, INDICATOR_TEXT_FIELDS);
+  const rules = data?.supermarket_rules;
+  if (prefix && rules && typeof rules === 'object') {
+    if (Array.isArray(rules.do_not_buy)) {
+      rules.do_not_buy = rules.do_not_buy.map((x: unknown) => applyHonorific(x, prefix));
+    }
+    if (Array.isArray(rules.recommended_to_buy)) {
+      rules.recommended_to_buy = rules.recommended_to_buy.map((x: unknown) => applyHonorific(x, prefix));
+    }
+  }
+  return data;
+}
+
+/**
  * 離線辨識讀不到足夠欄位時的回應。
  *
  * 【為什麼不給紅黃綠結論】
@@ -1024,32 +1165,40 @@ export function buildOcrFailedResult(
  * 兩邊各留一份遲早會漂移。
  * ------------------------------------------------------------------------- */
 
-export const SYSTEM_INSTRUCTION_INDICATORS = `You are a warm, gentle, patient family doctor and loving grandchild talking directly to an elderly grandfather or grandmother (阿公/阿婆, aged 65-85).
+export const SYSTEM_INSTRUCTION_INDICATORS = `You are a warm, gentle, patient family doctor speaking directly to the person using this app.
+
+⚠️ HOW TO ADDRESS THEM — read this twice, it is a hard rule:
+   The reader may be ANY age: an older adult, a teenager, a child, or a young office worker.
+   NEVER assume they are elderly. NEVER use grandparent terms — 阿公、阿婆、阿嬤、阿伯、爺爺、奶奶 are all FORBIDDEN.
+   Address them neutrally. Start your first sentence with 「您好」 — the exact form of address is
+   fixed by the 「怎麼稱呼使用者」 rule appended at the very end of this prompt, so follow that.
+   Whenever you would say "you", write 「您」. That is enough warmth — you do not need a nickname.
+   Getting this wrong is worse than being impersonal: calling a 15-year-old 阿公 is insulting.
 The senior is entering their home measurements or body indicators: blood pressure (上壓/下壓), blood sugar (血糖), uric acid (尿酸/關節), cholesterol (血脂/血管油), and physical feelings/symptoms.
 
-CRITICAL RULES FOR ELDERLY UNDERSTANDING:
+CRITICAL RULES FOR BEING EASY TO UNDERSTAND:
 1. USE ONLY SUPER SIMPLE, EVERYDAY, COLLOQUIAL WORDS (純大白話！禁止任何難懂的醫學化學名詞).
    - NEVER say "動脈粥狀硬化", say "血管塞住、血流不順"
    - NEVER say "收縮壓舒張壓", say "上壓、下壓"
    - NEVER say "糖化血色素或胰島素抗性", say "身體代謝糖分變慢、血糖太高"
    - NEVER say "低密度脂蛋白膽固醇", say "壞油、油卡在血管壁"
    - NEVER say "高普林結晶沉積", say "喝太濃的肉湯骨髓，腳趾關節會紅腫痛風"
-   - NEVER say "腎絲球過濾負擔", say "吃太鹹或化學粉，老人家腰子排不出去會水腫"
-2. Always speak with love, warmth, and respect (阿公、阿婆您好！孫子/醫生幫您看看...).
+   - NEVER say "腎絲球過濾負擔", say "吃太鹹或化學粉，腎臟排不出去會水腫"
+2. Always speak with love, warmth, and respect (您好！醫生幫您看看...).
 3. Specifically tell them what to buy and what NEVER to buy when grocery shopping at the supermarket based on their exact numbers!
 4. Provide practical, concrete daily care tips (drink warm water, walk 20 min, sleep early).
-5. BE CONCISE — this text is read aloud to an elder. simple_explanation at most 120 Chinese characters, voice_summary at most 120 Chinese characters, each array item at most 20 Chinese characters, at most 3 items per array.
+5. BE CONCISE — this text is read aloud. simple_explanation at most 120 Chinese characters, voice_summary at most 120 Chinese characters, each array item at most 20 Chinese characters, at most 3 items per array.
 6. Output MUST be ONLY valid JSON, no markdown fences, matching this schema:
 {
   "status_level": "green" | "yellow" | "red",
-  "status_title": "大字白話標題 (例如：⚠️ 阿公阿嬤注意喔！今天量到的指標有稍微偏高)",
+  "status_title": "大字白話標題 (例如：⚠️ 請注意！今天量到的指標有稍微偏高)",
   "simple_explanation": "100% 通俗大白話解釋目前的身體數字（血壓、血糖、症狀）到底代表什麼意思",
   "supermarket_rules": {
     "do_not_buy": ["超商千萬不能買的具體食物 (如：❌ 泡麵、罐頭醬菜，因為太鹹血壓會飆高)"],
     "recommended_to_buy": ["超商可以安心買的具體食物 (如：✅ 傳統豆腐、新鮮青菜，幫助排鹽顧血管)"]
   },
   "daily_care_tips": ["生活貼心小叮嚀 (如：喝溫水、睡飽覺、散步)"],
-  "voice_summary": "專為語音朗讀設計的親切對話（像孫子在耳邊關心阿公阿嬤一樣）",
+  "voice_summary": "專為語音朗讀設計的親切對話（像家人關心您一樣）",
   "linked_conditions": ["連動到食品標籤掃描的關注重點 (例如：高血壓(嚴防太鹹)、糖尿病(嚴防高糖))"]
 }`;
 
@@ -1073,7 +1222,7 @@ OUTPUT LANGUAGE: ENGLISH (this overrides the Chinese output rules above)
 1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
    anywhere in your output — not in the title, the explanation, the shopping lists, the tips,
    the voice summary, or the linked conditions.
-2. The reader is an older adult and this text is READ ALOUD to them. Use short everyday words,
+2. The text is READ ALOUD to the user. Use short everyday words,
    the way a kind family member would explain it. Never use medical jargon.
 3. Keep the SAME JSON keys as the schema above — only the VALUES change to English.
 4. Length limits (English words replace the Chinese character limits above):
@@ -1087,10 +1236,18 @@ OUTPUT LANGUAGE: ENGLISH (this overrides the Chinese output rules above)
    label analysis uses (e.g. "Hypertension", "Diabetes", "High blood cholesterol"), so the
    two features stay consistent.`;
 
-export const SYSTEM_INSTRUCTION_HEALTH_QA = `You are a warm, gentle, patient family doctor and loving grandchild speaking directly to an elderly grandfather or grandmother (阿公/阿婆, aged 65-85).
-The senior is asking a common health or diet question (e.g., "我有高血壓，喝咖啡可以嗎？", "血糖高可以吃香蕉嗎？", "吃降血壓藥可以吃柚子嗎？", "痛風可以吃豆腐嗎？").
+export const SYSTEM_INSTRUCTION_HEALTH_QA = `You are a warm, gentle, patient family doctor speaking directly to the person using this app.
 
-CRITICAL RULES FOR ELDERLY UNDERSTANDING:
+⚠️ HOW TO ADDRESS THEM — read this twice, it is a hard rule:
+   The reader may be ANY age: an older adult, a teenager, a child, or a young office worker.
+   NEVER assume they are elderly. NEVER use grandparent terms — 阿公、阿婆、阿嬤、阿伯、爺爺、奶奶 are all FORBIDDEN.
+   Address them neutrally. Start your first sentence with 「您好」 — the exact form of address is
+   fixed by the 「怎麼稱呼使用者」 rule appended at the very end of this prompt, so follow that.
+   Whenever you would say "you", write 「您」. That is enough warmth — you do not need a nickname.
+   Getting this wrong is worse than being impersonal: calling a 15-year-old 阿公 is insulting.
+The user is asking a common health or diet question (e.g., "我有高血壓，喝咖啡可以嗎？", "血糖高可以吃香蕉嗎？", "吃降血壓藥可以吃柚子嗎？", "痛風可以吃豆腐嗎？").
+
+CRITICAL RULES FOR BEING EASY TO UNDERSTAND:
 1. USE 100% COLLOQUIAL EVERYDAY WORDS (純大白話！禁止任何難懂的醫學化學名詞).
    - NEVER use words like "交感神經亢奮、血管阻力、腎絲球、GI指數、細胞色素P450、自由基".
    - Say "心臟跳比較快、血管繃緊、肚子吸收糖分太快血糖衝上去、柚子會讓藥效突然暴增四倍容易頭暈摔倒".
@@ -1098,9 +1255,9 @@ CRITICAL RULES FOR ELDERLY UNDERSTANDING:
    - "key_takeaway": A direct, bold, plain conclusion in one single sentence (e.g. "🟡 可以喝一點點，但每天最多一杯淡咖啡，千萬不要加糖和奶精！")
    - "answer": Warm, loving, conversational explanation. Break down practical dos and don'ts clearly.
    - "safe_tips": 2 to 3 actionable, bulleted practical tips.
-   - "voice_script": Spoken script formatted for text-to-speech, addressing them affectionately like a loving grandchild.
-3. If the senior provided their specific physical measurements (e.g. systolic BP, blood sugar), personalize your answer to their exact numbers!
-4. BE CONCISE — this text is read aloud to an elder. key_takeaway at most 40 Chinese characters, answer at most 150 Chinese characters, voice_script at most 150 Chinese characters, at most 3 safe_tips each at most 20 Chinese characters.
+   - "voice_script": Spoken script formatted for text-to-speech, warm and natural, but with NO grandparent terms.
+3. If the user provided their specific physical measurements (e.g. systolic BP, blood sugar), personalize your answer to their exact numbers!
+4. BE CONCISE — this text is read aloud. key_takeaway at most 40 Chinese characters, answer at most 150 Chinese characters, voice_script at most 150 Chinese characters, at most 3 safe_tips each at most 20 Chinese characters.
 5. Output MUST be ONLY valid JSON, no markdown fences, matching this schema:
 {
   "key_takeaway": "string",
@@ -1123,7 +1280,7 @@ OUTPUT LANGUAGE: ENGLISH (this overrides the Chinese output rules above)
 ════════════════════════════════════════════════════════════════
 1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
    anywhere in your output — not in the takeaway, the explanation, the tips, or the voice script.
-2. The reader is an older adult and the answer is READ ALOUD to them. Use short everyday words,
+2. The answer is READ ALOUD to the user. Use short everyday words,
    the way a kind family member would explain it. Never use medical jargon.
 3. Keep the SAME JSON keys as the schema above — only the VALUES change to English.
 4. Length limits (English words replace the Chinese character limits above):

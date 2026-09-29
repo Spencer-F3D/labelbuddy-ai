@@ -31,12 +31,28 @@ import {
   ArrowLeft,
   Check,
 } from 'lucide-react';
-import { LearnerProfileId } from '../types';
+import { AddressGender, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
 
+/**
+ * 性別。
+ *
+ * 【為什麼要問，以及為什麼一定要有「不指定」】
+ *   中文的稱謂分性別（先生／小姐），AI 回饋與語音都要用對才不失禮。
+ *   但這題**不該強迫作答** —— 使用者可能不想講、也可能覺得沒必要。
+ *   所以第三個選項不是裝飾，是為了讓「不想說」也能走下去。
+ *   `unspecified` 時一律用中性的「您好」，不要猜。
+ *
+ * 【為什麼是別名而不是重新定義一次】
+ *   型別定義在 `src/types.ts`，與後端 `server/core.ts` 的 AddressGender
+ *   對應。這裡保留 `Gender` 這個名字，只是為了讓既有 import 不用改。
+ */
+export type Gender = AddressGender;
+
 export interface OnboardingResult {
   profileId: LearnerProfileId;
+  gender: Gender;
   cloudConsent: boolean;
 }
 
@@ -56,11 +72,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const { t, language } = useI18n();
   const [step, setStep] = useState(0);
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
+  const [gender, setGender] = useState<Gender>('unspecified');
   const [cloudConsent, setCloudConsent] = useState(true);
 
   const isLast = step === TOTAL_STEPS - 1;
 
-  const finish = () => onComplete({ profileId, cloudConsent });
+  const finish = () => onComplete({ profileId, gender, cloudConsent });
+
+  // ⚠️ 用 `as const` 讓 key 成為字面型別 —— `t()` 只接受合法的翻譯鍵，
+  //    寫成 string 會編譯失敗（這正是型別強制同步的價值）。
+  const GENDER_OPTIONS = [
+    { id: 'male', key: 'onboard.genderMale', emoji: '👨' },
+    { id: 'female', key: 'onboard.genderFemale', emoji: '👩' },
+    { id: 'unspecified', key: 'onboard.genderNone', emoji: '🙂' },
+  ] as const;
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
@@ -100,6 +125,40 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               </div>
 
               <LearnerProfilePicker selectedId={profileId} onSelect={setProfileId} />
+
+              {/* 性別：只影響「怎麼稱呼您」，不影響任何營養判斷。
+                  ⚠️ 不要把它跟身分混在一起 —— 身分決定門檻，性別只決定稱謂。 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-3">
+                <div>
+                  <h2 className="text-[19px] font-black text-slate-950">
+                    {t('onboard.genderTitle')}
+                  </h2>
+                  <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
+                    {t('onboard.genderBody')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {GENDER_OPTIONS.map((opt) => {
+                    const on = gender === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setGender(opt.id)}
+                        aria-pressed={on}
+                        className={`min-h-[52px] px-4 py-2 rounded-xl text-[18px] font-black flex items-center gap-2 cursor-pointer border-2 transition-all active:scale-[0.97] ${
+                          on
+                            ? 'bg-blue-900 border-blue-900 text-white'
+                            : 'bg-white border-slate-400 text-slate-900'
+                        }`}
+                      >
+                        <span aria-hidden="true">{opt.emoji}</span>
+                        {t(opt.key)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
 
