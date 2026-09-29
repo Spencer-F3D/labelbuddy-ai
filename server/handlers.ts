@@ -38,6 +38,7 @@ import {
   SYSTEM_INSTRUCTION_HEALTH_QA,
   SYSTEM_INSTRUCTION_INDICATORS,
   ENGLISH_OUTPUT_OVERRIDE_INDICATORS,
+  ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA,
   writeCache,
   type ApiResult,
   type CoreDeps,
@@ -551,6 +552,10 @@ export async function handleAskHealthQuestion(body: any, headers: Headers, deps:
 
     const cleanQuestion = question.trim();
 
+    // 介面語言（與標籤／指標同一套規則：只有明確 'en' 才走英文）
+    const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
+    const isEnglish = language === 'en';
+
     let contextInfo = '';
     if (indicators) {
       contextInfo = `長輩目前量到的身體指標背景：
@@ -568,7 +573,9 @@ ${contextInfo}
 請針對長輩的提問與其體況數字，以 100% 通俗大白話、最孝順親切的口吻回答他。清楚說明到底「能不能吃/能不能做」、「為什麼」、「該怎麼吃才安全」，並提供一句話結論與語音朗讀文稿。`;
 
     const aiResult = await callAiModel(req, {
-      systemInstruction: SYSTEM_INSTRUCTION_HEALTH_QA,
+      systemInstruction: isEnglish
+        ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
+        : SYSTEM_INSTRUCTION_HEALTH_QA,
       userPrompt: promptText,
       temperature: 0.3,
       maxTokens: 1000,
@@ -591,14 +598,20 @@ ${contextInfo}
 
     // 降級：備用大白話長者問答引擎
     console.log('[LabelBuddy AI] 健康問答啟動本機守護引擎');
-    const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators);
+    const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators, language);
     return res.json({
       success: true,
       data: fallbackAnswer,
     });
   } catch (error: any) {
     console.error('處理健康問題時發生錯誤:', error);
-    const fallbackAnswer = answerSeniorHealthQuestion(req.body?.question || '常見健康保養', req.body?.indicators);
+    // ⚠️ language 宣告在 try 內，catch 取不到 → 這裡重算，否則英文模式遇到例外會冒中文
+    const qaFallbackLanguage: 'zh-TW' | 'en' = req.body?.language === 'en' ? 'en' : 'zh-TW';
+    const fallbackAnswer = answerSeniorHealthQuestion(
+      req.body?.question || '常見健康保養',
+      req.body?.indicators,
+      qaFallbackLanguage
+    );
     return res.json({
       success: true,
       data: fallbackAnswer,

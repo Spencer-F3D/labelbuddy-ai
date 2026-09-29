@@ -13,8 +13,24 @@ import { SeniorPhysicalIndicators, HealthQuestionAnswer } from '../src/types';
 
 export function answerSeniorHealthQuestion(
   question: string,
-  indicators?: Partial<SeniorPhysicalIndicators>
+  indicators?: Partial<SeniorPhysicalIndicators>,
+  /**
+   * 輸出語言。
+   *
+   * ⚠️ 這是**斷網後備**路徑（雲端 AI 是主要路徑）。
+   *    但這裡有個中文路徑沒有的問題：**關鍵字比對是中文的**
+   *    （`q.includes('咖啡')`…），英文提問一個字都對不上，
+   *    會直接掉到最後的「通用解答」。
+   *    → 所以英文必須**另寫一份**，連關鍵字一起換掉，
+   *      不是把中文字串翻譯過來就好。
+   *
+   * 做法：英文走 `answerInEnglish()`，完全不動下面既有的中文邏輯
+   *      （那條路徑已上線且經過驗證，不動它最安全）。
+   */
+  language: 'zh-TW' | 'en' = 'zh-TW'
 ): HealthQuestionAnswer {
+  if (language === 'en') return answerInEnglish(question, indicators);
+
   const q = (question || '').trim().toLowerCase();
   const systolic = indicators?.systolicBp || 135;
   const isHighBp = systolic >= 140;
@@ -181,6 +197,201 @@ export function answerSeniorHealthQuestion(
       '如有特殊身體不適，請在看診時跟主治醫生諮詢。',
     ],
     voice_script: `長輩您好！關於您的健康疑問，最重要的是日常飲食少油少鹽、多喝溫開水，少吃加工零食，吃飽飯後散步走動一下，身體就會越來越硬朗舒適喔！`,
+    source: 'smart_health_qa',
+  };
+}
+
+/* ============================================================================
+ * 英文版問答（斷網後備）
+ * ============================================================================
+ * 【為什麼要另寫一份，而不是翻譯中文字串】
+ *   上面的中文分支靠 `q.includes('咖啡')` 這類**中文關鍵字**比對。
+ *   英文提問（"can I drink coffee?"）一個字都對不上，會直接掉到通用解答。
+ *   → 只翻譯輸出、不換關鍵字，等於英文版永遠只會回同一句話。
+ *     所以關鍵字與輸出必須一起換。
+ *
+ * 【涵蓋的主題與中文版一致】咖啡／水果血糖／豆腐痛風／柚子藥物／
+ *   酒精／水腫喝水／通用。
+ */
+function answerInEnglish(
+  question: string,
+  indicators?: Partial<SeniorPhysicalIndicators>
+): HealthQuestionAnswer {
+  const q = (question || '').trim().toLowerCase();
+  const systolic = indicators?.systolicBp || 135;
+  const isHighBp = systolic >= 140;
+  const bloodSugar = indicators?.bloodSugar || 6.5;
+  const isHighSugar =
+    indicators?.bloodSugarUnit === 'mg/dL' ? bloodSugar >= 130 : bloodSugar >= 7.0;
+
+  const has = (...words: string[]) => words.some((w) => q.includes(w));
+
+  // 1. High blood pressure and coffee
+  if (has('coffee', 'caffeine') || (has('blood pressure', 'bp') && has('drink'))) {
+    if (isHighBp) {
+      return {
+        question,
+        key_takeaway:
+          '🟡 A small cup is fine, but keep it to one a day — and never add sugar or creamer.',
+        answer: `Hello! I see your top reading today was ${systolic}, which is a little high.
+
+High blood pressure does not mean you must give up coffee completely. Caffeine makes the heart beat a little faster and tightens the blood vessels slightly. If you already drink coffee every day, one small cup of weak black coffee in the morning, or with a splash of low-fat milk, is fine. But please avoid 3-in-1 instant sachets — they are full of sugar and bad fats. Do not drink coffee in the half hour before you measure your blood pressure, and skip it after 2pm so it does not keep you awake.`,
+        safe_tips: [
+          'At most one cup a day (about 150-200 ml), ideally after breakfast.',
+          'Avoid 3-in-1 instant sachets — far too much sugar and bad fat.',
+          'Do not drink any in the half hour before measuring your blood pressure.',
+        ],
+        voice_script: `Hello! You asked whether you can drink coffee with high blood pressure. A small cup is fine. Your top reading was ${systolic}, so keep it to one small cup of weak black coffee a day, no sugar and no creamer, and try not to drink it in the afternoon. Sleep well and your blood pressure will stay steady.`,
+        source: 'smart_health_qa',
+      };
+    }
+    return {
+      question,
+      key_takeaway: '✅ Enjoy it in moderation — one to two cups of plain black coffee a day is fine.',
+      answer: `Hello! Your blood pressure is holding up well. In moderation, black coffee can help circulation and alertness for many older adults.
+
+Just remember: choose plain black coffee or add unsweetened milk. Do not add sugar, condensed milk or creamer. And avoid it in the afternoon or evening so it does not disturb your sleep.`,
+      safe_tips: [
+        'Plain black coffee, or with unsweetened low-fat milk.',
+        'Avoid drinking a lot on an empty stomach — it can irritate acid reflux.',
+        'After 2pm, switch to warm water or barley tea.',
+      ],
+      voice_script:
+        'Hello! Your blood pressure is in a good range, so one or two cups of unsweetened black coffee a day is fine. Do not drink it on an empty stomach, and no creamer or sugar. Enjoy it with peace of mind!',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 2. Blood sugar and fruit
+  if (has('banana', 'fruit', 'blood sugar', 'diabetes', 'sugar level')) {
+    return {
+      question,
+      key_takeaway:
+        '🟡 You can eat fruit, but choose the less sweet ones and keep each portion to the size of your fist.',
+      answer: `Please do not worry — high blood sugar does not mean you must give up fruit! Fruit has natural vitamins and fibre, which help older adults with digestion.
+
+The key points:
+1. Bananas, mangoes, lychees, watermelon and grapes are very high in sugar. Half a banana or a few grapes is fine — do not eat a whole large ripe banana at once.
+2. Choose guava, small apples, tomatoes or kiwi instead. These raise blood sugar more slowly.
+3. Most importantly: eat fruit by biting it. Never blend it into juice — juice is absorbed far too quickly and your blood sugar will shoot up.`,
+      safe_tips: [
+        'One portion at a time, about the size of your fist.',
+        'Eat fruit between meals rather than straight after a big meal.',
+        'Never drink fruit juice — eat the fruit instead.',
+      ],
+      voice_script:
+        'Hello! You asked about fruit and blood sugar. Fruit is fine, but pick the less sweet kinds like guava, small apples or kiwi, and keep each portion to the size of your fist. Please bite the fruit instead of blending it into juice, because juice makes blood sugar rise very fast.',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 3. Gout and soy products
+  if (has('tofu', 'soy', 'gout', 'uric acid', 'bean curd')) {
+    return {
+      question,
+      key_takeaway: '✅ Plain tofu and unsweetened soy milk are fine in normal amounts — skip the rich broths.',
+      answer: `Hello! For gout, plain tofu and unsweetened soy milk are generally fine in normal amounts. Modern research shows plant purines from soy do not raise gout risk as much as people once thought.
+
+The real culprits are:
+1. Long-simmered soups and concentrated stock cubes — these are very high in purines.
+2. Organ meats, sardines and shellfish.
+3. Sugary drinks and fructose syrup, which stop your body flushing out uric acid.
+
+Drink plenty of warm water through the day — that is the single most helpful habit for gout.`,
+      safe_tips: [
+        'Drink 1.5 to 2 litres of water a day unless your doctor says otherwise.',
+        'Avoid long-boiled broth, stock cubes and organ meats.',
+        'Cut out sugary drinks and fruit juice.',
+      ],
+      voice_script:
+        'Hello! You asked about tofu and gout. Plain tofu and unsweetened soy milk in normal amounts are fine. What you really need to avoid is long-boiled soup and stock cubes, and sugary drinks. Drink plenty of warm water every day to help flush the uric acid out.',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 4. Blood pressure medicine and grapefruit
+  if (has('grapefruit', 'pomelo', 'medicine', 'medication', 'pills', 'drug')) {
+    return {
+      question,
+      key_takeaway: '⚠️ Do not eat grapefruit or pomelo if you take blood pressure medicine — ask your doctor first.',
+      answer: `This one matters. Grapefruit and pomelo interfere with how your body breaks down several blood pressure medicines. The medicine can build up in your blood and your blood pressure may drop too low, making you dizzy or faint.
+
+It is not only about eating them at the same time — the effect can last a day or more.
+
+Please do not stop or change your medicine on your own. Ask your doctor or pharmacist whether your particular medicine is affected.`,
+      safe_tips: [
+        'Tell your doctor or pharmacist which medicine you take before eating grapefruit.',
+        'Oranges and mandarins are usually safe — but check with them too.',
+        'Never stop your blood pressure medicine on your own.',
+      ],
+      voice_script:
+        'Please listen carefully. If you take blood pressure medicine, do not eat grapefruit or pomelo. They can make the medicine build up in your body and your blood pressure drop too low, which makes you dizzy. Please ask your doctor first, and never stop your medicine by yourself.',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 5. Alcohol
+  if (has('wine', 'alcohol', 'beer', 'drink alcohol', 'heart')) {
+    return {
+      question,
+      key_takeaway: '🟡 There is no safe amount of alcohol that is good for the heart — less is better.',
+      answer: `Hello! The old idea that a glass of red wine protects the heart has not held up in newer research. For older adults, alcohol raises blood pressure, disturbs sleep and adds empty calories.
+
+If you do drink, keep it occasional and small, and never on an empty stomach. If you take blood pressure or blood sugar medicine, please ask your doctor first — alcohol can interact with them.`,
+      safe_tips: [
+        'If you do not drink, there is no health reason to start.',
+        'Never drink on an empty stomach.',
+        'Ask your doctor if alcohol interacts with your medicine.',
+      ],
+      voice_script:
+        'Hello! You asked about alcohol and the heart. Newer research shows there is no amount of alcohol that is truly good for the heart. If you do drink, keep it small and occasional, never on an empty stomach, and ask your doctor first if you take any medicine.',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 6. Swelling and drinking water
+  if (has('swelling', 'swollen', 'edema', 'water retention', 'how much water')) {
+    return {
+      question,
+      key_takeaway: '💧 Do not stop drinking water — cut down on salt instead, and raise your feet when resting.',
+      answer: `Hello! If your ankles swell, many people stop drinking water — that is actually the wrong move. Swelling usually comes from too much salt, not too much water. Your body holds on to water to dilute the salt.
+
+What helps:
+1. Cut down on salt, pickled foods, fermented bean curd and soy sauce.
+2. Raise your feet on a cushion when you sit down.
+3. Keep drinking water normally through the day, but ease off in the two hours before bed.
+
+If the swelling is sudden, or only in one leg, or you feel short of breath, please see a doctor promptly.`,
+      safe_tips: [
+        'Cut salt first — that is what usually causes the swelling.',
+        'Raise your feet above heart level when resting.',
+        'See a doctor if swelling is sudden or only on one side.',
+      ],
+      voice_script:
+        'Hello! You asked about swelling and drinking water. Please do not stop drinking water. Swelling usually comes from too much salt, not too much water. Cut down on salt and pickled foods, raise your feet when you sit, and see a doctor if the swelling appears suddenly or only in one leg.',
+      source: 'smart_health_qa',
+    };
+  }
+
+  // 7. General fallback
+  return {
+    question,
+    key_takeaway: '💡 I could not reach the AI right now, so here is some general advice.',
+    answer: `Hello! I am not able to reach the AI service at the moment, so I cannot answer your exact question in detail. Please try again in a moment.
+
+In the meantime, a few things help most older adults:
+1. Keep meals light and low in salt, and drink warm water through the day.
+2. Eat at regular times and go easy on sugary drinks and snacks.
+3. If you feel unwell, or your readings are far from your usual range, please see a doctor.
+
+When the connection is back, ask me again and I will give you a full answer based on your own numbers.`,
+    safe_tips: [
+      'Try asking again in a moment — the AI may just be busy.',
+      'Check your readings and note them down for your doctor.',
+      'See a doctor promptly if you feel unwell.',
+    ],
+    voice_script:
+      'Hello! I am sorry, I cannot reach the AI service right now, so I cannot answer your question in full. Please try again in a moment. In the meantime, keep your meals light and low in salt, drink warm water, and see a doctor if you feel unwell.',
     source: 'smart_health_qa',
   };
 }

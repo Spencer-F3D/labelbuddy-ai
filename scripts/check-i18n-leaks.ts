@@ -28,6 +28,7 @@ import { buildConditionReminders } from '../server/conditionAdvice';
 import { buildOcrFailedResult } from '../server/core';
 import { parseNutritionLabel } from '../server/labelParser';
 import { analyzeSeniorPhysicalIndicators } from '../server/smartIndicatorAnalyzer';
+import { answerSeniorHealthQuestion } from '../server/smartHealthQA';
 import { getLearnerProfile } from '../src/data/learnerProfiles';
 import type { LabelAnalysisResult, SeniorPhysicalIndicators } from '../src/types';
 
@@ -283,6 +284,56 @@ console.log('\n── 生理指標引擎（斷網後備）──');
   }
   if (bad === 0) {
     console.log(`  ✅ ${cases.length} 種情境：中英顏色一致、英文零中文殘留`);
+  }
+}
+
+/* ── 健康問答引擎（斷網後備）───────────────────────────────────
+ * ⚠️ 這個引擎的英文是**另寫一份**，不是翻譯中文字串。
+ *    原因：它的比對是 `q.includes('咖啡')` 這種**中文關鍵字**，
+ *    英文提問一個字都對不上，會全部掉到「通用解答」。
+ *    → 所以測試必須用**英文問句**，用中文問句測不出這個問題。
+ */
+console.log('\n── 健康問答引擎（斷網後備）──');
+{
+  // 用英文提問，且每個主題都要命中（掉到通用解答就代表關鍵字沒對上）
+  const questions = [
+    'Can I drink coffee if I have high blood pressure?',
+    'Can I eat bananas with diabetes?',
+    'Is tofu bad for gout?',
+    'I take blood pressure medicine, can I eat grapefruit?',
+    'Is red wine good for my heart?',
+    'My legs are swollen, should I drink less water?',
+  ];
+
+  const indicators: SeniorPhysicalIndicators = {
+    systolicBp: 148, diastolicBp: 92, heartRate: 78,
+    bloodSugar: 7.4, bloodSugarUnit: 'mmol/L', bloodSugarTiming: 'fasting',
+    uricAcidStatus: 'high', cholesterolStatus: 'normal', kidneyStatus: 'normal',
+    symptoms: [], ageGroup: '70-79歲',
+  };
+
+  let bad = 0;
+  for (const q of questions) {
+    const en = answerSeniorHealthQuestion(q, indicators, 'en');
+    checks++;
+
+    const hits = findCJK(en);
+    // 掉到通用解答 = 關鍵字沒命中 → 英文使用者問什麼都得到同一段話
+    const fellThrough = /could not reach the AI right now/i.test(en.key_takeaway);
+
+    if (hits.length) {
+      bad += hits.length;
+      leaks += hits.length;
+      console.log(`  ❌ 「${q.slice(0, 42)}…」→ ${hits.length} 處中文`);
+      hits.slice(0, 3).forEach((h) => console.log(`     ${h.slice(0, 100)}`));
+    } else if (fellThrough) {
+      bad++;
+      leaks++;
+      console.log(`  ❌ 「${q.slice(0, 42)}…」→ 掉到通用解答（關鍵字沒命中）`);
+    }
+  }
+  if (bad === 0) {
+    console.log(`  ✅ ${questions.length} 個英文提問：全部命中主題且零中文殘留`);
   }
 }
 

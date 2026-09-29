@@ -1108,3 +1108,27 @@ CRITICAL RULES FOR ELDERLY UNDERSTANDING:
   "safe_tips": ["string", "string", "string"],
   "voice_script": "string"
 }`;
+
+/**
+ * 健康問答的英文輸出覆蓋。
+ *
+ * ⚠️ 與指標／標籤各有一份自己的覆蓋 —— 三者的輸出欄位都不同，
+ *    共用一份會讓模型看到不存在的欄位名稱，反而更容易亂寫。
+ *    欄位名稱必須與 SYSTEM_INSTRUCTION_HEALTH_QA 的 schema 一致。
+ */
+export const ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA = `
+
+════════════════════════════════════════════════════════════════
+OUTPUT LANGUAGE: ENGLISH (this overrides the Chinese output rules above)
+════════════════════════════════════════════════════════════════
+1. Write EVERY string value in natural, plain English. Do NOT write any Chinese characters
+   anywhere in your output — not in the takeaway, the explanation, the tips, or the voice script.
+2. The reader is an older adult and the answer is READ ALOUD to them. Use short everyday words,
+   the way a kind family member would explain it. Never use medical jargon.
+3. Keep the SAME JSON keys as the schema above — only the VALUES change to English.
+4. Length limits (English words replace the Chinese character limits above):
+   - key_takeaway: at most 18 words (one clear sentence, this is the headline)
+   - answer: at most 90 words
+   - each safe_tips item: at most 14 words, 2 to 3 items
+   - voice_script: at most 70 words, written to be spoken aloud
+5. The question itself may be written in Chinese or English. Answer it in English regardless.`;
