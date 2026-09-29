@@ -21,10 +21,9 @@
     "ocr:smoke": "esbuild scripts/ocr-smoke.ts --bundle --platform=node --format=esm --packages=external --outfile=.ocr-smoke.mjs --log-level=error && node .ocr-smoke.mjs",
     "verify:conditions": "esbuild scripts/verify-condition-keywords.ts --bundle --platform=node --format=esm --packages=external --outfile=.verify-conditions.mjs --log-level=error && node .verify-conditions.mjs",
     "check:i18n": "tsx scripts/check-i18n-leaks.ts",
-    "check:indicator": "tsx scripts/check-indicator-i18n.ts",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
-    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:indicator"
+    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

@@ -310,12 +310,14 @@ try {
   await sleep(1500);
   if (!vitalsOpen) console.log('  ⚠️  找不到「Daily health measurements」區塊');
   // 捲到 AI 分析區塊（它在四張指標卡下方，不捲看不到）
+  // ⚠️ 一定要挑「最內層」的元素：用 'div' 會先命中包住整個區塊的大容器，
+  //    scrollIntoView 之後畫面只會停在中間，看不到標題（實測就是這樣）。
   const scrolled = await cdp.eval(`
     (() => {
-      const el = [...document.querySelectorAll('span, p, h3, div')].find(e =>
+      const title = [...document.querySelectorAll('span')].find(e =>
         /Let the AI take a closer look|讓 AI 幫您深入看一次/i.test(e.textContent || ''));
-      if (!el) return false;
-      el.scrollIntoView({ block: 'center' });
+      if (!title) return false;
+      title.scrollIntoView({ block: 'start' });
       return true;
     })()
   `);
