@@ -42,6 +42,21 @@
 - ⚠️ **emoji 用 `w-[Npx] h-[Npx]` 控制，不要用 `text-[Npx]`**。
   這樣「字級一律 16–20px」才能用 grep 機械驗證（emoji 不干擾）。
 
+### ⚠️ 唯一的例外：12px（私隱條款與免責聲明，2026-09-29 使用者指定）
+
+`src/components/LegalNotice.tsx` 的條款本文用 **12px**（`LEGAL_TEXT_CLASS`）。
+這是**全站唯一**低於 16px 的地方，理由：
+
+1. 它不是操作介面 —— 沒有「看不清楚就按錯」的風險。
+2. 它必須**完整呈現**，不能為了放大而刪減內容。
+3. 使用者明確指定。
+
+⚠️ **12px 不是既有的四種字級**，所以：
+- 它**不會**被 `html[data-density='compact']` 的字級縮放影響
+  （那條 CSS 只命中既有的四個 class）。這是刻意的 —— 12px 已經很小，不該再縮。
+- 若日後有人想「順手」把條款也納入縮放，會變成 10px，**不要做**。
+- 標題（「私隱條款」「免責聲明」）仍維持 16px。
+
 **哪些檔案要改**：`App.tsx`、`theme.ts`、`NutrientFactBars`、`LearnerProfilePicker`、
 `FoodEdClassroom`、`VitalMetricsSection`、`DietHealthHistory`。
 ⚠️ **`VitalMetricsSection` 不是死碼**，它真的渲染在「健康設定」頁。

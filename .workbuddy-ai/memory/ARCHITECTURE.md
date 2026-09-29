@@ -96,3 +96,85 @@
   只缺「呼叫 AI」→ 已加「AI 深入分析」按鈕 ＋ 後端雙語 ＋ 安全覆蓋。
 - ✅ **`/api/ask-health-question`**（09-29）：新做 `HealthQASection`（雙語），
   英文走獨立的 `answerInEnglish()`，中文走 `answerSeniorHealthQuestion()`。
+
+## 導覽與頁面（2026-09-29）
+
+`App.tsx` 的 `MENU_ITEMS` 是**唯一的頁面切換入口**（底部導航列已於 09-28 移除）。
+`NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classroom' | 'qa'`
+
+| 選單順序 | tab | 備註 |
+| --- | --- | --- |
+| 主頁 | `home` | |
+| 拍照辨識 | `scan` | |
+| 飲食紀錄 | `history` | |
+| 食育學堂 | `classroom` | |
+| **健康問答** | `qa` | **09-29 從「設定」搬過來** —— 它是功能，不是設定 |
+| 健康設定 | `conditions` | |
+
+⚠️ 新增分頁要改**四處**：`NavigationTab` 型別、`MENU_ITEMS`、頁面渲染區塊、
+footer 的 CTA 分支（`activeTab === 'xxx' ? ... : ...` 鏈）。漏掉 footer 那處不會報錯，
+只會讓底部按鈕顯示成上一個分頁的內容。
+
+## 09-29 新增的元件
+
+| 檔案 | 職責 |
+| --- | --- |
+| `src/components/GenderPicker.tsx` | 稱謂性別（先生／小姐／不用特別稱呼）。**引導頁與設定共用同一份** `GENDER_OPTIONS`，避免兩邊漂移 |
+| `src/components/LegalNotice.tsx` | 私隱條款 ＋ 免責聲明（**12px**）＋ 引導頁的同意勾選 |
+| `src/components/ClearAllDataSection.tsx` | 清除所有資料（**兩級警告**）＋ `clearAllAppData()` |
+| `src/utils/labelLanguage.ts` | `detectLabelLanguage()` —— 抽出來才能在測試腳本單獨驗證（import App.tsx 會拉起整個 React App） |
+
+★ **兩級警告的設計理由**：這個按鈕一按下去，身分、慢性病、指標、整週紀錄全部消失，
+而且**無法復原**（沒有帳號、沒有雲端備份 —— 那正是隱私承諾）。
+單一 confirm 在手機上很容易誤觸，所以拆成兩步，且**兩步的用詞與按鈕顏色都不同**：
+第 1 步說明「會刪掉什麼」（中性色），第 2 步是最後確認（**紅色** ＋ 明寫「無法復原」）。
+刻意不用「再按一次相同按鈕」—— 那對誤觸沒有防護力。
+
+## 四支自動化檢查（09-29 新增三支）
+
+| 指令 | 守住什麼 | 項數 |
+| --- | --- | --- |
+| `check:i18n` | 引擎輸出的英文零中文殘留 | 15 組 |
+| `check:honorific` | 稱謂正確、英文不加稱謂、**性別不影響顏色** | 29 |
+| `check:cache` | 快取鍵必須區分不同商品 | 11 |
+| `check:diet` | 紀錄跟隨標籤語言、品名取自標籤原文 | 15 |
+| `check:ui` | 真實 Chrome 走 15 個畫面 | 15 畫面 |
+
+★ 這幾支都是「**不會報錯的 bug**」的防線 ——
+對照表鍵對不上、稱謂時有時無、快取張冠李戴、紀錄語言混雜，
+四種都不會丟例外，只會安靜地給出錯的結果。
+
+## localStorage 鍵清單（全部以 `labelbuddy` 開頭）
+
+| 鍵 | 用途 |
+| --- | --- |
+| `labelbuddy-language` | 介面語言（`I18nContext`） |
+| `labelbuddy_learner_profile_v1` | 學習者身分 |
+| `labelbuddy_gender_v1` | 稱謂性別 |
+| `labelbuddy_selected_conditions` | 勾選的慢性病與過敏原 |
+| `labelbuddy_conditions_migrated_v1` | 舊版設定遷移旗標 |
+| `labelbuddy_senior_indicators_v2` | 身體指標 |
+| `labelbuddy_diet_records_v1` | 飲食紀錄 |
+| `labelbuddy_learning_progress_v1` | 食育學堂學習進度 |
+| `labelbuddy_cloud_consent_v1` | 雲端分析同意 |
+| `labelbuddy_onboarded_v1` | 是否走過引導頁 |
+
+★ 「清除所有資料」用**前綴掃描**（`k.startsWith('labelbuddy')`）而不是逐一列出鍵名 ——
+新增儲存鍵時不必回來改這裡，也不會因為漏列而留下殘留資料（那種 bug 不會報錯）。
+清完呼叫 `window.location.reload()`，讓 App 用乾淨的 localStorage 重新初始化
+（逐一重設 state 很容易漏掉某個 `useState`，而且不會報錯，只會留下殘留資料）。
+
+## Gemini 區域封鎖：完整錯誤碼對照（已定案，不必重查）
+
+使用者在中國澳門；Gemini 官方支援區域**不含中國澳門／香港／大陸**。
+三把不同金鑰、不同帳號皆回 `400 FAILED_PRECONDITION: User location is not supported`。
+
+| 情況 | 回應 |
+| --- | --- |
+| 有效金鑰 ＋ 不支援區域 | `400 FAILED_PRECONDITION: User location is not supported` |
+| 無效金鑰 | `400 API_KEY_INVALID` |
+| 完全沒帶金鑰 | `403 unregistered callers` |
+
+★ 這個順序證明「區域檢查發生在**金鑰被接受之後**」，且依**呼叫來源的位置**判定 ——
+所以換幾個帳號結果都一樣。唯一合規解法是把後端部署到支援區域
+（已部署 Cloudflare，**尚未驗證 Gemini 是否復活**）。
