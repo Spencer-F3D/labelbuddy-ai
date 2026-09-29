@@ -116,8 +116,8 @@ const zhTW = {
   'result.noConclusion':
     '沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。',
   'result.why': '為什麼？',
-  'result.switchToLocal': '改回本機模式（不上傳）',
-  'result.switchToCloud': '開啟雲端辨識（更準）',
+  'result.switchToLocal': '改回本機模式（文字也不送出）',
+  'result.switchToCloud': '改用雲端分析（更準）',
   'result.stopReading': '⏹️ 停止朗讀',
   'result.readToMe': '🔊 念給我聽',
   'result.moreInfo': '更多資訊與替代建議',
@@ -638,8 +638,8 @@ const en: Record<TranslationKey, string> = {
   'result.noConclusion':
     'I could not read enough nutrition numbers, so I am not giving a verdict this time — that way I will not guess wrong.',
   'result.why': 'Why?',
-  'result.switchToLocal': 'Switch back to on-device (no upload)',
-  'result.switchToCloud': 'Turn on cloud AI (more accurate)',
+  'result.switchToLocal': 'Switch back to on-device (nothing is sent out)',
+  'result.switchToCloud': 'Use cloud analysis (more accurate)',
   'result.stopReading': '⏹️ Stop reading',
   'result.readToMe': '🔊 Read it to me',
   'result.moreInfo': 'More details and alternatives',

@@ -185,6 +185,9 @@ try {
   const lang = await cdp.eval(`document.documentElement.lang`);
   console.log(`介面語言（<html lang>）: ${lang}`);
 
+  /** index.html 裡寫死的中文標題。用來偵測「標題還沒被 JS 更新」的空窗。 */
+  const HTML_DEFAULT_TITLE = 'LabelBuddy AI - 您的超市健康小幫手';
+
   /** 收集畫面上所有「使用者看得到或讀得到」的文字 */
   const COLLECT = `
     (() => {
@@ -203,7 +206,17 @@ try {
   const results = [];
 
   async function capture(name) {
-    const data = await cdp.eval(COLLECT);
+    /* ⚠️ `document.title` 偶發性會讀到 index.html 的中文預設值。
+     * 原因：切換頁面／導引頁結束的瞬間，eval 可能落在「新文件已載入、
+     * 但 main.tsx 還沒跑」的空窗（實測 3 次中出現過 1 次）。
+     * 這不是程式的 bug —— main.tsx 與 I18nContext 都會設標題，
+     * 只是抓得太早。所以在這裡給它一次重讀的機會，避免假警報。
+     */
+    let data = await cdp.eval(COLLECT);
+    if (data.title === HTML_DEFAULT_TITLE) {
+      await sleep(1200);
+      data = await cdp.eval(COLLECT);
+    }
     const all = [
       ...data.innerText.split('\n'),
       data.title,
@@ -226,6 +239,35 @@ try {
         : `  ❌ ${name} → ${r.hits.length} 處中文`
     );
     return r;
+  }
+
+  /* ── 首次啟動引導頁 ────────────────────────────────────────────
+   * 新的 profile 第一次打開會先看到引導頁，不按完就看不到主介面。
+   * 這裡先掃描它（它本身也要是英文的），再按到最後一步。
+   *
+   * ⚠️ 順序很重要：一定要在 capture('01-home') 之前處理掉，
+   *    否則後面每一個畫面都會拍到引導頁，全部誤判。
+   */
+  const onboardVisible = await cdp.eval(`
+    (() => !!document.body.textContent.match(/Step 1 of 3|第 1 步，共 3 步/))()
+  `);
+  if (onboardVisible) {
+    await capture('00-onboarding-step1');
+    // 逐步按到底：下一步 ×2 → 開始使用
+    for (const label of ['Next', 'Next', 'Get started']) {
+      await sleep(700);
+      await cdp.eval(`
+        (() => {
+          const b = [...document.querySelectorAll('button')].find(e =>
+            (e.textContent || '').trim() === ${JSON.stringify(label)});
+          if (b) b.click();
+        })()
+      `);
+    }
+    // 引導頁結束後 App 會整頁重繪，給它足夠時間再開始掃描，
+    // 否則第一個畫面（選單尚未就緒）會間歇性抓不到
+    await sleep(3000);
+    console.log('  ✅ 00-onboarding（已走完引導頁）');
   }
 
   console.log('\n── 逐頁掃描 ──────────────────────────────');
