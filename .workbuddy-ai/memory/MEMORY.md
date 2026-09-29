@@ -193,12 +193,21 @@
 - ⚠️ 只做可達性分析會漏掉 `import('./x')`；只做 grep 會把連帶死檔當成活的。
 ★ **bundle 大小不變是正常的** —— 死檔本來就被 tree-shaking 排除，價值在**可維護性**。
 
-### ⏳ 待接回的後端端點（09-29 確認保留）
-`/api/analyze-indicators`、`/api/ask-health-question` 目前無 UI 呼叫
-（唯一呼叫者已刪）。**使用者決定接回**（09-29 指示）。
-連帶模組：`server/smartIndicatorAnalyzer.ts`(239)、`server/smartHealthQA.ts`(186)。
-⚠️ 原元件 `PhysicalIndicatorSection`(937 行/1088 中文字)、`SeniorHealthQASection`(549 行/713 中文字)
-**完全沒有 i18n** → 接回時必須一併英文化。
+### 接回兩個後端端點（09-29 使用者指示）
+- ✅ **`/api/analyze-indicators` 已完成**（09-29）：
+  不需還原 937 行舊元件 —— 現役 `VitalMetricsSection`(677 行) 已有輸入與本機即時評估，
+  只缺「呼叫 AI」。已加「AI 深入分析」按鈕 ＋ 後端雙語 ＋ 安全覆蓋。
+- ⏳ **`/api/ask-health-question` 尚未接**（目前無對應畫面，要新做 UI）。
+  ⚠️ 原元件 `SeniorHealthQASection`(549 行/713 中文字) **完全沒有 i18n**。
+
+★ **安全鐵則（09-29 實測發現）**：**顏色一律以規則引擎為準，AI 只提供文字**。
+  實測血壓 158/96 ＋ 空腹血糖 8.4（兩項都超過紅燈門檻）：規則判 red、雲端 AI 判 yellow。
+  對健康 App 來說「該紅卻報黃」比誤報更危險。
+  通則：**可預測的安全訊號交給規則，細膩的解釋交給模型。**
+
+★ **兩個「不會報錯」的 bug 類型（各踩過兩次）**：
+  ① **對照表鍵對不上**：長中文句子當鍵，一字之差（嚴防/嚴控）就失效，靜默回中文。
+  ② **插值變數漏翻**：`sugarDisplay` 的「度」被插進兩個欄位，只看字面字串會漏掉。
 
 ## 🎨 UI 與版面規則 → **見 `UI_RULES.md`**（同目錄）
 
