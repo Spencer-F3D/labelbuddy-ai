@@ -257,27 +257,44 @@ npm run dev
 ## 專案結構
 
 ```
-├── server.ts                       # Express 伺服器：Vite 中介軟體 + API 端點 + AI 代理（OpenRouter）
-├── server/                         # 本機備援引擎（無金鑰或斷網時使用）
-│   ├── smartNutritionAnalyzer.ts   #   食品營養規則引擎
-│   ├── smartIndicatorAnalyzer.ts   #   生理指標大白話分析
-│   └── smartHealthQA.ts            #   常見健康問答
+├── worker.ts                       # Cloudflare Workers 進入點（線上部署用）
+├── server.ts                       # Express 伺服器（本機開發用，130 行的薄轉接層）
+├── wrangler.toml                   # Cloudflare 部署設定
+├── server/                         # 平台無關的後端核心（兩層轉接共用同一份）
+│   ├── core.ts                     #   共用邏輯：供應商、快取、配額、提示詞、簡繁表
+│   ├── handlers.ts                 #   API handler（平台無關）
+│   ├── labelParser.ts              #   標籤文字解析（中英文皆可）
+│   ├── smartNutritionAnalyzer.ts   #   本機規則引擎（預設路徑）
+│   ├── localEngineEn.ts            #   本機引擎的英文對照
+│   ├── conditionAdvice.ts          #   慢性病專屬提醒（雙語）
+│   └── ocrLabel.ts                 #   Node 專屬 OCR（命令列實測用）
 ├── index.html                      # 網頁入口
-├── metadata.json                   # AI Studio Applet 元數據
-├── vite.config.ts                  # Vite 設定
-├── tsconfig.json                   # TypeScript 編譯規則
+├── vite.config.ts / tsconfig.json  # 建置與型別設定
 ├── .env.example                    # 環境變數範本
+├── scripts/                        # 工具腳本（見下方「驗證指令」）
 └── src/
     ├── main.tsx                    # React 掛載點
-    ├── App.tsx                     # 主控制器：三個分頁、狀態、掃描流程、語音
-    ├── index.css                   # Tailwind 入口與全域樣式
+    ├── App.tsx                     # 主控制器：導覽、狀態、掃描流程、語音
+    ├── theme.ts                    # 設計權杖（色彩、字級、間距、三重編碼）
     ├── types.ts                    # 全域型別定義
-    ├── components/                 # UI 元件（14 個）
-    ├── data/                       # 靜態資料（慢性病清單、示範紀錄、示範標籤）
+    ├── components/                 # UI 元件（6 個，全部在用）
+    ├── i18n/                       # 中英雙語（字典、Context、語言選擇器）
+    ├── ocr/ocrBrowser.ts           # 瀏覽器端 OCR（照片不離開裝置）
+    ├── data/                       # 靜態資料（身分、慢性病、教材、示範標籤、雙語對照）
     └── utils/
-        ├── tts.ts                  # Web Speech API 封裝（粵語優先、語速 0.88）
+        ├── tts.ts                  # Web Speech API 封裝（粵語／國語／英文）
         └── imageCompression.ts     # Canvas 前端壓縮（長邊 1024px、JPEG 0.8）
 ```
+
+### 驗證指令
+
+| 指令 | 作用 |
+| --- | --- |
+| `npm run lint` | `tsc --noEmit` 型別檢查 |
+| `npm run check:i18n` | 實際執行本機引擎，掃描輸出是否有中文殘留（英文模式用） |
+| `npm run check:ui` | 用真實 Chrome 走 9 個畫面掃描畫面文字並截圖 |
+| `npm run verify:conditions` | 確認 12 項慢性病都能觸發規則引擎 |
+| `npm run verify:all` | 上面三項一起跑 |
 
 ### 目前的三個分頁
 
@@ -321,28 +338,27 @@ npm run dev
 只要在 `.env` 設定 `OPENROUTER_MODEL` 即可切換，程式不用改。
 免費層的瓶頸是中文輸出可靠度，不是辨識能力。
 
-### 1. 慢性病項目：文件寫 12 項，實際只有 4 項
+### 1. ~~慢性病項目：文件寫 12 項，實際只有 4 項~~ ✅ 已解決
 
-`src/data/conditions.ts` 定義了完整的 12 項慢性病，`server/smartNutritionAnalyzer.ts`
-也比對了 12 項。但現役的 `App.tsx` 只實作了 4 項勾選（高血壓、糖尿病、腎臟病、花生過敏），
-且只把這 4 個名稱傳給後端。
+`App.tsx` 現在直接以 `src/data/conditions.ts` 的 `PHYSICAL_INDICATORS` 為唯一來源
+（`const ALL_CONDITIONS = PHYSICAL_INDICATORS`，12 項），已無硬編碼的 4 項清單。
+`npm run verify:conditions` 會確認每一項都能觸發規則引擎與專屬提醒。
 
-**影響**：痛風、高血脂、心血管疾病、胃食道逆流、骨質疏鬆、海鮮過敏、乳糖不耐、麩質過敏
-這 8 項的把關邏輯永遠不會被觸發。
+### 2. ~~14 個元件中有 11 個未被任何地方引用~~ ✅ 已解決
 
-### 2. 14 個元件中有 11 個未被任何地方引用
+2026-09-29 已刪除這 11 個孤兒元件（共約 4,300 行）。
+刪除前經過兩道驗證：從 `src/main.tsx` 走 import 圖的可達性分析，
+以及全專案字串搜尋（確認沒有動態 import 或字串引用）。
+刪除後 `tsc`、`check:i18n`、`check:ui` 全過，bundle 大小不變
+（這些檔案本來就被 tree-shaking 排除了）。
 
-`Header`、`FunctionSwitchBar`、`CaptureSection`、`CameraViewfinderModal`、`ResultDisplay`、
-`AnalysisStatus`、`HealthSettings`、`PhysicalIndicatorSection`、`SeniorHealthQASection`、
-`SettingsModal`、`UsageGuideModal` — 共約 4,300 行。
+⚠️ **隨之移除的功能**（日後若需要，可從 git 歷史還原）：
 
-連帶使得以下功能**目前點不到**：
-
-- 一鍵放大鏡／特大字體模式、高對比主題（在 `SettingsModal`）
-- 語速、音量、自動播報開關、防連按 debounce（在 `SettingsModal`）
-- 語音發問與飲食諮詢（在 `SeniorHealthQASection`）
-- 生理指標 AI 分析與超市買菜指南（在 `PhysicalIndicatorSection`）
-- 相機取景框（在 `CameraViewfinderModal`）、使用說明（在 `UsageGuideModal`）
+- 一鍵放大鏡／特大字體模式、高對比主題（原在 `SettingsModal`）
+- 語速、音量、自動播報開關、防連按 debounce（原在 `SettingsModal`）
+- 語音發問與飲食諮詢（原在 `SeniorHealthQASection`）
+- 生理指標 AI 分析與超市買菜指南（原在 `PhysicalIndicatorSection`）
+- 相機取景框（原在 `CameraViewfinderModal`）、使用說明（原在 `UsageGuideModal`）
 
 ### 3. 本機備援引擎不具備實際辨識能力
 

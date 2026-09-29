@@ -1,5 +1,11 @@
 # `incoming-new/` 差異報告
 
+> ✅ **2026-09-29 已結案**：本報告建議的 4 項設計**全部移植完成**
+> （tesseract.js OCR、隱私優先、食育欄位內嵌結果頁、慢性病提醒模組），
+> traineddata 資產也已在 `public/tessdata/`。
+> 依報告結論第 13 點「其餘封存或刪除」，`incoming-new/` 快照**已刪除**。
+> 本文件保留作為當時的決策紀錄。
+
 > **目的**：判斷 `incoming-new/` 這包 7.5 MB 快照該怎麼處理（合併 / 封存 / 刪除）。
 > **產出時間**：2026-09-26 22:0x
 > **比對基準**：主線 `C:\Users\Spencer\Downloads\labelbuddy-ai`（git 基線 `f0cf7cf`）

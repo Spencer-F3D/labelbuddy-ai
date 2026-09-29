@@ -1,6 +1,0 @@
-{
-  "name": "LabelBuddy AI",
-  "description": "多族群食育學習平台：長者、健身族、外食族、學生都能使用的食品標籤判讀課程。以「先自己判斷，再讓 AI 對答案」的預測—驗證循環設計，提供每日參考值、讀標籤三步驟、知識卡與形成性評量。預設本機分析模式，食品照片不上傳雲端。",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

@@ -15,7 +15,7 @@
  *   而且中間層元件明明不用翻譯卻被迫傳遞。Context 直接解決這件事。
  *
  * 【存哪裡】
- *   localStorage（與本專案其他設定一致，見 HealthSettings / learnerProfiles 的用法）。
+ *   localStorage（與本專案其他設定一致，見 LearnerProfilePicker / learnerProfiles 的用法）。
  *   語言是「這台裝置的偏好」，不需要上傳到伺服器，也不會離開裝置。
  */
 
