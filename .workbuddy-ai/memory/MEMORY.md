@@ -271,16 +271,35 @@
 | 現況與規劃（**2026-09-25，已過時**：本機 OCR 與雲端部署都已完成，且未涵蓋比賽與雙語） | `Desktop/LabelBuddyAI_現況與規劃_20260925.typ` |
 | 章程（掃描版） | 專案根目錄 `2026全球青少年人工智能未來創新競賽...(1).pdf` |
 
-## ⚠️ 已知死檔（未被任何地方引用，翻譯時可跳過）
+## ✅ 死檔已於 2026-09-29 清理完畢
 
-`CaptureSection`、`CameraViewfinderModal`、`ResultDisplay`、`SeniorHealthQASection`、
-`Header`、`SettingsModal`、`HealthSettings`、`FunctionSwitchBar`、`AnalysisStatus`、
-`UsageGuideModal`、`PhysicalIndicatorSection`（合計約 2,000 中文字；是否刪除待使用者決定）
+11 個不可達元件**已刪除**（共約 4,300 行），`src/components/` 現在只剩 6 個現役檔案：
+`DietHealthHistory`、`FoodEdClassroom`、`LearnerProfilePicker`、`NutrientFactBars`、
+`SettingsSection`、`VitalMetricsSection`。
 
-★ **可達性分析的用法**（09-29 實測有效）：從 `src/main.tsx` 走 import 圖，
-  真正可達的只有 **23 個檔案**。要判斷「某段程式碼會不會顯示在畫面上」時，
-  這比逐檔閱讀快得多，也能避免花時間翻譯永遠不會執行的程式碼。
-★ **連帶影響**：`/api/analyze-indicators` 只被 `PhysicalIndicatorSection`（死檔）呼叫，
-  `/api/ask-health-question` 只被 `SeniorHealthQASection`（死檔）呼叫
-  → `server/smartIndicatorAnalyzer.ts` 與 `server/smartHealthQA.ts` 在畫面上不可達，
-  **不需要雙語化**（但檔案仍在，屬於後端死路徑）。
+→ **做全專案機械檢查（字級合規、折行品質等）時已經沒有例外檔案了。**
+→ 需要時可從 git 歷史還原（commit `0ea86bd` 之前）。
+
+### 死檔檢查工具（專案內建，可重複使用）
+| 腳本 | 作用 |
+| --- | --- |
+| `scripts/analyze-dead-code.py` | 從進入點走 import 圖的可達性分析 |
+| `scripts/verify-dead-code.py` | 字串交叉驗證（抓動態 import 與字串引用） |
+
+★ **兩道都要跑**：只做 grep 會漏掉「被死檔 import 的檔案」
+  （看起來有人用，其實是連帶死的）。
+★ **bundle 大小不變是正常的** —— 死檔本來就被 tree-shaking 排除，
+  刪除的價值在**可維護性**，不是效能。
+
+## ⚠️ 仍存在的後端死路徑（尚未處理，待使用者決定）
+
+兩個 API 端點**只有已刪除的死元件會呼叫**，所以目前是無人呼叫的死端點：
+- `/api/analyze-indicators` ← 原本只被 `PhysicalIndicatorSection` 呼叫
+- `/api/ask-health-question` ← 原本只被 `SeniorHealthQASection` 呼叫
+
+連帶模組：`server/smartIndicatorAnalyzer.ts`（239 行）、`server/smartHealthQA.ts`（186 行），
+以及 `server/core.ts` 的 `SYSTEM_INSTRUCTION_INDICATORS` / `SYSTEM_INSTRUCTION_HEALTH_QA`
+兩個提示詞模板（約 80 行）。合計可再減約 500 行。
+
+⚠️ 但 `build-verification-report.html`（已刪）曾把它列為「**未接上**的待辦功能」，
+   所以不確定使用者是否打算日後接回來 → **要問過再動**。
