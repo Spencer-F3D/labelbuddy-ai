@@ -38,6 +38,8 @@ import { LearnerProfilePicker } from './LearnerProfilePicker';
 import { GenderPicker } from './GenderPicker';
 import { LegalNotice } from './LegalNotice';
 import { AnalysisModePicker } from './AnalysisModePicker';
+// 語言閘門（2026-09-30）：全流程的第一頁，獨立於編號步驟之外。
+import { OnboardingLanguageStep } from './OnboardingLanguageStep';
 import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { conditionName } from '../data/bilingual';
 
@@ -105,8 +107,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   initialConditions,
   onComplete,
 }) => {
-  const { t, language } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const [step, setStep] = useState(0);
+  /**
+   * 語言是否已選。
+   *
+   * ★ 為什麼用獨立的布林值，而不是把 'language' 塞進 `buildSteps()`：
+   *   這一頁**不屬於編號流程** —— 它不能顯示「第 N 步，共 M 步」。
+   *   理由有兩個（見 `OnboardingLanguageStep.tsx` 的說明）：
+   *     ① 選語言之前，進度指示該用哪種語言本身就是錯的
+   *     ② 總步數要等選完身分才確定（長者 9／其他 7）
+   *   塞進陣列的話，第一頁會變成「第 2 步，共 10 步」，兩邊都錯。
+   */
+  const [languageChosen, setLanguageChosen] = useState(false);
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
   const [gender, setGender] = useState<Gender>('unspecified');
   /** 第 3 頁的勾選（與設定頁共用同一個儲存鍵，由 App 負責存） */
@@ -190,6 +203,22 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       </button>
     );
   };
+
+  /* ── 語言閘門：全流程的第一頁（不屬於編號步驟）────────────────────
+      ★ 這一頁刻意不顯示進度指示 —— 在選語言之前，進度指示該用哪種語言
+        本身就是錯的（預設是中文，英文使用者看不懂那行字）。
+      ★ 選完就直接進第 1 頁，中間沒有任何緩衝。 */
+  if (!languageChosen) {
+    return (
+      <OnboardingLanguageStep
+        current={language}
+        onChoose={(lang) => {
+          setLanguage(lang);
+          setLanguageChosen(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
@@ -456,16 +485,23 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
         {/* 底部按鈕：固定在最後，長者不必找 */}
         <div className="flex items-center gap-3 pb-2">
-          {current > 0 && (
-            <button
-              type="button"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-              className="min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-slate-400 text-slate-800 text-[18px] font-black whitespace-nowrap cursor-pointer flex items-center gap-2"
-            >
-              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
-              {t('onboard.back')}
-            </button>
-          )}
+          {/* 上一步。
+              ★ 第一頁的「上一步」＝ 回到語言選擇 ——
+                選錯語言的人在這裡就能改，不用先走完再進設定找。 */}
+          <button
+            type="button"
+            onClick={() => {
+              if (current === 0) {
+                setLanguageChosen(false);
+                return;
+              }
+              setStep((s) => Math.max(0, s - 1));
+            }}
+            className="min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-slate-400 text-slate-800 text-[18px] font-black whitespace-nowrap cursor-pointer flex items-center gap-2"
+          >
+            <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+            {t('onboard.back')}
+          </button>
 
           <button
             type="button"

@@ -249,24 +249,52 @@ try {
    *    否則後面每一個畫面都會拍到引導頁，全部誤判。
    */
   /**
-   * ⚠️⚠️ 這裡的正則**不可以寫死頁數**。
+   * ⚠️⚠️ 這裡的正則**不可以寫死頁數**，也**不可以只認「第 N 步」**。
    *
-   * 2026-09-30 引導頁從 3 頁變成 9 頁（長者）／7 頁（其他身分），
-   * 而偵測字串原本是寫死的 `Step 1 of 3` —— 於是偵測不到引導頁、
-   * 整個 onboarding 區塊被跳過，**後面 15 個「畫面」全部拍到引導頁**，
-   * 卻因為引導頁本身是英文而全部「通過」。
+   * 2026-09-30 踩過兩次：
+   *   ① 引導頁從 3 頁變成 9 頁（長者）／7 頁（其他），
+   *      而偵測字串寫死 `Step 1 of 3` → 偵測不到 → 整個 onboarding 被跳過
+   *      → 後面 15 個「畫面」全部拍到引導頁，卻因為引導頁是英文而全部「通過」。
+   *   ② 又在第一頁前面加了「語言閘門」，那一頁**刻意沒有進度指示**，
+   *      所以「第 N 步」的正則再次偵測不到。
    *
-   * 那是一次**假通過**：真正的首頁、紀錄、學堂、設定都沒被驗證到。
-   * 所以改成 `\d+`，並在下面加一道防護（若第一張不是首頁就報錯）。
+   * 現在改成認**兩種**開場畫面：
+   *   - 語言閘門：有 `onboarding-language-zh-TW` 這顆按鈕
+   *   - 引導頁：有「第 N 步，共 M 步」
    */
-  const onboardVisible = await cdp.eval(`
-    (() => !!document.body.textContent.match(/Step 1 of \\d+|第 1 步，共 \\d+ 步/))()
-  `);
+  const detectOnboarding = `
+    (() => {
+      const hasLanguageGate = !!document.getElementById('onboarding-language-zh-TW');
+      const hasSteps = /Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || '');
+      return hasLanguageGate || hasSteps;
+    })()
+  `;
+  const onboardVisible = await cdp.eval(detectOnboarding);
   if (onboardVisible) {
-    await capture('00-onboarding-step1');
+    /* ── 語言閘門（2026-09-30 新增，全流程第一頁）─────────────────
+     * ⚠️ 這一頁是**刻意雙語**的（兩種語言同時寫）——
+     *    因為它是唯一一個「使用者可能看不懂當前介面語言」的畫面。
+     *    所以它**一定**會有中文，中文殘留掃描會誤報。
+     *    這裡先截圖存證（供人工目視），但**不納入掃描**，
+     *    然後選英文繼續走。 */
+    const gate = await cdp.eval(`
+      (() => {
+        const b = document.getElementById('onboarding-language-en');
+        if (!b) return false;
+        b.click();
+        return true;
+      })()
+    `);
+    if (gate) {
+      await sleep(1500);
+      console.log('  ℹ️  語言閘門（雙語，刻意不納入掃描）→ 已選 English');
+    } else {
+      await capture('00-onboarding-step1');
+    }
+    await sleep(600);
+
     /**
-     * ⚠️ 2026-09-30 起引導頁是 **9 頁（長者）／7 頁（其他身分）**，
-     *    不能再寫死「按兩次下一步」。
+     * ⚠️ 引導頁是 **9 頁（長者）／7 頁（其他身分）**，不能寫死「按兩次下一步」。
      *    改成一直按到「Next」消失（＝只剩「Get started」）為止，並設上限防呆。
      */
     for (let i = 0; i < 12; i++) {
@@ -321,7 +349,11 @@ try {
    *   這是**假通過**，比紅燈危險得多，所以這裡直接中止。
    */
   const leftOnboarding = await cdp.eval(`
-    (() => !/Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || ''))()
+    (() => {
+      const stillGate = !!document.getElementById('onboarding-language-zh-TW');
+      const stillSteps = /Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || '');
+      return !stillGate && !stillSteps;
+    })()
   `);
   if (!leftOnboarding) {
     console.error('  ❌ 仍卡在引導頁 —— 後續畫面全部會誤判，中止檢查');
@@ -590,6 +622,15 @@ try {
    *   所以長條圖一定會渲染 —— 這樣這一塊才是真的被驗證過。
    */
   console.log('\n── 只在本機（確定性，專門驗成分長條圖）──────');
+  // ⚠️ 這一輪也會重新看到語言閘門（因為重新載入），要先選英文
+  await sleep(1200);
+  await cdp.eval(`
+    (() => {
+      const b = document.getElementById('onboarding-language-en');
+      if (b) b.click();
+    })()
+  `);
+  await sleep(1500);
   // 走完引導頁（此時預設就是 cloud_image）
   for (let i = 0; i < 12; i++) {
     await sleep(600);
