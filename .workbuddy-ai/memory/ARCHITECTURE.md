@@ -392,3 +392,58 @@ UI 刻意分成兩份：
 的兩個陣列）／健康問答。
 ⚠️ 使用 `NUTRIENT_WORDING_FIELDS`（= `LABEL_TEXT_FIELDS` **減去 `ingredients_detected`**）——
 標籤原文不能改。
+
+## 「改了 A 忘了 B」的五種形狀（2026-09-30 全面審查）
+
+本專案已踩過五種。**每一種都不會報錯，TypeScript 也檢查不到。**
+
+| # | 形狀 | 實例 | 後果 |
+| --- | --- | --- | --- |
+| ① | 對照表鍵對不上 | 改引擎中文沒改 `localEngineEn` 的鍵 | 英文模式靜默回中文 |
+| ② | 插值變數漏翻 | `sugarDisplay` 的「度」被插進兩個欄位 | 單位重複 |
+| ③ | 快取鍵用錯內容來源 | 前端 OCR 下 `imageBase64` 是空字串 | 所有商品共用一個鍵 |
+| ④ | 改了映射函式沒改呼叫端 | `NutrientFactBars` 直接渲染 `fact.name` / `fact.unit` | 畫面顯示舊字 |
+| ⑤ | 後端沒產生某個值，前端卻寫了分支 | `direction === 'target'` 永遠不成立 | 功能靜默失效 |
+
+### ⑤ 的細節（2026-09-30 新發現，最隱蔽）
+
+`factTone()` / `factLabel()` 都寫好了 `direction === 'target'` 的分支，
+但 `normalizeNutrientFacts()` 永遠只產生 `'limit'` ——
+**那段程式碼從上線以來從未執行過**，而且畫面看起來完全正常。
+
+★ 通則：**凡是 UI 有 if/else 的值，都要回頭確認每個值真的有生產者。**
+
+### 對策：把「不可能」變成「檢查得到」
+
+| 形狀 | 防線 |
+| --- | --- |
+| ① | `scripts/check-lookup-keys.ts`（9 張表的孤兒鍵）＋ `check:i18n`（執行時掃 CJK） |
+| ③ | `scripts/check-cache-key.ts` |
+| ④ | 改映射函式時 grep 所有消費者（人工，但註解已寫在各處） |
+| ⑤ | `scripts/check-analysis-mode.ts` 的「方向」測試組 |
+
+## 營養素方向（limit vs target）
+
+`numericLimits` **沒有**方向資訊，`targets` 才有（`NutritionTarget.direction`）。
+`getNutrientDirections(profileId)` 把 `targets` 攤平成查表用的物件 ——
+**單一真相來源仍然是 `targets`**，不要在 `numericLimits` 裡再寫一份。
+
+```
+normalizeNutrientFacts(raw, numericLimits, directions?)
+                                      ^^^^^^^^^^ 漏掉 → 全部當成「上限」
+```
+
+⚠️ **排序也必須「上限類優先」**：`b.percent - a.percent` 會讓
+「纖維 120%（好事）」把「鈉 118%（壞事）」擠到後面，使用者第一眼看到綠色。
+
+## 檢查腳本的不確定性問題（2026-09-30）
+
+`check-ui-cjk.mjs` 原本只走「直接雲端」。但雲端模型**不一定每次都會回傳
+`nutrient_facts`** → `NutrientFactBars` 回傳 null → 文字掃描掃不到 →
+**檢查通過，但那一塊完全沒被驗到**。單位翻譯的 bug 就是這樣躲過去的。
+
+→ 追加一輪 `local_only`（確定性引擎）＋ 斷言「長條圖必須出現」。
+★ 通則：**檢查要有確定性來源，並且要斷言「東西真的出現了」**，不能只掃描。
+
+⚠️ 設定 localStorage 的時機：**引導頁的 `useState` 預設值會覆寫回去**，
+所以「改模式」必須在走完引導頁**之後**再做。
