@@ -29,13 +29,13 @@
  *   看不懂當前語言的人才找得到自己的語言，這是語言選擇器的通用慣例。
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Languages, Check } from 'lucide-react';
 import type { Language } from '../i18n/translations';
 import { LANGUAGE_OPTIONS } from '../i18n/translations';
 
 interface OnboardingLanguageStepProps {
-  /** 目前語言（用於標示已選項目；第一次進來時等於預設值） */
+  /** 目前語言（作為確認前的預設選項；第一次進來時等於預設值） */
   current: Language;
   onChoose: (lang: Language) => void;
 }
@@ -49,6 +49,12 @@ const QUESTION = {
 const HINT = {
   zh: '之後可以隨時更改',
   en: 'You can change this later',
+} as const;
+
+/** 確認按鈕：同樣兩種語言都寫，任一方都看得懂 */
+const CONFIRM = {
+  zh: '確定',
+  en: 'Confirm',
 } as const;
 
 /**
@@ -65,8 +71,24 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
   current,
   onChoose,
 }) => {
+  /**
+   * 尚未確認的選擇。
+   *
+   * ★ 為什麼要有「確認」這一步（2026-09-30 使用者指定）：
+   *   原本點一下就立刻切換語言並前進 —— 手指滑一下就會誤選，
+   *   而語言一換，後面所有頁面都變了，使用者會一頭霧水。
+   *   加一顆確認鈕讓「選擇」與「生效」分開，也符合其他設定頁的習慣。
+   */
+  const [pending, setPending] = useState<Language>(current);
+
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
+    /* ⚠️ `id="onboarding-language-gate"` 與引導頁的 `onboarding-flow` 一樣，
+       是給**檢查腳本**用的穩定錨點。這一頁沒有「第 N 步」也沒有進度條，
+       所以只能靠 id 認 —— 用文案認的話，改一次文案就會失效。 */
+    <div
+      id="onboarding-language-gate"
+      className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
+    >
       <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col justify-center p-4 gap-5">
         {/* 品牌區：用中性內容，不偏任何一種語言 */}
         <div className="flex flex-col items-center gap-3">
@@ -88,14 +110,14 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
         {/* 兩個選項：高度 88px（比一般按鈕更大，這是唯一能做的事） */}
         <div className="flex flex-col gap-3">
           {LANGUAGE_OPTIONS.map((opt) => {
-            const isActive = current === opt.id;
+            const isActive = pending === opt.id;
             const nativeLabel = NATIVE_NAME[opt.id] ?? opt.short;
             return (
               <button
                 key={opt.id}
                 type="button"
                 id={`onboarding-language-${opt.id}`}
-                onClick={() => onChoose(opt.id)}
+                onClick={() => setPending(opt.id)}
                 aria-pressed={isActive}
                 className={`w-full min-h-[88px] px-5 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all active:scale-[0.98] cursor-pointer ${
                   isActive
@@ -118,6 +140,18 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
             );
           })}
         </div>
+
+        {/* 確認鈕：選好之後按這裡才生效（兩種語言都寫） */}
+        <button
+          type="button"
+          id="onboarding-language-confirm"
+          onClick={() => onChoose(pending)}
+          className="w-full min-h-[72px] px-5 rounded-2xl bg-blue-900 text-white text-[20px] font-black flex items-center justify-center gap-3 border-4 border-blue-700 shadow-xl cursor-pointer transition-all active:scale-[0.98]"
+        >
+          <span>{CONFIRM.zh}</span>
+          <span className="w-[1px] h-[24px] bg-blue-700 shrink-0" aria-hidden="true" />
+          <span>{CONFIRM.en}</span>
+        </button>
 
         {/* 提示：同樣兩種語言都寫 */}
         <div className="flex flex-col items-center gap-0.5">

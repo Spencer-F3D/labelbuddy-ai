@@ -31,7 +31,22 @@
  */
 
 import React, { useState } from 'react';
-import { ShieldCheck, Camera, Cloud, WifiOff, ArrowRight, ArrowLeft, Check, HeartPulse, AlertTriangle } from 'lucide-react';
+import {
+  ShieldCheck,
+  Camera,
+  Cloud,
+  WifiOff,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  HeartPulse,
+  AlertTriangle,
+  // 第一頁的功能清單圖示（2026-09-30）
+  Calendar,
+  GraduationCap,
+  MessageCircleQuestion,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { AddressGender, AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
@@ -221,33 +236,33 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
+    /* ⚠️ `id="onboarding-flow"` 是給**檢查腳本**用的穩定錨點。
+       以前它靠「第 N 步，共 M 步」偵測引導頁，但 2026-09-30 使用者要求
+       移除進度指示 —— 那行字沒了，偵測就會失效（而且會靜默跳過整個引導頁）。
+       改用 id 之後，文案怎麼改都不影響偵測。 */
+    <div
+      id="onboarding-flow"
+      className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
+    >
       <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-4 gap-4">
-        {/* 進度指示：讓使用者知道還剩幾步，不會覺得沒完沒了 */}
-        <div className="flex items-center gap-2 pt-2">
-          {steps.map((s, i) => (
-            <div
-              key={`dot-${s}`}
-              className={`h-2 flex-1 rounded-full ${i <= current ? 'bg-blue-800' : 'bg-slate-300'}`}
-            />
-          ))}
-        </div>
-        <p className="text-[16px] font-black text-slate-600 text-center">
-          {t('onboard.stepOf', { n: current + 1, total: steps.length })}
-        </p>
+        {/* ⚠️ 2026-09-30 使用者要求：移除上方的步數與進度條。
+            理由：長者在引導頁只想趕快設定完，數字只會增加壓力，
+            而且總頁數會依身分變動（長者 9／其他 7），顯示數字反而困惑。 */}
+        <div className="pt-2" />
 
         <div className="flex-1 flex flex-col gap-4">
-          {/* ── 1. 產品介紹（一眼看懂）────────────────────────────
-              ★ 這一頁的任務只有一個：讓人在 3 秒內知道這個 App 是做什麼的。
-                所以順序是「先講結果，再講怎麼做」——
-                「拍食品標籤 → 知道能不能吃」比「拍一張，我幫您看」明確得多。
-              ★ 加一個「拍這個 → 得到這個」的視覺對照：
-                不用讀字也能懂，對不識字或不想讀的長者是必要的。 */}
+          {/* ── 1. 產品介紹（一眼看懂 ＋ 講到每一個功能）────────────
+              ★ 這一頁要同時做到兩件事（使用者 09-30 指定）：
+                ① 3 秒內知道這個 App 是做什麼的 → 標題 ＋「拍這個 → 得到這個」視覺
+                ② **每一個功能都要提到** → 下方六條功能清單
+              ★ 順序刻意是「先講結果，再講怎麼做」：
+                「拍標籤 → 知道能不能買」比「拍一張，我幫您看」明確得多。
+              ★ 視覺對照不用讀字也能懂，對不識字或不想讀的長者是必要的。 */}
           {stepId === 'intro' && (
             <>
               <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-5">
                 <p className="text-[16px] font-black text-blue-200 tracking-wide">
-                  {t('app.name')}
+                  {t('onboard.introKicker')}
                 </p>
                 <h1 className="text-[20px] font-black mt-1 leading-tight">
                   {t('onboard.introTitle')}
@@ -293,15 +308,29 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 </p>
               </div>
 
+              {/* 功能清單：把 App 的每一個功能都講到 */}
               <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex flex-col gap-3">
-                {(['1', '2', '3'] as const).map((n) => (
-                  <div key={n} className="flex items-start gap-3">
-                    <span className="w-8 h-8 rounded-full bg-blue-900 text-white text-[16px] font-black flex items-center justify-center shrink-0">
-                      {n}
-                    </span>
-                    <p className="text-[18px] font-black text-slate-900 leading-snug pt-1">
-                      {t(`onboard.introPoint${n}` as 'onboard.introPoint1')}
-                    </p>
+                <h2 className="text-[19px] font-black text-slate-950">
+                  {t('onboard.featListTitle')}
+                </h2>
+                {[
+                  { n: 1, Icon: Camera },
+                  { n: 2, Icon: MessageCircleQuestion },
+                  { n: 3, Icon: Calendar },
+                  { n: 4, Icon: GraduationCap },
+                  { n: 5, Icon: MessageCircleQuestion },
+                  { n: 6, Icon: SlidersHorizontal },
+                ].map(({ n, Icon }) => (
+                  <div key={`feat-${n}`} className="flex items-start gap-3">
+                    <Icon className="w-6 h-6 text-blue-800 shrink-0 mt-[3px]" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[18px] font-black text-slate-900 leading-snug">
+                        {t(`onboard.feat${n}Title` as 'onboard.feat1Title')}
+                      </p>
+                      <p className="text-[16px] font-bold text-slate-600 leading-snug">
+                        {t(`onboard.feat${n}Body` as 'onboard.feat1Body')}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

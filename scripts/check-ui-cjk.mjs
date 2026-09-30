@@ -263,11 +263,7 @@ try {
    *   - 引導頁：有「第 N 步，共 M 步」
    */
   const detectOnboarding = `
-    (() => {
-      const hasLanguageGate = !!document.getElementById('onboarding-language-zh-TW');
-      const hasSteps = /Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || '');
-      return hasLanguageGate || hasSteps;
-    })()
+    (() => !!(document.getElementById('onboarding-language-gate') || document.getElementById('onboarding-flow')))()
   `;
   const onboardVisible = await cdp.eval(detectOnboarding);
   if (onboardVisible) {
@@ -286,8 +282,19 @@ try {
       })()
     `);
     if (gate) {
+      await sleep(900);
+      // ⚠️ 2026-09-30 起要先「選」再按「確定」——不會點一下就生效
+      const confirmed = await cdp.eval(`
+        (() => {
+          const b = document.getElementById('onboarding-language-confirm');
+          if (!b) return false;
+          b.click();
+          return true;
+        })()
+      `);
       await sleep(1500);
-      console.log('  ℹ️  語言閘門（雙語，刻意不納入掃描）→ 已選 English');
+      console.log('  ℹ️  語言閘門（雙語，刻意不納入掃描）→ 已選 English' + (confirmed ? ' 並確定' : '（找不到確定鈕！）'));
+      if (!confirmed) exitCode = 1;
     } else {
       await capture('00-onboarding-step1');
     }
@@ -349,11 +356,7 @@ try {
    *   這是**假通過**，比紅燈危險得多，所以這裡直接中止。
    */
   const leftOnboarding = await cdp.eval(`
-    (() => {
-      const stillGate = !!document.getElementById('onboarding-language-zh-TW');
-      const stillSteps = /Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || '');
-      return !stillGate && !stillSteps;
-    })()
+    (() => !(document.getElementById('onboarding-language-gate') || document.getElementById('onboarding-flow')))()
   `);
   if (!leftOnboarding) {
     console.error('  ❌ 仍卡在引導頁 —— 後續畫面全部會誤判，中止檢查');
@@ -627,6 +630,13 @@ try {
   await cdp.eval(`
     (() => {
       const b = document.getElementById('onboarding-language-en');
+      if (b) b.click();
+    })()
+  `);
+  await sleep(900);
+  await cdp.eval(`
+    (() => {
+      const b = document.getElementById('onboarding-language-confirm');
       if (b) b.click();
     })()
   `);
