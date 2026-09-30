@@ -24,6 +24,10 @@ import { TONES, percentTone, describePercent, barWidth } from '../theme';
 import type { ToneName } from '../theme';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
+// 難字簡化（2026-09-30）：`fact.name` 是 canonical（鈉／膳食纖維…），
+// ⚠️ **必須經過 nutrientName() 才會變成「鹽分／纖維」** ——
+//    一開始漏了這一步，長條圖照樣顯示「鈉」，而且不會報錯（畫面看起來很正常）。
+import { nutrientName } from '../data/bilingual';
 
 /**
  * 依「方向」決定這一列的色調。
@@ -81,7 +85,9 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
           <div key={fact.name} className="flex flex-col gap-[6px]">
             {/* 名稱 + 百分比：百分比刻意比名稱大，因為那才是判斷依據 */}
             <div className="flex items-baseline justify-between gap-[8px]">
-              <span className="text-[18px] font-black text-slate-900">{fact.name}</span>
+              <span className="text-[18px] font-black text-slate-900">
+                {nutrientName(fact.name, language)}
+              </span>
               <span className="text-[20px] font-black shrink-0" style={{ color: tone.text }}>
                 {factLabel(fact, language)}
               </span>
@@ -91,7 +97,7 @@ export const NutrientFactBars: React.FC<NutrientFactBarsProps> = ({ facts, profi
             <div
               className="w-full h-[18px] rounded-full bg-slate-200 border border-slate-300 overflow-hidden"
               role="img"
-              aria-label={`${fact.name} ${factLabel(fact, language)}`}
+              aria-label={`${nutrientName(fact.name, language)} ${factLabel(fact, language)}`}
             >
               <div
                 className="h-full rounded-full transition-all"

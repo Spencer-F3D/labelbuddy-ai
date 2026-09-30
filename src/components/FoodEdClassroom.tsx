@@ -717,11 +717,11 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
             </div>
           )}
 
-          {/* 身分切換 */}
+          {/* 身分切換（食育學堂上方已有自己的區塊標題，故隱藏內建標題） */}
           <LearnerProfilePicker
             selectedId={profileId}
             onSelect={onChangeProfile}
-            compact
+            hideHeading
           />
 
           {/* 重設進度 */}

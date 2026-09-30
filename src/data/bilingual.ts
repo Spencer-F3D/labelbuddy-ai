@@ -132,6 +132,58 @@ export function canonicalNutrientName(name: string): string {
 }
 
 /**
+ * 難字**片語** → 簡單說法（只用在中文輸出）。
+ *
+ * 【為什麼是「片語」而不是把單一個「鈉」字換掉】
+ *   「鈉」單獨出現時要換成「鹽分」，但它也可能是化學名稱的一部分 ——
+ *   L-麩酸鈉（味精）、苯甲酸鈉、碳酸鈉、亞硝酸鈉…那些換掉就變成錯的。
+ *   所以只換**明確的片語**，不碰單一個「鈉」字。
+ *   寧可漏換（使用者看到一個「鈉」），也不要錯換（把味精寫成鹽分）。
+ *
+ * ⚠️ 這是**後處理**，補的是「模型沒照提示詞用簡化名稱」的情況。
+ *    提示詞本身已經給了簡化名稱（見 `nutrientName` 的用法），
+ *    但模型不一定每次都聽話 —— 實測它就寫過「鈉含量」。
+ */
+const NUTRIENT_PHRASE_SIMPLIFY: ReadonlyArray<readonly [RegExp, string]> = [
+  [/鈉含量/g, '鹽分含量'],
+  [/含鈉量/g, '含鹽量'],
+  [/高鈉/g, '高鹽分'],
+  [/低鈉/g, '低鹽分'],
+  [/鈉攝取/g, '鹽分攝取'],
+  [/膳食纖維/g, '纖維'],
+  [/飽和脂肪/g, '動物油'],
+  [/添加糖/g, '糖'],
+];
+
+/** 把中文說明文字裡的難字片語換成簡單說法。英文輸出不受影響。 */
+export function simplifyNutrientWording(text: string): string {
+  let out = text;
+  for (const [re, to] of NUTRIENT_PHRASE_SIMPLIFY) out = out.replace(re, to);
+  return out;
+}
+
+/**
+ * 對結果物件的指定欄位套用難字簡化（支援字串與字串陣列）。
+ *
+ * ⚠️ 與稱謂後處理一樣，**只動我們自己產生的欄位**，不遞迴走訪整個物件 ——
+ *    否則會改到使用者自己的輸入（例如他在食育學堂打的字）。
+ */
+export function simplifyNutrientWordingInFields(
+  obj: Record<string, any> | null | undefined,
+  fields: readonly string[]
+): void {
+  if (!obj) return;
+  for (const f of fields) {
+    const v = obj[f];
+    if (typeof v === 'string') {
+      obj[f] = simplifyNutrientWording(v);
+    } else if (Array.isArray(v)) {
+      obj[f] = v.map((x) => (typeof x === 'string' ? simplifyNutrientWording(x) : x));
+    }
+  }
+}
+
+/**
  * 取營養素名稱。找不到對照時**安全退回原名**，
  * 而不是回傳 undefined（會讓畫面出現空白或 "undefined"）。
  *

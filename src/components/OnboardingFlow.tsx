@@ -208,17 +208,63 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         </p>
 
         <div className="flex-1 flex flex-col gap-4">
-          {/* ── 1. 產品超簡單介紹 ─────────────────────────────────── */}
+          {/* ── 1. 產品介紹（一眼看懂）────────────────────────────
+              ★ 這一頁的任務只有一個：讓人在 3 秒內知道這個 App 是做什麼的。
+                所以順序是「先講結果，再講怎麼做」——
+                「拍食品標籤 → 知道能不能吃」比「拍一張，我幫您看」明確得多。
+              ★ 加一個「拍這個 → 得到這個」的視覺對照：
+                不用讀字也能懂，對不識字或不想讀的長者是必要的。 */}
           {stepId === 'intro' && (
             <>
               <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-5">
-                <h1 className="text-[20px] font-black">{t('onboard.introTitle')}</h1>
-                <p className="text-[16px] font-bold mt-2 leading-relaxed">
+                <p className="text-[16px] font-black text-blue-200 tracking-wide">
+                  {t('app.name')}
+                </p>
+                <h1 className="text-[20px] font-black mt-1 leading-tight">
+                  {t('onboard.introTitle')}
+                </h1>
+                <p className="text-[16px] font-bold mt-2 leading-relaxed text-blue-50">
                   {t('onboard.introBody')}
                 </p>
               </div>
 
-              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-3">
+              {/* 「拍這個 → 得到這個」：左邊是標籤長相，右邊是結論 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
+                <div className="flex items-stretch gap-3">
+                  <div className="flex-1 min-w-0 rounded-xl border-2 border-slate-400 bg-slate-50 p-3 flex flex-col gap-1">
+                    <p className="text-[16px] font-black text-slate-500">
+                      {t('onboard.introShotLabel')}
+                    </p>
+                    {/* ⚠️ 這幾行是「模擬標籤」的示意，必須雙語 ——
+                        寫死中文的話，英文介面會露出中文（i18n 檢查抓到過）。 */}
+                    <p className="text-[16px] font-bold text-slate-700 whitespace-nowrap">
+                      {t('onboard.introShotSalt')}
+                    </p>
+                    <p className="text-[16px] font-bold text-slate-700 whitespace-nowrap">
+                      {t('onboard.introShotSugar')}
+                    </p>
+                  </div>
+
+                  <ArrowRight
+                    className="w-7 h-7 text-blue-800 shrink-0 self-center"
+                    aria-hidden="true"
+                  />
+
+                  <div className="flex-1 min-w-0 rounded-xl border-2 border-emerald-600 bg-emerald-50 p-3 flex flex-col justify-center gap-1">
+                    <p className="text-[18px] font-black text-emerald-800">
+                      {t('history.greenLight')}
+                    </p>
+                    <p className="text-[16px] font-black text-emerald-900">
+                      {t('onboard.introShotResult')}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[16px] font-bold text-slate-600 text-center mt-3">
+                  {t('onboard.introShotCaption')}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex flex-col gap-3">
                 {(['1', '2', '3'] as const).map((n) => (
                   <div key={n} className="flex items-start gap-3">
                     <span className="w-8 h-8 rounded-full bg-blue-900 text-white text-[16px] font-black flex items-center justify-center shrink-0">
@@ -244,7 +290,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   {t('onboard.identityBody')}
                 </p>
               </div>
-              <LearnerProfilePicker selectedId={profileId} onSelect={setProfileId} />
+              {/* ⚠️ hideHeading：外層卡片已經有標題了，不要出現兩個標題 */}
+              <LearnerProfilePicker
+                selectedId={profileId}
+                onSelect={setProfileId}
+                hideHeading
+              />
             </>
           )}
 

@@ -2148,17 +2148,17 @@ export default function App() {
                             : 'bg-amber-50 text-amber-800 border-amber-400'
                         }`}
                         title={
-                          analysisResult.ai_model
-                            ? t('result.modelLabel', { name: analysisResult.ai_model })
-                            : analysisResult.ocr_used
-                            ? t('mode.ocrLocal')
-                            : t('mode.ruleLocal')
+                          analysisResult.analysis_mode === 'cloud_ai'
+                            ? t('mode.cloudBadgeTip')
+                            : t('mode.localBadgeTip')
                         }
                       >
+                        {/* 來源徽章：只區分「雲端」與「離線」兩種，用白話。
+                            ⚠️ 2026-09-30 移除「（快取）」與模型名稱 tooltip ——
+                               那些是寫給工程師與評審看的，一般使用者不需要，
+                               而且會讓結果頁看起來像除錯畫面。 */}
                         {analysisResult.analysis_mode === 'cloud_ai'
-                          ? analysisResult.cached
-                            ? t('mode.cloudCache')
-                            : t('mode.cloud')
+                          ? t('mode.cloud')
                           : t('mode.localBadge')}
                       </span>
                     </div>
@@ -2224,14 +2224,6 @@ export default function App() {
                         language
                       )}
                     />
-
-                    {/* 難字簡化的一行說明（2026-09-30）。
-                        ⚠️ 這一行是**安全網**，不是裝飾：長條圖把「鈉」顯示成「鹽分」，
-                           但包裝上印的是「鈉」。不講清楚，長者拿包裝對照時會找不到。
-                        ⚠️ 也順帶提醒：鹽分的數字單位是「鈉」，不要拿鹽的每日建議量直接比。 */}
-                    <p className={`${TYPE.body} ${WEIGHT.normal} text-slate-600 leading-snug`}>
-                      {t('result.labelWordingNote')}
-                    </p>
 
                     <p className={`${TYPE.body} ${WEIGHT.normal} text-slate-900 leading-relaxed`}>
                       {analysisResult.plain_summary}

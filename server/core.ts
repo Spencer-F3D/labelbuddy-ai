@@ -69,6 +69,8 @@ import {
   unitName,
   profileName,
   canonicalNutrientName,
+  simplifyNutrientWording,
+  simplifyNutrientWordingInFields,
 } from '../src/data/bilingual';
 
 /* ---------------------------------------------------------------------------
@@ -917,6 +919,9 @@ ${targetLines}
 ${numericLines}
    判斷 nutrient_facts 該收錄哪些項目時，就用上表比較：達到三成以上的才列入。
    （百分比由後端統一換算，你不需計算，只要確保 value 是整包的正確含量。）
+   ★ 談到這些成分時，**一律使用上表列出的名稱**（例如寫「鹽分」而不是「鈉」、
+     寫「纖維」而不是「膳食纖維」）。使用者是普通人，看不懂化學名稱 ——
+     即使包裝上印的是另一個詞，你的說明文字仍要用上表的名稱。
 
 【這個身分想學會的事 — 若情況允許，可在建議中自然帶到】
 ${objectiveLines}
@@ -1127,6 +1132,24 @@ export function applyHonorificToFields(
   'ingredients_detected',
 ] as const;
 
+/**
+ * 難字簡化要處理的欄位（2026-09-30）。
+ *
+ * ⚠️ **刻意不含 `ingredients_detected`** —— 那是「標籤上的原文」，
+ *    使用者要拿去和包裝對照，改了就不是原文了。
+ *    而且它還被用來判斷標籤語言與取出食品品名，改動會連帶影響紀錄。
+ *    （`LABEL_TEXT_FIELDS` 可以含它，因為稱謂的 `^\s*您好` 守衛在那裡不會命中。）
+ */
+export const NUTRIENT_WORDING_FIELDS = [
+  'warning_title',
+  'plain_summary',
+  'alternative_advice',
+  'knowledge_point',
+  'label_reading_tip',
+  'daily_limit_context',
+  'nutrition_concerns',
+] as const;
+
 /** 生理指標分析結果的文字欄位（不含巢狀的 supermarket_rules，另外處理） */
 export const INDICATOR_TEXT_FIELDS = [
   'status_title',
@@ -1155,6 +1178,23 @@ export function applyHonorificToIndicators(data: Record<string, any>, prefix: st
       rules.recommended_to_buy = rules.recommended_to_buy.map((x: unknown) => applyHonorific(x, prefix));
     }
   }
+
+  // 難字簡化（2026-09-30）：生理指標的說明也常提到「鈉」——
+  // 例如血壓偏高的買菜指南。同樣換成「鹽分」。
+  simplifyNutrientWordingInFields(data, INDICATOR_TEXT_FIELDS);
+  if (rules && typeof rules === 'object') {
+    if (Array.isArray(rules.do_not_buy)) {
+      rules.do_not_buy = rules.do_not_buy.map((x: unknown) =>
+        typeof x === 'string' ? simplifyNutrientWording(x) : x
+      );
+    }
+    if (Array.isArray(rules.recommended_to_buy)) {
+      rules.recommended_to_buy = rules.recommended_to_buy.map((x: unknown) =>
+        typeof x === 'string' ? simplifyNutrientWording(x) : x
+      );
+    }
+  }
+
   return data;
 }
 

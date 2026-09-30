@@ -24,6 +24,7 @@ import {
   analysisCacheContent,
   applyHonorific,
   applyHonorificToFields,
+  NUTRIENT_WORDING_FIELDS,
   applyHonorificToIndicators,
   buildAddressRule,
   buildOcrFailedResult,
@@ -61,6 +62,9 @@ import { buildConditionReminders } from './conditionAdvice';
 import { getLearnerProfile } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
 import { nutrientName, profileName, conditionName } from '../src/data/bilingual';
+// 難字簡化（2026-09-30）：把說明文字裡的「鈉含量」換成「鹽分含量」等。
+// 這是最後一道後處理 —— 補的是「模型沒照提示詞用簡化名稱」的情況。
+import { simplifyNutrientWordingInFields } from '../src/data/bilingual';
 import { PHYSICAL_INDICATORS } from '../src/data/conditions';
 // 本機引擎的英文對照（2026-09-28）：引擎本身維持中文，這裡只轉換輸出欄位。
 import { translateLocalResult } from './localEngineEn';
@@ -339,6 +343,7 @@ ${promptContext}`;
         ensureEducationFields(cachedData, cachedFacts, language);
         // 稱謂是最後一步才插上去（快取內容維持中性）
         applyHonorificToFields(cachedData, honorific, LABEL_TEXT_FIELDS);
+        simplifyNutrientWordingInFields(cachedData, NUTRIENT_WORDING_FIELDS);
         return res.json({ success: true, data: attachReminders(cachedData) });
       }
     } else {
@@ -382,6 +387,7 @@ ${promptContext}`;
         //    反過來的話，快取裡就會帶著第一位使用者的性別稱謂。
         writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
         applyHonorificToFields(aiResult.data, honorific, LABEL_TEXT_FIELDS);
+        simplifyNutrientWordingInFields(aiResult.data, NUTRIENT_WORDING_FIELDS);
         console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
         return res.json({
           success: true,
@@ -429,6 +435,7 @@ ${promptContext}`;
     if (!ocr.ok || !ocr.profile) {
       const failed = buildOcrFailedResult(learnerProfile, ocr, language);
       applyHonorificToFields(failed, honorific, LABEL_TEXT_FIELDS);
+      simplifyNutrientWordingInFields(failed, NUTRIENT_WORDING_FIELDS);
       return res.json({
         success: true,
         data: attachReminders({
@@ -451,6 +458,7 @@ ${promptContext}`;
     const localizedResult = translateLocalResult(smartResult, language);
     // 稱謂最後才插（在翻譯之後，所以不會影響 localEngineEn 的對照表鍵）
     applyHonorificToFields(localizedResult, honorific, LABEL_TEXT_FIELDS);
+    simplifyNutrientWordingInFields(localizedResult, NUTRIENT_WORDING_FIELDS);
 
     return res.json({
       success: true,
@@ -676,6 +684,7 @@ ${contextInfo}
       };
       // ⚠️ QA_TEXT_FIELDS 不含 `question` —— 那是**使用者自己的話**，不能改。
       applyHonorificToFields(qaData, honorific, QA_TEXT_FIELDS);
+      simplifyNutrientWordingInFields(qaData, QA_TEXT_FIELDS);
       return res.json({
         success: true,
         data: qaData,
@@ -686,6 +695,7 @@ ${contextInfo}
     console.log('[LabelBuddy AI] 健康問答啟動本機守護引擎');
     const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators, language);
     applyHonorificToFields(fallbackAnswer as any, honorific, QA_TEXT_FIELDS);
+    simplifyNutrientWordingInFields(fallbackAnswer as any, QA_TEXT_FIELDS);
     return res.json({
       success: true,
       data: fallbackAnswer,

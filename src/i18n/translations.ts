@@ -40,8 +40,8 @@ const zhTW = {
   //    預設使用者不是長者。標語若預設對方是老人，等於一開始就稱呼錯。
   'app.tagline': '看懂超市食品標籤的健康放大鏡',
   'app.taglineEn': 'A health magnifier for supermarket food labels',
-  'app.statusCloud': '雲端 AI 辨識',
-  'app.statusLocal': '本機備援引擎',
+  'app.statusCloud': '雲端 AI 已連線',
+  'app.statusLocal': '離線模式',
   'app.menuTitle': '功能選單',
   'app.openMenu': '開啟選單',
   'app.closeMenu': '關閉選單',
@@ -49,8 +49,8 @@ const zhTW = {
   /* ── 側邊選單 ─────────────────────────────────────────────── */
   'menu.home': '主頁',
   'menu.home.hint': '回到首頁',
-  'menu.scan': '拍照辨識',
-  'menu.scan.hint': '掃描食品標籤',
+  'menu.scan': '拍照看標籤',
+  'menu.scan.hint': '拍食品標籤',
   'menu.history': '飲食紀錄',
   'menu.history.hint': '看過去的把關紀錄',
   'menu.classroom': '食育學堂',
@@ -63,21 +63,21 @@ const zhTW = {
   /* ── 主頁 ─────────────────────────────────────────────────── */
   'home.greeting': '您好',
   'home.intro': '今天也要吃得安心。把包裝上的營養標示拍下來，我幫您看看適不適合。',
-  'home.cameraButton': '拍照辨識',
-  'home.cameraHint': '掃描食品標籤，馬上知道能不能買',
+  'home.cameraButton': '拍照看標籤',
+  'home.cameraHint': '拍食品標籤，馬上知道能不能買',
   'home.summaryTitle': '我的把關',
   'home.recordCount': '筆紀錄',
   'home.conditionCount': '項健康設定',
   'home.currentProfile': '目前身分',
 
   /* ── 底部固定按鈕 ─────────────────────────────────────────── */
-  'footer.homeCamera': '拍照辨識',
+  'footer.homeCamera': '拍照看標籤',
   /* 從相簿／檔案選圖（2026-09-30）：只有 capture 的 input 會強制開鏡頭，
      使用者需要另一個入口才能選已經拍好的照片。 */
   'footer.pickFromGallery': '從相簿選',
-  'footer.scanCamera': '一鍵拍照',
+  'footer.scanCamera': '拍照看標籤',
   'footer.scanRetake': '重新拍照',
-  'footer.goScan': '前往拍照辨識',
+  'footer.goScan': '前往拍照',
   'footer.classroomTry': '去超市試試看',
   'footer.qaToScan': '拍照為食品把關',
   'footer.historyScan': '拍照為食品把關',
@@ -99,7 +99,7 @@ const zhTW = {
   'settings.language.saved': '語言已切換',
   'settings.conditions.title': '個人慢性病與過敏把關',
   'settings.conditions.availableCount': '共 {n} 項可選',
-  'settings.conditions.desc': 'AI 在超市辨識食品時，會依據勾選項目嚴格比對食品成分與禁忌：',
+  'settings.conditions.desc': 'AI 在超市幫您看食品時，會依據勾選項目比對成分與禁忌：',
 
   /* ── 拍照辨識流程（第二階段）───────────────────────────────── */
   /* 重拍提示卡 */
@@ -109,8 +109,8 @@ const zhTW = {
   'scan.tip1': '把手機靠近成分標籤一點，讓字看清楚',
   'scan.tip2': '找光線亮一點的地方，避開反光',
   'scan.tip3': '走到訊號比較好的位置再拍一次',
-  'scan.aimLabel': '對準商品背後的成分標籤',
-  'scan.tapButton': '點下方「📸 一鍵拍照」',
+  'scan.aimLabel': '對準包裝背面的「營養標示」',
+  'scan.tapButton': '點下方「📸 拍照看標籤」',
   'scan.checking': '正在把關：',
   'scan.switchProfile': '切換 ➔',
   'scan.demoTitle': '沒有食品？用示範標籤',
@@ -126,11 +126,9 @@ const zhTW = {
     '沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。',
   'result.why': '為什麼？',
   /* 難字簡化的說明（安全網：長條圖用簡單說法，但包裝上印的是另一組字） */
-  'result.labelWordingNote':
-    '包裝上印的是「鈉」「膳食纖維」這些字，這裡用比較好懂的說法顯示。看標籤時請認包裝上的字。',
   'result.autoDowngraded':
-    '⚠️ 這次雲端沒有回應，已自動改用本機 OCR ＋ 文字分析（照片沒有上傳）。',
-  'result.changeMode': '在設定裡改分析模式',
+    '⚠️ 這次連不上雲端，已改用手機內建的方式看（照片沒有上傳）。',
+  'result.changeMode': '在設定裡改',
   'result.stopReading': '⏹️ 停止朗讀',
   'result.readToMe': '🔊 念給我聽',
   'result.moreInfo': '更多資訊與替代建議',
@@ -159,12 +157,12 @@ const zhTW = {
   'risk.unclearTitle': '看不清楚標籤數字',
 
   /* 資料處理模式標籤 */
-  'mode.ocrLocal': '本機離線 OCR（照片沒有離開裝置）',
-  'mode.ruleLocal': '本機規則引擎（未使用雲端 AI）',
-  'mode.cloudCache': '☁️ 雲端 AI（快取）',
   'mode.cloud': '☁️ 雲端 AI',
-  'mode.localBadge': '📴 本機離線',
-  'mode.imageUploaded': '這次的照片有上傳到雲端辨識。',
+  'mode.localBadge': '📴 離線回答',
+  /* 來源徽章的 tooltip（滑鼠停留才看到）：用白話說清楚答案從哪來 */
+  'mode.cloudBadgeTip': '這次的答案來自雲端 AI。',
+  'mode.localBadgeTip': '這次的答案在你手機上算出來，沒有上網。',
+  'mode.imageUploaded': '這次的照片有送到雲端。',
   'mode.imageLocal': '這次的照片只在這支手機上處理，沒有上傳。',
 
   /* ── 三種分析模式（2026-09-30）───────────────────────────────
@@ -184,8 +182,8 @@ const zhTW = {
   'mode.localOnlyData': '離開手機：無',
   'mode.changeLater': '之後可以在設定裡隨時改，不用重來。',
   'mode.savedVoice': '已切換為「{mode}」',
-  'mode.currentLabel': '目前的模式',
-  'settings.mode.title': 'AI 分析模式',
+  'mode.currentLabel': '目前的方式',
+  'settings.mode.title': 'AI 方式',
 
   /* 營養素長條圖 */
   'nutrient.amount': '這包有 {value} {unit}',
@@ -196,12 +194,11 @@ const zhTW = {
 
   /* 其他 */
   'common.noConditions': '無特殊病史',
-  'common.weakSignalSpeech': '掃描成功，正在處理資料，請保持在網絡訊號良好區域',
+  'common.weakSignalSpeech': '照片收到了，正在處理。請保持網路順暢。',
   /** 清單分隔符號：中文用頓號，英文用逗號加空格 */
   'common.listSeparator': '、',
   /** 「血壓、糖尿病 等 5 項」的後綴 */
   'scan.conditionMore': '等 {n} 項',
-  'result.modelLabel': '模型：{name}',
   /* 語音朗讀的段落標題（拼接給 TTS 用，不是畫面文字） */
   'result.speechWhy': '為什麼：{text}',
   'result.speechHow': '下次怎麼看：{text}',
@@ -215,12 +212,9 @@ const zhTW = {
 
   /* ── 身分選擇器（第三階段）─────────────────────────────────── */
   'profile.picker.title': '先選您的身分',
-  'profile.picker.desc': '選好之後，辨識結果和學堂內容都會依您的需求調整。之後隨時可以回來改。',
+  'profile.picker.desc': '選好之後，拍完的結果和學堂內容都會依您的需求調整。之後隨時可以回來改。',
   'profile.picker.selected': '目前選擇',
   'profile.picker.selectAria': '選擇身分：{name}',
-  'profile.picker.dailyTitle': '{name}的每日參考值',
-  'profile.picker.limit': '不超過',
-  'profile.picker.atLeast': '至少',
 
   /* ── 日常生理指標（第三階段）───────────────────────────────── */
   'vitals.title': '日常身體量測指標',
@@ -293,16 +287,16 @@ const zhTW = {
   'vitals.ai.title': '🤖 讓 AI 幫您深入看一次',
   'vitals.ai.hint':
     '上面的評估是用固定標準算的。按下按鈕，AI 會把您今天量到的數字、勾選的症狀一起看過，給您更完整的解釋與超市買菜建議。',
-  'vitals.ai.button': '開始 AI 深入分析',
+  'vitals.ai.button': '讓 AI 幫我看一次',
   'vitals.ai.busy': 'AI 正在看您的數字…',
   'vitals.ai.readAloud': '唸給我聽',
-  'vitals.ai.resultTitle': 'AI 的分析結果',
+  'vitals.ai.resultTitle': 'AI 怎麼看',
   'vitals.ai.doNotBuy': '🛒 超市千萬不要買',
   'vitals.ai.recommended': '✅ 超市可以安心買',
   'vitals.ai.tips': '💡 生活貼心小叮嚀',
   'vitals.ai.linked': '🔗 已同步到食品標籤掃描',
   'vitals.ai.linkedNote': '下次掃食品標籤時，會特別幫您盯這些項目。',
-  'vitals.ai.modeCloud': '☁️ 雲端 AI 分析',
+  'vitals.ai.modeCloud': '☁️ 雲端 AI',
   'vitals.ai.modeLocal': '📴 離線分析（目前沒有連線，用內建規則給您建議）',
   'vitals.ai.error': '目前連不上 AI，請稍後再試一次。',
 
@@ -330,11 +324,17 @@ const zhTW = {
   'onboard.welcomeTitle': '歡迎使用 LabelBuddy AI',
   'onboard.welcomeBody': '拍一張食品包裝後面的營養標籤，我幫您看這個東西適不適合您吃。',
   /* ── 第 1 頁：超簡單介紹（2026-09-30）── */
-  'onboard.introTitle': '拍一張，我幫您看',
-  'onboard.introBody': '拍下包裝後面那張營養標籤，我告訴您這個東西適不適合您吃。',
-  'onboard.introPoint1': '不用自己算數字',
-  'onboard.introPoint2': '用綠、黃、紅告訴您能不能買',
-  'onboard.introPoint3': '看不懂的字，我用白話講給您聽',
+  'onboard.introTitle': '拍食品標籤，馬上知道能不能吃',
+  'onboard.introBody': '對準包裝背面的「營養標示」拍一張就好。',
+  'onboard.introPoint1': '綠可以買、黃少吃、紅先放回去',
+  'onboard.introPoint2': '看不懂的字，我用白話講給您聽',
+  'onboard.introPoint3': '沒網路也能用，只是建議比較簡單',
+  /* 「拍這個 → 得到這個」的視覺對照（不識字也看得懂） */
+  'onboard.introShotLabel': '營養標示',
+  'onboard.introShotSalt': '鹽分　120 毫克',
+  'onboard.introShotSugar': '糖　3 公克',
+  'onboard.introShotResult': '可以買',
+  'onboard.introShotCaption': '拍標籤，馬上知道',
   /* ── 第 3 頁：慢性病與過敏（2026-09-30）── */
   'onboard.conditionsTitle': '您有下面這些情形嗎？',
   'onboard.conditionsBody': '有的話請打勾。沒有的話直接按下一步就好。',
@@ -438,7 +438,7 @@ const zhTW = {
   'settings.conditionsPreview': '包括：{list}',
   'settings.conditionsPreviewMore': '共 {n} 項，包括：{list} 等等',
   'settings.readFull': '🔊 朗讀我的完整健康設定（粵語/國語）',
-  'settings.done': '✅ 設定完成，前往拍照辨識',
+  'settings.done': '✅ 設定完成，前往拍照',
   'settings.upgradeTitle': '我們新增了更多健康項目',
   'settings.upgradeBody':
     '現在可以勾選的慢性病與過敏原變多了（共 {n} 項）。您原本勾選的項目我們都保留了，要不要花一分鐘重新確認一下？',
@@ -477,11 +477,11 @@ const zhTW = {
   /* ── 掃描流程的提示與錯誤訊息（第三階段）───────────────────── */
   'scan.readingLabel': '正在讀取標籤文字',
   /* 「直接雲端」失敗時的自動降級提示（一定要讓使用者知道，不能悄悄降級） */
-  'scan.autoDowngrade': '雲端忙線中，已改用本機辨識重試。',
-  'scan.analyzing': '正在為您分析',
+  'scan.autoDowngrade': '雲端忙線中，已改用手機內建的方式重試。',
+  'scan.analyzing': '正在幫您看',
   'scan.errBusy': '網絡繁忙，請稍後再試',
   'scan.errUnclear': '照片看不清楚，請重新拍一次',
-  'scan.errNoResult': '無法取得食品辨識結果，請再試一次',
+  'scan.errNoResult': '這張標籤看不清楚，請再拍一次',
   'scan.errPhoto': '讀取照片失敗，請重新拍照。',
   'settings.savedKeptToast': '已保留您原本的設定',
   'settings.savedResetToast': '已為您重新套用預設的健康項目',
@@ -504,8 +504,8 @@ const zhTW = {
 
   /* ── 等待畫面（第三階段）───────────────────────────────────── */
   'loading.reading': '正在讀取標籤…',
-  'loading.analyzing': '正在為您分析…',
-  'loading.localOnly': '照片只在這支手機上處理，不會上傳',
+  'loading.analyzing': '正在幫您看…',
+  'loading.localOnly': '照片只在這支手機上處理，不會送出去',
   'loading.typical': '通常需要 5 到 10 秒',
   'loading.waited': '（已等 {n} 秒）',
   'loading.privacyBadge': '照片不會離開這支手機',
@@ -516,7 +516,7 @@ const zhTW = {
   /* ── 飲食紀錄頁（第三階段）─────────────────────────────────── */
   'history.ariaModule': '我的飲食健康紀錄模組',
   'history.title': '飲食健康週紀錄',
-  'history.subtitle': '過去 7 天把關與分級分析',
+  'history.subtitle': '過去 7 天的紀錄',
   'history.export': '匯出健康概況',
   'history.gradeBadge': '評級 {letter} ({title})',
   'history.gradeA': '優良把關',
@@ -541,7 +541,7 @@ const zhTW = {
   'history.badgeGreen': '🟢 綠燈',
   'history.badgeYellow': '🟡 黃燈',
   'history.badgeRed': '🔴 紅燈',
-  'history.speakThisTitle': '語音播報此食品分析',
+  'history.speakThisTitle': '唸給我聽',
   'history.speakThis': '播報',
   'history.plainLabel': '💬 長者白話說明：',
   'history.altLabel': '💡 採買替代建議：',
@@ -591,7 +591,7 @@ const zhTW = {
   'history.report.itemGreen': '🟢綠燈',
   'history.report.itemYellow': '🟡黃燈',
   'history.report.itemRed': '🔴紅燈',
-  'history.report.noItems': '  （暫無掃描紀錄）',
+  'history.report.noItems': '  （還沒有紀錄）',
   'history.report.tipsHeader': '💡 溫馨健康叮嚀：',
   'history.report.tip1': '  • 請保持每日充足水分攝取（約 1500~2000cc）。',
   'history.report.tip2': '  • 採買時認明綠燈天然原型食材，少吃高鈉加工醬料與高糖零食。',
@@ -648,16 +648,16 @@ const en: Record<TranslationKey, string> = {
   'app.documentTitle': 'LabelBuddy AI - Your supermarket health helper',
   'app.tagline': 'A health magnifier for supermarket food labels',
   'app.taglineEn': 'A health magnifier for supermarket food labels',
-  'app.statusCloud': 'Cloud AI',
-  'app.statusLocal': 'On-device engine',
+  'app.statusCloud': 'Cloud AI online',
+  'app.statusLocal': 'Offline mode',
   'app.menuTitle': 'Menu',
   'app.openMenu': 'Open menu',
   'app.closeMenu': 'Close menu',
 
   'menu.home': 'Home',
   'menu.home.hint': 'Back to the start',
-  'menu.scan': 'Scan a label',
-  'menu.scan.hint': 'Read a food label',
+  'menu.scan': 'Photo a label',
+  'menu.scan.hint': 'Photograph a food label',
   'menu.history': 'History',
   'menu.history.hint': 'See past checks',
   'menu.classroom': 'Learn',
@@ -670,18 +670,18 @@ const en: Record<TranslationKey, string> = {
   'home.greeting': 'Hello',
   'home.intro':
     'Take a photo of the nutrition label and I will tell you whether this product suits you.',
-  'home.cameraButton': 'Scan a label',
+  'home.cameraButton': 'Photo a label',
   'home.cameraHint': 'Find out if it is safe to buy',
   'home.summaryTitle': 'My checks',
   'home.recordCount': 'records',
   'home.conditionCount': 'health settings',
   'home.currentProfile': 'Current profile',
 
-  'footer.homeCamera': 'Scan a label',
+  'footer.homeCamera': 'Photo a label',
   'footer.pickFromGallery': 'From gallery',
-  'footer.scanCamera': 'Take a photo',
+  'footer.scanCamera': 'Photo a label',
   'footer.scanRetake': 'Retake photo',
-  'footer.goScan': 'Go to scanner',
+  'footer.goScan': 'Go to the camera',
   'footer.classroomTry': 'Try it at the store',
   'footer.qaToScan': 'Check a product',
   'footer.historyScan': 'Check a product',
@@ -701,7 +701,7 @@ const en: Record<TranslationKey, string> = {
   'settings.conditions.title': 'My conditions and allergens',
   'settings.conditions.availableCount': '{n} available',
   'settings.conditions.desc':
-    'When scanning a product, the AI strictly checks the ingredients against the items you select:',
+    'When you photograph a product, the AI checks the ingredients against the items you select:',
 
   'scan.retakeTitle': 'That did not work',
   'scan.retakeSubtitle': 'It is not your fault — nothing is broken.',
@@ -709,8 +709,8 @@ const en: Record<TranslationKey, string> = {
   'scan.tip1': 'Move the phone closer to the ingredient list',
   'scan.tip2': 'Find brighter light and avoid glare',
   'scan.tip3': 'Move somewhere with a better signal and try again',
-  'scan.aimLabel': 'Point at the ingredient list on the back',
-  'scan.tapButton': 'Tap "📸 Take a photo" below',
+  'scan.aimLabel': 'Point at the nutrition table on the back',
+  'scan.tapButton': 'Tap "📸 Photo a label" below',
   'scan.checking': 'Checking for:',
   'scan.switchProfile': 'Change ➔',
   'scan.demoTitle': 'No product? Try a sample label',
@@ -724,10 +724,8 @@ const en: Record<TranslationKey, string> = {
   'result.noConclusion':
     'I could not read enough nutrition numbers, so I am not giving a verdict this time — that way I will not guess wrong.',
   'result.why': 'Why?',
-  'result.labelWordingNote':
-    'Packaging prints terms like \u201csodium\u201d and \u201cdietary fibre\u201d; we show them in plainer words. Look for the packaging wording on the label itself.',
   'result.autoDowngraded':
-    'The cloud did not respond, so this used on-device OCR and text analysis instead. Your photo was not uploaded.',
+    'Could not reach the cloud, so this used what is built into your phone instead. Your photo was not uploaded.',
   'result.changeMode': 'Change mode in Settings',
   'result.stopReading': '⏹️ Stop reading',
   'result.readToMe': '🔊 Read it to me',
@@ -755,11 +753,10 @@ const en: Record<TranslationKey, string> = {
   'risk.green': 'The ingredients are gentle — safe to buy and take home.',
   'risk.unclearTitle': 'Cannot read the label numbers',
 
-  'mode.ocrLocal': 'On-device OCR (photo never left your phone)',
-  'mode.ruleLocal': 'On-device rule engine (no cloud AI)',
-  'mode.cloudCache': '☁️ Cloud AI (cached)',
   'mode.cloud': '☁️ Cloud AI',
-  'mode.localBadge': '📴 On-device',
+  'mode.localBadge': '📴 Offline answer',
+  'mode.cloudBadgeTip': 'This answer came from the cloud AI.',
+  'mode.localBadgeTip': 'This answer was worked out on your phone, with no internet.',
   'mode.imageUploaded': 'This photo was uploaded for cloud analysis.',
   'mode.imageLocal': 'This photo was processed only on this phone — it was not uploaded.',
 
@@ -788,10 +785,9 @@ const en: Record<TranslationKey, string> = {
 
   'common.noConditions': 'No specific conditions',
   'common.weakSignalSpeech':
-    'Scan complete, processing your data. Please stay where the signal is good.',
+    'Photo received, processing. Please stay where the signal is good.',
   'common.listSeparator': ', ',
   'scan.conditionMore': 'and {n} more',
-  'result.modelLabel': 'Model: {name}',
   'result.speechWhy': 'Why: {text}',
   'result.speechHow': 'What to look for next time: {text}',
   'result.speechMeaning': 'What this means for you: {text}',
@@ -803,12 +799,9 @@ const en: Record<TranslationKey, string> = {
 
   'profile.picker.title': 'Choose your profile',
   'profile.picker.desc':
-    'Once chosen, scan results and lesson content adapt to your needs. You can change it any time.',
+    'Once chosen, results and lesson content adapt to your needs. You can change it any time.',
   'profile.picker.selected': 'Selected',
   'profile.picker.selectAria': 'Select profile: {name}',
-  'profile.picker.dailyTitle': 'Daily reference values for {name}',
-  'profile.picker.limit': 'Up to',
-  'profile.picker.atLeast': 'At least',
 
   'vitals.title': 'Daily health measurements',
   'vitals.subtitle': 'Blood pressure, heart rate and blood sugar (tap + / − to adjust)',
@@ -888,10 +881,10 @@ const en: Record<TranslationKey, string> = {
   'vitals.ai.title': '🤖 Let the AI take a closer look',
   'vitals.ai.hint':
     'The assessment above uses fixed thresholds. Tap the button and the AI will read today\u2019s numbers together with the symptoms you ticked, and give you a fuller explanation plus supermarket advice.',
-  'vitals.ai.button': 'Start AI analysis',
+  'vitals.ai.button': 'Have the AI look at this',
   'vitals.ai.busy': 'The AI is reading your numbers\u2026',
   'vitals.ai.readAloud': 'Read this to me',
-  'vitals.ai.resultTitle': 'AI analysis result',
+  'vitals.ai.resultTitle': 'What the AI sees',
   'vitals.ai.doNotBuy': '🛒 Do not buy at the supermarket',
   'vitals.ai.recommended': '✅ Safe to buy',
   'vitals.ai.tips': '💡 Daily care tips',
@@ -928,11 +921,16 @@ const en: Record<TranslationKey, string> = {
   'onboard.welcomeBody':
     'Take a photo of the nutrition label on the back of any food package, and I will tell you whether it suits you.',
   /* ── Page 1: very short intro (2026-09-30) ── */
-  'onboard.introTitle': 'Take one photo \u2014 I will check it for you',
-  'onboard.introBody': 'Photograph the nutrition label on the back of the pack, and I will tell you whether it suits you.',
-  'onboard.introPoint1': 'No numbers to work out yourself',
-  'onboard.introPoint2': 'Green, yellow or red tells you if you can buy it',
-  'onboard.introPoint3': 'Hard words explained in plain language',
+  'onboard.introTitle': 'Photograph a food label \u2014 know at once if you can eat it',
+  'onboard.introBody': 'Just point at the nutrition table on the back of the pack and take one photo.',
+  'onboard.introPoint1': 'Green: buy it. Yellow: small portion. Red: put it back',
+  'onboard.introPoint2': 'Hard words explained in plain language',
+  'onboard.introPoint3': 'Works without internet too \u2014 the advice is just simpler',
+  'onboard.introShotLabel': 'Nutrition table',
+  'onboard.introShotSalt': 'Salt  120 mg',
+  'onboard.introShotSugar': 'Sugar  3 g',
+  'onboard.introShotResult': 'Fine to buy',
+  'onboard.introShotCaption': 'Photo the label, know right away',
   /* ── Page 3: conditions and allergies (2026-09-30) ── */
   'onboard.conditionsTitle': 'Do any of these apply to you?',
   'onboard.conditionsBody': 'Tick the ones that apply. If none do, just tap Next.',
@@ -1048,7 +1046,7 @@ const en: Record<TranslationKey, string> = {
   'settings.conditionsPreview': 'Including: {list}',
   'settings.conditionsPreviewMore': '{n} in total, including: {list} and more',
   'settings.readFull': '🔊 Read my full health settings aloud',
-  'settings.done': '✅ Done — go to the scanner',
+  'settings.done': '✅ Done — go to the camera',
   'settings.upgradeTitle': 'We added more health items',
   'settings.upgradeBody':
     'There are now more conditions and allergens you can tick ({n} in total). Everything you had selected is kept — would you like a minute to review?',
@@ -1089,11 +1087,11 @@ const en: Record<TranslationKey, string> = {
     'Long-term habit: drink enough warm water at set times each day and eat vegetables and fruit of many colours.',
 
   'scan.readingLabel': 'Reading the label text',
-  'scan.autoDowngrade': 'The cloud is busy \u2014 retrying with on-device recognition.',
-  'scan.analyzing': 'Analysing for you',
+  'scan.autoDowngrade': 'The cloud is busy \u2014 retrying with what is built into your phone.',
+  'scan.analyzing': 'Checking it for you',
   'scan.errBusy': 'The network is busy — please try again shortly',
   'scan.errUnclear': 'The photo is not clear enough — please take another one',
-  'scan.errNoResult': 'Could not get a result — please try again',
+  'scan.errNoResult': 'Could not read this label — please take another photo',
   'scan.errPhoto': 'Could not read the photo. Please take another one.',
   'settings.savedKeptToast': 'Your original settings were kept',
   'settings.savedResetToast': 'The default health items were applied again',
@@ -1113,8 +1111,8 @@ const en: Record<TranslationKey, string> = {
   'foodname.red': 'High burden — not recommended',
 
   'loading.reading': 'Reading the label…',
-  'loading.analyzing': 'Analysing for you…',
-  'loading.localOnly': 'The photo is processed only on this phone — nothing is uploaded',
+  'loading.analyzing': 'Checking it for you…',
+  'loading.localOnly': 'The photo is processed only on this phone — nothing is sent out',
   'loading.typical': 'Usually takes 5 to 10 seconds',
   'loading.waited': '(waited {n}s)',
   'loading.privacyBadge': 'The photo never leaves this phone',
@@ -1124,7 +1122,7 @@ const en: Record<TranslationKey, string> = {
 
   'history.ariaModule': 'My food health history module',
   'history.title': 'Weekly food health record',
-  'history.subtitle': 'Checks and grades over the past 7 days',
+  'history.subtitle': 'Your last 7 days',
   'history.export': 'Export summary',
   'history.gradeBadge': 'Grade {letter} ({title})',
   'history.gradeA': 'Excellent',
@@ -1150,7 +1148,7 @@ const en: Record<TranslationKey, string> = {
   'history.badgeGreen': '🟢 Green',
   'history.badgeYellow': '🟡 Yellow',
   'history.badgeRed': '🔴 Red',
-  'history.speakThisTitle': 'Read this analysis aloud',
+  'history.speakThisTitle': 'Read this to me',
   'history.speakThis': 'Read',
   'history.plainLabel': '💬 In plain words:',
   'history.altLabel': '💡 Shopping alternatives:',
@@ -1201,7 +1199,7 @@ const en: Record<TranslationKey, string> = {
   'history.report.itemGreen': '🟢 Green',
   'history.report.itemYellow': '🟡 Yellow',
   'history.report.itemRed': '🔴 Red',
-  'history.report.noItems': '  (no scans yet)',
+  'history.report.noItems': '  (nothing yet)',
   'history.report.tipsHeader': '💡 Friendly health reminders:',
   'history.report.tip1': '  • Drink enough water every day (about 1500-2000 ml).',
   'history.report.tip2':

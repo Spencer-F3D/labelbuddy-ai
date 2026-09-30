@@ -370,7 +370,7 @@ try {
     ['03-classroom', 'Learn'],
     ['04c-health-qa', 'Health Q&A'],
     ['04-health-settings', 'Health settings'],
-    ['05-scan', 'Scan a label'],
+    ['05-scan', 'Photo a label'],
   ];
 
   for (const [name, label] of NAV) {
@@ -521,7 +521,7 @@ try {
   // 示範按鈕在「拍照辨識」分頁上
   await openMenu();
   await sleep(900);
-  await clickByText('Scan a label');
+  await clickByText('Photo a label');
   await sleep(1500);
   await capture('06-scan-tab');
 

@@ -158,6 +158,26 @@ try {
     '★ 不再有概括的 imageNeverLeavesDevice 保證（它對 cloud_image 不成立）',
     privacy?.imageNeverLeavesDevice === undefined
   );
+
+  console.log('\n── 3. 難字簡化：片語要換，化學名稱不能動 ──');
+  const { simplifyNutrientWording } = await import('../src/data/bilingual');
+
+  check('鈉含量 → 鹽分含量', simplifyNutrientWording('鈉含量高達 2350 毫克') === '鹽分含量高達 2350 毫克');
+  check('高鈉 → 高鹽分', simplifyNutrientWording('高鈉泡麵') === '高鹽分泡麵');
+  check('膳食纖維 → 纖維', simplifyNutrientWording('膳食纖維不足') === '纖維不足');
+  check('飽和脂肪 → 動物油', simplifyNutrientWording('飽和脂肪偏高') === '動物油偏高');
+  check('添加糖 → 糖', simplifyNutrientWording('添加糖過多') === '糖過多');
+
+  /**
+   * ⚠️ 這三條是**最重要的**：這些是化學名稱，不是「鈉」這個營養素。
+   *    把 L-麩酸鈉（味精）寫成「L-麩酸鹽分」就是事實錯誤。
+   *    所以後處理只換片語，不碰單一個「鈉」字。
+   */
+  check('★ L-麩酸鈉（味精）不能被改', simplifyNutrientWording('含 L-麩酸鈉') === '含 L-麩酸鈉');
+  check('★ 苯甲酸鈉（防腐劑）不能被改', simplifyNutrientWording('苯甲酸鈉') === '苯甲酸鈉');
+  check('★ 碳酸鈉不能被改', simplifyNutrientWording('碳酸鈉') === '碳酸鈉');
+  check('★ 單獨一個「鈉」字不改（寧可漏換，不要錯換）', simplifyNutrientWording('鈉 2350 毫克') === '鈉 2350 毫克');
+  check('英文不受影響', simplifyNutrientWording('High sodium content') === 'High sodium content');
 } catch (e: any) {
   console.error('測試執行失敗:', e?.message ?? e);
   fail++;

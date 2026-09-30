@@ -17,11 +17,14 @@ import React from 'react';
 import { Check, ChevronRight, Users } from 'lucide-react';
 import type { LearnerProfile, LearnerProfileId } from '../types';
 import { getAllLearnerProfiles } from '../data/learnerProfiles';
-// 雙語（2026-09-28 第三階段）：身分名稱、對象說明、每日參考值都放在資料層，
+// 雙語（2026-09-28 第三階段）：身分名稱與對象說明放在資料層，
 // 這裡只負責「取值」與介面文字，翻譯資料本身集中在 data/bilingualContent.ts。
+//
+// ⚠️ 2026-09-30：原本這裡還會渲染「每日參考值」整塊（鈉不超過 2000 毫克…），
+//    已移除 —— 使用者選身分時不需要看這些數字，那是內部判斷用的門檻。
+//    連帶移除了 nutrientName / targetText / targetNote 三個 import。
 import { useI18n } from '../i18n/I18nContext';
-import { nutrientName } from '../data/bilingual';
-import { profileDisplayName, targetText, targetNote } from '../data/bilingualContent';
+import { profileDisplayName } from '../data/bilingualContent';
 
 interface LearnerProfilePickerProps {
   /** 目前選定的身分 */
@@ -29,7 +32,15 @@ interface LearnerProfilePickerProps {
   /** 切換身分時的回呼 */
   onSelect: (id: LearnerProfileId) => void;
   /** 是否使用精簡版（放在學堂頁面內時用 true） */
-  compact?: boolean;
+  /**
+   * 隱藏內建的標題與說明（2026-09-30）。
+   *
+   * 【為什麼需要】
+   *   引導頁已經有自己的卡片標題（「先問一下：您是誰？」），
+   *   再用這裡的標題就會變成同一個畫面有兩個幾乎一樣的標題。
+   *   設定頁與食育學堂則需要自己的標題（那裡沒有外層卡片）。
+   */
+  hideHeading?: boolean;
 }
 
 /** 各身分的視覺配色（避免使用動態組字串的 Tailwind class，改為靜態對照表） */
@@ -141,27 +152,24 @@ function ProfileCard({
 export const LearnerProfilePicker: React.FC<LearnerProfilePickerProps> = ({
   selectedId,
   onSelect,
-  compact = false,
+  hideHeading = false,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const profiles = getAllLearnerProfiles();
-  const selected = profiles.find((p) => p.id === selectedId);
-  const selectedName = selected
-    ? profileDisplayName(selected.id, selected.name, language)
-    : '';
 
   return (
     <section className="w-full">
-      {/* 標題 */}
-      <div className="flex items-center gap-2 mb-3">
-        <Users className="w-6 h-6 text-blue-800 shrink-0" />
-        <h2 className="text-[20px] font-black text-blue-950">{t('profile.picker.title')}</h2>
-      </div>
-
-      {!compact && (
-        <p className="text-[16px] text-slate-700 mb-4 leading-relaxed">
-          {t('profile.picker.desc')}
-        </p>
+      {/* 標題與說明（引導頁已有自己的卡片標題時可關掉，避免兩個標題） */}
+      {!hideHeading && (
+        <>
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-6 h-6 text-blue-800 shrink-0" />
+            <h2 className="text-[20px] font-black text-blue-950">{t('profile.picker.title')}</h2>
+          </div>
+          <p className="text-[16px] text-slate-700 mb-4 leading-relaxed">
+            {t('profile.picker.desc')}
+          </p>
+        </>
       )}
 
       {/* 選項清單（單欄垂直） */}
@@ -175,42 +183,6 @@ export const LearnerProfilePicker: React.FC<LearnerProfilePickerProps> = ({
           />
         ))}
       </div>
-
-      {/* 目前身分的每日參考值（讓選擇有具體意義） */}
-      {selected && (
-        <div className="mt-4 rounded-2xl bg-slate-100 border-2 border-slate-300 p-4">
-          <p className="text-[20px] font-black text-slate-900 mb-2">
-            {selected.emoji} {t('profile.picker.dailyTitle', { name: selectedName })}
-          </p>
-          <ul className="space-y-1.5">
-            {selected.targets.map((target) => (
-              <li
-                key={target.nutrient}
-                className="flex items-start gap-2 text-[16px] leading-snug text-slate-800"
-              >
-                <span
-                  className={`shrink-0 mt-1 w-2.5 h-2.5 rounded-full ${
-                    target.direction === 'limit' ? 'bg-rose-500' : 'bg-emerald-500'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span>
-                  <strong className="font-black">
-                    {nutrientName(target.nutrient, language)}
-                  </strong>
-                  <span className="mx-1">·</span>
-                  {target.direction === 'limit'
-                    ? t('profile.picker.limit')
-                    : t('profile.picker.atLeast')}{' '}
-                  <strong className="font-black">{targetText(target.target, language)}</strong>
-                  <br />
-                  <span className="text-slate-600">{targetNote(target.note, language)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   );
 };
