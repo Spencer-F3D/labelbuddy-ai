@@ -343,11 +343,6 @@ const zhTW = {
   'onboard.feat6Title': '健康設定',
   'onboard.feat6Body': '選身分、勾慢性病，結論更貼近您',
   /* 「拍這個 → 得到這個」的視覺對照（不識字也看得懂） */
-  'onboard.introShotLabel': '營養標示',
-  'onboard.introShotSalt': '鹽分　120 毫克',
-  'onboard.introShotSugar': '糖　3 公克',
-  'onboard.introShotResult': '可以買',
-  'onboard.introShotCaption': '拍標籤，馬上知道',
   /* ── 第 3 頁：慢性病與過敏（2026-09-30）── */
   'onboard.conditionsTitle': '您有下面這些情形嗎？',
   'onboard.conditionsBody': '有的話請打勾。沒有的話直接按下一步就好。',
@@ -950,11 +945,6 @@ const en: Record<TranslationKey, string> = {
   'onboard.feat5Body': 'Ask a question whenever you want',
   'onboard.feat6Title': 'Health settings',
   'onboard.feat6Body': 'Pick your profile and conditions for a sharper verdict',
-  'onboard.introShotLabel': 'Nutrition table',
-  'onboard.introShotSalt': 'Salt  120 mg',
-  'onboard.introShotSugar': 'Sugar  3 g',
-  'onboard.introShotResult': 'Fine to buy',
-  'onboard.introShotCaption': 'Photo the label, know right away',
   /* ── Page 3: conditions and allergies (2026-09-30) ── */
   'onboard.conditionsTitle': 'Do any of these apply to you?',
   'onboard.conditionsBody': 'Tick the ones that apply. If none do, just tap Next.',
