@@ -178,3 +178,87 @@ footer 的 CTA 分支（`activeTab === 'xxx' ? ... : ...` 鏈）。漏掉 footer
 ★ 這個順序證明「區域檢查發生在**金鑰被接受之後**」，且依**呼叫來源的位置**判定 ——
 所以換幾個帳號結果都一樣。唯一合規解法是把後端部署到支援區域
 （已部署 Cloudflare，**尚未驗證 Gemini 是否復活**）。
+
+## 三種分析模式（2026-09-30）
+
+`AnalysisMode = 'cloud_image' | 'cloud_text' | 'local_only'`（定義在 `src/types.ts`）
+
+| 模式 | 前端做什麼 | 送出去的內容 | 後端引擎 |
+| --- | --- | --- | --- |
+| `cloud_image`（預設） | 只壓縮，**不跑 OCR** | 照片 ＋ 慢性病清單 | 雲端視覺模型 |
+| `cloud_text` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | 雲端文字模型 |
+| `local_only` | 跑 OCR | **什麼都不送** | 本機規則引擎 |
+
+### 資料流與閘門
+
+- `App.tsx` 的 `sendImageForAnalysis()` 依模式分流，抽出 `postAnalyzeLabel()` helper
+- ★ `localOnly` **一律由 `analysisMode` 推導**，呼叫端不能自己傳 ——
+  否則會出現「使用者選了只在本機，卻因為某個分支忘了帶旗標而上傳」的漏洞
+- 後端三個端點都讀 `localOnly`：
+  - `analyze-label`：`allowCloud = localOnly === false`（原本就有）
+  - `analyze-indicators`：`localOnly ? null : await callAiModel(...)`（09-30 補）
+  - `ask-health-question`：同上（09-30 補）
+- ★ 這兩個端點先前**無條件呼叫雲端**，是「不會報錯、只會偷偷違背承諾」的 bug
+
+### 自動降級（`cloud_image` 專屬）
+
+Cloudflare Worker 沒有 tesseract.js → 圖片模式雲端失敗會回 `400 OCR_NOT_AVAILABLE`，
+**後端無法自己 OCR**。所以降級做在**前端**：
+失敗 → 自己跑 OCR → 改用文字重送 → 結果頁顯示 `result.autoDowngraded` 通知。
+
+★ 一定要告知使用者：他選「直接雲端」是為了準確度，悄悄降級會讓他以為照片有被用到。
+
+### 解析度
+
+| 常數 | 值 | 理由 |
+| --- | --- | --- |
+| `IMAGE_MAX_DIM_CLOUD` | 1600 | 視覺模型要看得清標籤小字（base64 約 300–500KB） |
+| `IMAGE_MAX_DIM_OCR` | 1024 | OCR 的瓶頸在字元辨識，不在像素數；越大越慢 |
+
+### 舊設定遷移
+
+`labelbuddy_cloud_consent_v1`（`'true'`/`'false'`）→ `labelbuddy_analysis_mode_v1`：
+`true`→`cloud_text`、`false`→`local_only`。
+★ **不可直接蓋成新預設值** —— 那等於偷偷把「不同意上傳」的人改成「照片會上傳」。
+遷移後移除舊鍵。
+
+### 相關檔案
+
+| 檔案 | 角色 |
+| --- | --- |
+| `src/data/analysisModes.ts` | 模式順序 ＋ 三組翻譯鍵的對照（避免 App ↔ 元件循環引用） |
+| `src/components/AnalysisModePicker.tsx` | 三選一 UI（引導頁與設定頁共用） |
+| `scripts/check-analysis-mode.ts` | 12 項閘門測試（實際啟動伺服器、不耗 API 額度） |
+
+## nutrient_facts 管線細節
+
+★ **鐵則：模型只讀出「含量」，百分比一律由後端重算** ——
+小模型算 `2480÷2000×100` 會錯，而且錯得無聲無息。
+
+`normalizeNutrientFacts(raw, numericLimits)`：
+用每日上限**覆蓋**模型算的 percent，補 `dailyLimit` / `direction`，
+過濾（最多 3 項、**門檻 30%**、依嚴重度排序）。
+
+⚠️ **三條路徑都要套用**：雲端成功、**快取命中**、本機備援 ——
+漏掉快取那條會回傳舊格式（而且不會報錯）。
+⚠️ **limit 與 target 方向相反**（鈉 120% 是壞事、蛋白質 120% 是好事）
+→ `NutrientFactBars.tsx` 的 `factTone()` 分開處理。
+
+## 簡繁後處理
+
+`core.ts` 的 `SIMPLIFIED_TO_TRADITIONAL` 只收「簡繁一對一無歧義」的字，
+現約 438 字。**一律不列**的（因為一簡對多繁、有歧義）：
+后/後、干/乾、里/裡、面/麵、只/隻、发/發/髮。
+
+★ 看到簡體字先查是不是「新字不在表內」，不要急著換模型。
+
+## 額度節省四層
+
+1. **雙供應商輪替**：`orderedProviders()` 依「今日已用 ÷ 每日上限」排序
+2. **健康冷卻**：一般失敗連續 2 次 → 10 分鐘；永久性錯誤 → 6 小時
+3. **回應快取**（最有效）：TTL 24h（實測 5065ms → 7ms）
+4. **額度預檢**：`getOpenRouterQuota()` 查 `GET /api/v1/key`（快取 60s、查詢本身不耗額度）
+
+⚠️ 多開金鑰／帳號**無效**（官方：capacity 是全域治理，多開違反條款）。
+真實用量看 `GET /api/v1/key` 的 `free_model_daily_requests`
+（`limit` / `limit_remaining` 是 per-key 信用上限，容易混淆）。

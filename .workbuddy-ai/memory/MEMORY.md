@@ -46,20 +46,37 @@
 3. `node node_modules/wrangler/bin/wrangler.js deploy`（只上傳變動檔，約 30 秒）
 4. **驗證**：線上首頁引用的 `assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名
 
-## 🔒 隱私架構與 AI 模式
+## 🔒 隱私架構與 AI 模式（09-30 改為三模式）
 
 ```
-拍照 ──> 前端 tesseract.js 讀出文字  ← 照片到此為止，從未離開裝置
-      └─ 只送 ocrText 給後端 ─> 雲端 AI（主要）｜斷網／失敗 → 本機規則引擎（後備）
+拍照 ──┬─ cloud_image  → 照片直接上傳給雲端視覺模型（不做 OCR）
+       ├─ cloud_text   → 前端 tesseract.js 讀出文字 → 只送文字給雲端 AI
+       └─ local_only   → 前端 OCR → 本機規則引擎，完全不連網
 ```
-- 理由：章程規則 2 → **雲端真實 AI 必須是主角**。`analysis_mode` 回 `cloud_ai`/`local_fallback`，前端要顯示
-- ★ **照片永遠不離開裝置，與 `cloudConsent` 無關** —— 本機 OCR 一直是唯一路徑，
-  旗標只決定「文字」要不要送出。**不要把兩者混為一談。**
-- ★ **引導頁是唯一能把 `cloudConsent` 設成 true 的入口**。旗標 `labelbuddy_onboarded_v1`
-- 元件 `OnboardingFlow.tsx`（3 步：身分＋性別／使用介紹／私隱＋AI 模式）
+| 模式 | 照片 | 文字 | 健康資訊 | 引擎 |
+| --- | --- | --- | --- | --- |
+| `cloud_image`（**預設**） | 上傳 | — | 上傳 | 雲端視覺 AI |
+| `cloud_text` | 留在裝置 | 上傳 | 上傳 | 雲端文字 AI |
+| `local_only` | 留在裝置 | 留在裝置 | 留在裝置 | 本機規則引擎 |
+
+- 理由：章程規則 2 → **雲端真實 AI 必須是主角**；三模式讓使用者自己選隱私／準確度取捨
+- ★ **「照片永遠不離開裝置」已不再是通則**（只對 `cloud_text`／`local_only` 成立）。
+  文案一律**逐模式陳述** —— 概括保證在模式增加時最容易變成謊言
+- ★ **前端 OCR 從「必經之路」變成後備方案**（09-30）
+- ★ **同意閘門（09-30 補上）**：`analyze-indicators` 與 `ask-health-question`
+  先前**無條件呼叫雲端**，選 `local_only` 時血壓／症狀／提問照樣上傳 →
+  兩者都加 `localOnly` 檢查。**這是「不會報錯、只會偷偷違背承諾」的 bug**
+- ★ `localOnly` **一律由 `analysisMode` 推導**，呼叫端不能自己傳
+- ★ `cloud_image` 失敗時前端**自己 OCR 改用文字重送**＋顯示降級通知
+  （Worker 沒有 tesseract，後端無法自己 OCR）
+- ★ 舊鍵遷移：`true`→`cloud_text`、`false`→`local_only`。
+  **不可直接蓋成新預設值** —— 那等於把「不同意上傳」的人改成「照片會上傳」
+- ★ 解析度：`cloud_image` 1600px、OCR 模式 1024px（OCR 瓶頸在字元辨識，不在像素數）
 - ★ 判斷「哪一種模式」看**欄位是否存在**，不是看內容是否為空：前端 OCR 失敗送 `ocrText: ''`，
   那仍是文字模式 → 要回「請重拍」而不是 400（400 讓使用者看到「系統壞了」）
 - ★ **空文字要提早擋掉**，不查快取也不呼叫雲端（送空字串只會得到幻覺，還白費額度）
+- 元件：`OnboardingFlow.tsx`｜`AnalysisModePicker.tsx`｜`src/data/analysisModes.ts`
+  （細節與資料流見 `ARCHITECTURE.md`）
 
 ## 🛡️ 安全鐵則（違反會害到人）
 ★ **顏色一律以規則引擎為準，AI 只提供文字。**
@@ -101,13 +118,10 @@
 - OpenRouter 會快取相同請求 → 驗證延遲時提示詞要加唯一編號
 
 ## 💰 額度節省（四層）
-1. **雙供應商輪替**：`orderedProviders()` 依「今日已用 ÷ 每日上限」排序
-2. **健康冷卻**：一般失敗連續 2 次 → 10 分鐘；永久性錯誤 → 6 小時
-3. **回應快取**（最有效）：TTL 24h（5065ms → 7ms）。鍵的組成見「安全鐵則」第三類
-4. **額度預檢**：`getOpenRouterQuota()` 查 `GET /api/v1/key`（快取 60s、不耗額度）
+雙供應商輪替｜健康冷卻（連續失敗 2 次→10 分；永久性→6 小時）｜
+**回應快取**（最有效，TTL 24h：5065ms → 7ms）｜額度預檢（`GET /api/v1/key`，不耗額度）。
 
-⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，多開違反條款）。
-真實用量看 `free_model_daily_requests`（`limit*` 是 per-key 信用上限，易混淆）。
+⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。
 
 ## 🎓 6 身分（`LearnerProfileId`）
 `senior` 長者｜`child` 兒童 6–12｜`teen` 青少年 13–18｜`fitness` 健身增肌｜
@@ -122,12 +136,11 @@
 ## 🗣️ 稱謂機制（性別，09-29 新增）
 `gender`（`male`/`female`/`unspecified`）**只影響怎麼稱呼，不影響任何判斷**。
 雲端用 `buildAddressRule()` 追加 system prompt；本機用 `applyHonorific*()` **確定性後處理**
-（只改「開頭的第一個『您好』」）。兩者不會重複加：模型已寫「先生您好」時 `^\s*您好` 不命中。
+（只改「開頭的第一個『您好』」）。
 - ★ **性別刻意不進快取鍵** —— 快取存**中性**文字，稱謂在輸出最後一步插入。
   若改成「把稱謂寫進快取內容」，**必須**把 gender 加進鍵
-- 英文一律不加稱謂（"Mr Hello!" 是錯的，英文沒有這種慣例）
+- 英文一律不加稱謂（"Mr Hello!" 是錯的）
 - ⚠️ `QA_TEXT_FIELDS` **不含 `question`** —— 那是使用者自己的話，不能改
-- 設定頁與引導頁共用 `GenderPicker.tsx`（選項只留一份，避免兩邊漂移）
 
 ## 🎨 字級縮放（非長者，09-29 新增）
 `<html data-density="compact|comfortable">`，由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換。
@@ -135,32 +148,31 @@
 對應 16→14／18→16／19→17／20→18 px（**全域只有這 4 種字級**）。
 - ⚠️ **新增第 5 種字級必須回來補一行**，否則那個字級不會縮
 - 寫在 `<html>` 而非包 div：側邊選單／彈窗／引導頁都是 fixed，包 div 蓋不到
-- 不需要 `!important`（未分層 CSS 在 Tailwind v4 會蓋過 `@layer` 內樣式）
 - ★ **唯一例外：12px**（私隱條款／免責聲明，`LegalNotice.tsx`，09-29 使用者指定）。
   不在上面四個 class 內 → **不會**被縮放影響（刻意）。理由見 `UI_RULES.md`。
 
 ## 💾 儲存鍵與「清除所有資料」
-全部以 `labelbuddy` 開頭（語言／身分／性別／慢性病／指標／紀錄／同意／引導頁／學習進度）。
+全部以 `labelbuddy` 開頭（語言／身分／性別／**分析模式**／慢性病／指標／紀錄／同意／引導頁／學習進度）。
 ★ 清除用**前綴掃描**（`k.startsWith('labelbuddy')`），不是寫死清單；
 清完用 `location.reload()` 而非逐一重設 state（逐一重設會漏且不報錯）。
 詳見 `ARCHITECTURE.md`。
 
 ## 📊 nutrient_facts 管線
-**鐵則：模型只讀出「含量」，百分比一律由後端重算**（小模型算 `2480÷2000×100` 會錯且無聲）。
-- `normalizeNutrientFacts(raw, numericLimits)` 用每日上限**覆蓋** percent，補 `dailyLimit`/`direction`，
-  過濾（最多 3 項、**門檻 30%**、依嚴重度排序）
-- **三條路徑都要套用**：雲端成功、**快取命中**、本機備援（漏掉快取會回傳舊格式）
-- ⚠️ **limit 與 target 方向相反**（鈉 120% 是壞事、蛋白質 120% 是好事）→ `factTone()` 分開處理
+★ **鐵則：模型只讀出「含量」，百分比一律由後端重算**（小模型算 `2480÷2000×100` 會錯且無聲）。
+★ **三條路徑都要套用**：雲端成功、**快取命中**、本機備援（漏掉快取會回傳舊格式）。
+⚠️ **limit 與 target 方向相反**（鈉 120% 是壞事、蛋白質 120% 是好事）。
+細節見 `ARCHITECTURE.md`。
 
 ## 🔤 簡繁後處理
-`core.ts` 的 `SIMPLIFIED_TO_TRADITIONAL` 只收「簡繁一對一無歧義」的字
-（后/後、干/乾、里/裡、面/麵、只/隻、发/發/髮 **一律不列**），現約 438 字。
+`core.ts` 的 `SIMPLIFIED_TO_TRADITIONAL` 只收「簡繁一對一無歧義」的字（現約 438 字，
+后/後、干/乾、里/裡、面/麵、只/隻、发/發/髮 **一律不列**）。
 **看到簡體字先查是不是新字不在表內，別急著換模型。**
 
-## 🧪 驗證機制（**改動翻譯／稱謂／快取後必跑**）
+## 🧪 驗證機制（**改動翻譯／稱謂／快取／模式後必跑**）
 `npm run check:i18n`（引擎輸出掃 CJK）｜`npm run check:honorific`（稱謂 29 項）
 ｜`npm run check:cache`（快取鍵 11 項）｜`npm run check:diet`（紀錄語言 15 項）
-｜`npm run check:ui`（真實 Chrome 走 **15 畫面**）｜`npm run verify:all`（全部）
+｜`npm run check:mode`（**同意閘門 12 項，會實際啟動伺服器**）
+｜`npm run check:ui`（真實 Chrome 走 **16 畫面**）｜`npm run verify:all`（全部）
 
 ★★ **靜態掃描（grep）只能找線索，不能當驗收。** 分不出條件分支（**假警報**）、
   抓不到執行時組出的字串（**漏報**）。最終一定要用瀏覽器實際渲染。
