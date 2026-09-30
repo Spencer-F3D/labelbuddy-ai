@@ -178,6 +178,43 @@ try {
   check('★ 碳酸鈉不能被改', simplifyNutrientWording('碳酸鈉') === '碳酸鈉');
   check('★ 單獨一個「鈉」字不改（寧可漏換，不要錯換）', simplifyNutrientWording('鈉 2350 毫克') === '鈉 2350 毫克');
   check('英文不受影響', simplifyNutrientWording('High sodium content') === 'High sodium content');
+
+  console.log('\n── 4. 營養素方向：上限 vs 目標（2026-09-30 修掉的 bug）──');
+  const { normalizeNutrientFacts } = await import('../server/core');
+  const { getLearnerProfile, getNutrientDirections } = await import('../src/data/learnerProfiles');
+
+  const norm = (profileId: string, raw: unknown[]) => {
+    const p = getLearnerProfile(profileId);
+    return normalizeNutrientFacts(raw, p.numericLimits, getNutrientDirections(profileId));
+  };
+
+  /**
+   * ⚠️ 這一組是**核心**：`numericLimits` 混了「上限」與「目標」兩種性質。
+   *    原本 `normalizeNutrientFacts` 把全部寫成 'limit'，於是
+   *    「膳食纖維」與「蛋白質」被講成「每天上限」——
+   *    對健身族來說，那等於把「你該吃到的量」說成「你超標了」。
+   *    而且前端的 `factTone` / `factLabel` 早就寫好了 target 分支，
+   *    只是後端從來沒產生過 —— 那是一段**從未執行過的死路**。
+   */
+  const fibre = norm('senior', [{ name: '膳食纖維', value: 8, unit: '公克' }]);
+  check('★ 膳食纖維是「目標」不是「上限」', fibre[0]?.direction === 'target', `→ ${fibre[0]?.direction}`);
+
+  const protein = norm('fitness', [{ name: '蛋白質', value: 80, unit: '公克' }]);
+  check('★ 蛋白質是「目標」不是「上限」', protein[0]?.direction === 'target', `→ ${protein[0]?.direction}`);
+
+  const sodium = norm('senior', [{ name: '鈉', value: 2350, unit: '毫克' }]);
+  check('鈉仍然是「上限」', sodium[0]?.direction === 'limit', `→ ${sodium[0]?.direction}`);
+
+  // 排序：目標類百分比再高，也不能把上限類擠到後面
+  const mixed = norm('senior', [
+    { name: '膳食纖維', value: 30, unit: '公克' }, // 120%（好事）
+    { name: '鈉', value: 2350, unit: '毫克' }, // 118%（壞事）
+  ]);
+  check(
+    '★ 排序：上限類排在目標類前面（紅色不能被綠色擠下去）',
+    mixed[0]?.name === '鈉' && mixed[1]?.name === '膳食纖維',
+    `→ ${mixed.map((f) => f.name).join(' > ')}`
+  );
 } catch (e: any) {
   console.error('測試執行失敗:', e?.message ?? e);
   fail++;

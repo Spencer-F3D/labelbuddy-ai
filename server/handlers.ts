@@ -59,7 +59,7 @@ import { analyzeNutritionWithIndicators } from './smartNutritionAnalyzer';
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
-import { getLearnerProfile } from '../src/data/learnerProfiles';
+import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
 import { nutrientName, profileName, conditionName } from '../src/data/bilingual';
 // 難字簡化（2026-09-30）：把說明文字裡的「鈉含量」換成「鹽分含量」等。
@@ -183,6 +183,9 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     // 學習者身分：決定 AI 的判斷基準（每日參考值）。
     // 傳入無效值時 getLearnerProfile 會安全退回「長者」，因此這裡不需額外防護。
     const learnerProfile = getLearnerProfile(profileId);
+    // 營養素方向（上限 vs 目標）：`numericLimits` 本身沒有方向資訊，
+    // 必須另外從 targets 攤平。漏掉的話膳食纖維／蛋白質會被當成「上限」。
+    const nutrientDirections = getNutrientDirections(profileId);
 
     // 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
     const conditionText =
@@ -326,7 +329,8 @@ ${promptContext}`;
         // 快取存的可能是舊格式，出快取時再正規化一次，確保欄位齊全
         const cachedFacts = normalizeNutrientFacts(
           cached.data?.nutrient_facts,
-          learnerProfile.numericLimits
+          learnerProfile.numericLimits,
+          nutrientDirections
         );
         const cachedData: any = {
           ...cached.data,
@@ -372,7 +376,8 @@ ${promptContext}`;
         // 用每日上限重算百分比，覆蓋模型自己算的數字（模型算術不可靠）
         const cloudFacts = normalizeNutrientFacts(
           aiResult.data.nutrient_facts,
-          learnerProfile.numericLimits
+          learnerProfile.numericLimits,
+          nutrientDirections
         );
         aiResult.data.nutrient_facts = cloudFacts;
         aiResult.data.analysis_mode = 'cloud_ai';

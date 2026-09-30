@@ -27,7 +27,7 @@ import type { TranslationKey } from '../i18n/translations';
 // 難字簡化（2026-09-30）：`fact.name` 是 canonical（鈉／膳食纖維…），
 // ⚠️ **必須經過 nutrientName() 才會變成「鹽分／纖維」** ——
 //    一開始漏了這一步，長條圖照樣顯示「鈉」，而且不會報錯（畫面看起來很正常）。
-import { nutrientName } from '../data/bilingual';
+import { nutrientName, unitName } from '../data/bilingual';
 
 /**
  * 依「方向」決定這一列的色調。
@@ -59,10 +59,21 @@ function factDetail(
   language: 'zh-TW' | 'en',
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string
 ): string {
-  const amount = t('nutrient.amount', { value: fact.value, unit: fact.unit });
+  /**
+   * ⚠️ 單位一定要過 `unitName()`。
+   *
+   * `fact.unit` 是**後端給的中文單位**（毫克／公克／大卡）。
+   * 直接插進英文字串會變成「This pack has 2350 毫克」——
+   * 而且**不會報錯**，畫面看起來也正常。
+   *
+   * 這正是本專案第 4 類 bug（「改了 A 忘了 B」）的變體：
+   * `unitName()` 一直存在、後端也一直在用，但**前端從來沒呼叫過它**。
+   */
+  const unit = unitName(fact.unit, language);
+  const amount = t('nutrient.amount', { value: fact.value, unit });
   return fact.direction === 'target'
-    ? amount + t('nutrient.dailyMin', { limit: fact.dailyLimit, unit: fact.unit })
-    : amount + t('nutrient.dailyMax', { limit: fact.dailyLimit, unit: fact.unit });
+    ? amount + t('nutrient.dailyMin', { limit: fact.dailyLimit, unit })
+    : amount + t('nutrient.dailyMax', { limit: fact.dailyLimit, unit });
 }
 
 interface NutrientFactBarsProps {

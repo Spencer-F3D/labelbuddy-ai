@@ -362,8 +362,32 @@ export function getLearnerProfile(id?: string | null): LearnerProfile {
 }
 
 /** 取得全部身分（依固定順序，供選擇器渲染） */
-export function getAllLearnerProfiles(): LearnerProfile[] {
-  return PROFILES;
+/**
+ * 取某個身分的「營養素方向」對照表（鈉 → limit、膳食纖維 → target）。
+ *
+ * 【為什麼需要這支，以及它修掉什麼 bug（2026-09-30）】
+ *   `numericLimits` 只是一個 `名稱 → {value, unit}` 的表，**沒有方向資訊**。
+ *   而後端的 `normalizeNutrientFacts()` 原本把**所有**項目都寫成
+ *   `direction: 'limit'`（越低越好）—— 於是：
+ *     膳食纖維 8 公克 → 顯示「每天上限 25 公克」（其實是「建議至少」）
+ *     蛋白質 80 公克   → 顯示「每天上限 100 公克」＋警示色
+ *   對健身族來說，那等於把「你該吃到的量」講成「你超標了」。
+ *
+ *   方向其實**已經存在**於 `targets`（`NutritionTarget.direction`），
+ *   只是沒被攤平成查表用的物件。這支就是那個攤平 ——
+ *   **單一真相來源仍然是 `targets`**，不要另外在 `numericLimits` 裡再寫一份。
+ */
+export function getNutrientDirections(
+  id?: string | null
+): Record<string, 'limit' | 'target'> {
+  const out: Record<string, 'limit' | 'target'> = {};
+  for (const t of getLearnerProfile(id).targets) {
+    out[t.nutrient] = t.direction;
+  }
+  return out;
+}
+
+export function getAllLearnerProfiles(): LearnerProfile[] {  return PROFILES;
 }
 
 /** 判斷字串是否為有效的身分 ID */

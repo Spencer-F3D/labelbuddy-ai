@@ -59,7 +59,7 @@ import {
   DataHandling,
   LearnerProfile,
 } from '../src/types';
-import { getLearnerProfile } from '../src/data/learnerProfiles';
+import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞的營養素名稱是封閉清單，
 // 若清單是中文，模型輸出的 nutrient_facts.name 就會是中文。
 // 難字簡化（2026-09-30）：提示詞給模型看的是「鹽分／纖維／動物油／糖」，
@@ -898,8 +898,18 @@ export function buildSystemInstruction(
   // 若只給「2000 毫克」這種字串，模型有機會誤讀或自行猜測，因此明確列出。
   // ⚠️ 英文模式下**必須換成英文名稱與單位**：這是封閉清單，
   //    模型只能從中挑選，若清單是中文，輸出的 nutrient_facts.name 就會是中文。
+  // ⚠️ 方向（2026-09-30）：`numericLimits` 混了兩種性質 ——
+  //    「上限」（鈉／糖／飽和脂肪，越少越好）與「目標」（纖維／鈣／蛋白質，越多越好）。
+  //    不標出來的話，模型會把「蛋白質 80 公克」講成「超過上限」。
+  const directionMap = getNutrientDirections(profile.id);
   const numericLines = Object.entries(profile.numericLimits)
-    .map(([name, l]) => `   - ${nutrientName(name, language)}: ${l.value} ${unitName(l.unit, language)}`)
+    .map(([name, l]) => {
+      const dir =
+        directionMap[name] === 'target'
+          ? '（目標值：達到或超過是好事）'
+          : '（上限：超過是壞事）';
+      return `   - ${nutrientName(name, language)}: ${l.value} ${unitName(l.unit, language)} ${dir}`;
+    })
     .join('\n');
 
   const profileNameForPrompt = profileName(profile.id, profile.name, language);
@@ -918,6 +928,8 @@ ${targetLines}
 【每日上限的數值 — 判斷「算多還是算少」時請以此為基準】
 ${numericLines}
    判斷 nutrient_facts 該收錄哪些項目時，就用上表比較：達到三成以上的才列入。
+   ★ 注意「上限」與「目標值」的差別：上限是「越少越好」，目標值是「越多越好」。
+     目標值（例如纖維、蛋白質）達到或超過 100% 是**好事**，不要寫成「超標」或「過量」。
    （百分比由後端統一換算，你不需計算，只要確保 value 是整包的正確含量。）
    ★ 談到這些成分時，**一律使用上表列出的名稱**（例如寫「鹽分」而不是「鈉」、
      寫「纖維」而不是「膳食纖維」）。使用者是普通人，看不懂化學名稱 ——
@@ -945,7 +957,15 @@ ${SYSTEM_INSTRUCTION_SHARED}${isEnglish ? ENGLISH_OUTPUT_OVERRIDE : ''}`;
  * ------------------------------------------------------------------------- */
 export function normalizeNutrientFacts(
   raw: unknown,
-  numericLimits: Record<string, { value: number; unit: string }>
+  numericLimits: Record<string, { value: number; unit: string }>,
+  /**
+   * 每個營養素的方向（`limit` = 越低越好、`target` = 越多越好）。
+   * 由 `getNutrientDirections(profileId)` 提供，來源是身分的 `targets`。
+   *
+   * ⚠️ 沒有這個參數的話，全部都會被當成上限 ——
+   *    膳食纖維與蛋白質會被講成「每天上限」，那是**錯的健康建議**。
+   */
+  directions?: Record<string, 'limit' | 'target'>
 ): NutrientFact[] {
   if (!Array.isArray(raw)) return [];
 
@@ -984,11 +1004,20 @@ export function normalizeNutrientFacts(
         : limit.unit,
       dailyLimit: limit.value,
       percent,
-      direction: 'limit',
+      direction: directions?.[canonical] ?? 'limit',
     });
   }
 
-  return facts.sort((a, b) => b.percent - a.percent).slice(0, 3);
+  /**
+   * 排序：**先排「上限」類，再排「目標」類**，同類內依百分比由高到低。
+   *
+   * ⚠️ 為什麼不能單純 `b.percent - a.percent`：
+   *    「目標」類百分比高是**好事**。若一起排，
+   *    一份纖維很高（120%）的燕麥片會把「鈉超標（118%）」擠到後面 ——
+   *    使用者第一眼看到的是綠色，而真正該注意的紅色在下面。
+   */
+  const isLimit = (f: NutrientFact) => (f.direction === 'target' ? 1 : 0);
+  return facts.sort((a, b) => isLimit(a) - isLimit(b) || b.percent - a.percent).slice(0, 3);
 }
 
 /**

@@ -574,6 +574,123 @@ try {
   await capture('08-result-bottom');
   await cdp.eval(`window.scrollTo(0, 0); 'ok'`);
 
+  /* ══════════════════════════════════════════════════════════════════
+   * 追加一輪「只在本機」的分析（2026-09-30）
+   * ══════════════════════════════════════════════════════════════════
+   *
+   * 【為什麼一定要有這一輪】
+   *   上面那一輪走的是「直接雲端」—— 而雲端模型**不一定每次都會回傳
+   *   `nutrient_facts`**。沒有那個欄位，成分長條圖就不會渲染，
+   *   而文字掃描掃不到「不存在的東西」→ **檢查會通過，但實際上什麼都沒驗到**。
+   *
+   *   實測就真的發生過一次：單位沒翻譯的 bug（英文介面顯示「2350 毫克」）
+   *   因為那一輪模型沒回傳 nutrient_facts 而躲過檢查。
+   *
+   *   「只在本機」走的是確定性的規則引擎，一定會產生 nutrient_facts，
+   *   所以長條圖一定會渲染 —— 這樣這一塊才是真的被驗證過。
+   */
+  console.log('\n── 只在本機（確定性，專門驗成分長條圖）──────');
+  // 走完引導頁（此時預設就是 cloud_image）
+  for (let i = 0; i < 12; i++) {
+    await sleep(600);
+    const ok = await cdp.eval(`
+      (() => {
+        const b = [...document.querySelectorAll('button')].find(e => (e.textContent||'').trim() === 'Next');
+        if (!b) return false;
+        b.click();
+        return true;
+      })()
+    `);
+    if (!ok) break;
+  }
+  await sleep(700);
+  await cdp.eval(`
+    (() => {
+      const cb = document.querySelector('input[type="checkbox"]');
+      if (cb && !cb.checked) cb.click();
+    })()
+  `);
+  await sleep(400);
+  await clickByText('Get started');
+  await sleep(3500);
+
+  /**
+   * ⚠️ 模式一定要在**引導頁之後**才設定。
+   *    引導頁的 `useState` 預設值是 `cloud_image`，走完引導會把
+   *    localStorage 的模式覆寫回預設 —— 先設再走引導等於白設。
+   *    （實測踩過：以為在驗本機模式，其實跑的是雲端。）
+   */
+  await cdp.eval(`
+    (() => {
+      localStorage.setItem('labelbuddy_analysis_mode_v1', 'local_only');
+      return 'ok';
+    })()
+  `);
+  await cdp.send('Page.navigate', { url: BASE });
+  await sleep(4000);
+
+  await openMenu();
+  await sleep(900);
+  await clickByText('Photo a label');
+  await sleep(1500);
+  await cdp.eval(`
+    (() => {
+      const det = [...document.querySelectorAll('details')].find(d =>
+        /sample label|示範標籤/i.test(d.innerText || ''));
+      if (det) det.open = true;
+    })()
+  `);
+  await sleep(700);
+  const localClicked = await cdp.eval(`
+    (() => {
+      const b = document.getElementById('btn-sample-ramen');
+      if (!b) return false;
+      b.click();
+      return true;
+    })()
+  `);
+  if (!localClicked) {
+    console.log('  ⚠️  找不到示範標籤按鈕');
+  } else {
+    for (let i = 0; i < 15; i++) {
+      await sleep(1500);
+      const done = await cdp.eval(`
+        (() => /daily limit|每天上限|Why this result/i.test(document.body.innerText))()
+      `);
+      if (done) break;
+    }
+    await sleep(1200);
+    await capture('09-local-result');
+    await cdp.eval(`window.scrollTo(0, document.body.scrollHeight); 'ok'`);
+    await sleep(1500);
+    await capture('10-local-result-bottom');
+
+    /**
+     * ⚠️⚠️ 關鍵防護：**長條圖必須真的出現**。
+     *
+     * 【為什麼要這道】
+     *   如果 `nutrient_facts` 是空的，`NutrientFactBars` 會回傳 null，
+     *   文字掃描就掃不到它 —— 檢查會「通過」，但那一塊其實**完全沒被驗到**。
+     *   實測就發生過：單位沒翻譯（英文介面顯示「2350 毫克」）因此躲過檢查。
+     *
+     *   本機模式走的是確定性引擎，一定會產生 `nutrient_facts`。
+     *   所以「長條圖沒出現」本身就是一個必須回報的異常。
+     */
+    const barsRendered = await cdp.eval(`
+      (() => {
+        const txt = document.body.innerText || '';
+        // 長條圖一定會帶這幾個字之一（英文介面）
+        return /daily limit|% of limit|of daily target/.test(txt);
+      })()
+    `);
+    if (!barsRendered) {
+      console.log('  ❌ 成分長條圖沒有渲染 —— 這一塊等於沒驗到（nutrient_facts 是空的？）');
+      exitCode = 1;
+    } else {
+      console.log('  ✅ 成分長條圖已渲染（確定性驗證生效）');
+    }
+  }
+
   /* ── 總結 ─────────────────────────────────────────────────── */
   const total = results.reduce((s, r) => s + r.hits.length, 0);
   console.log(`\n${'='.repeat(66)}`);
