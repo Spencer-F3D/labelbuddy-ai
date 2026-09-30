@@ -61,7 +61,7 @@ import {
   Activity as ActivityIcon,
   MessageCircleQuestion,
 } from 'lucide-react';
-import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId } from './types';
+import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId, AnalysisMode } from './types';
 import { compressImage } from './utils/imageCompression';
 // OCR 在瀏覽器端執行：照片不會離開使用者的裝置，只有讀出的文字會送到後端。
 import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser';
@@ -79,6 +79,12 @@ import { buildRecognitionResult } from '../server/labelParser';
 import { analyzeNutritionWithIndicators } from '../server/smartNutritionAnalyzer';
 import { translateLocalResult } from '../server/localEngineEn';
 import { detectLabelLanguage as detectLabelLanguageImpl } from './utils/labelLanguage';
+import {
+  ANALYSIS_MODES,
+  MODE_LABEL_KEY,
+  MODE_NOTE_KEY,
+  MODE_DATA_KEY,
+} from './data/analysisModes';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
 // 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
@@ -108,6 +114,7 @@ import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { GenderPicker } from './components/GenderPicker';
 import { LegalNotice } from './components/LegalNotice';
 import { ClearAllDataSection } from './components/ClearAllDataSection';
+import { AnalysisModePicker } from './components/AnalysisModePicker';
 import { NutrientFactBars } from './components/NutrientFactBars';
 import {
   DEFAULT_PROFILE_ID,
@@ -188,13 +195,65 @@ const STORAGE_DIET_RECORDS_KEY = 'labelbuddy_diet_records_v1';
 const STORAGE_INDICATORS_KEY = 'labelbuddy_senior_indicators_v2';
 const STORAGE_PROFILE_KEY = 'labelbuddy_learner_profile_v1';
 /**
- * 是否同意把照片上傳雲端辨識。
+ * 分析模式（三選一，2026-09-30 起）。
  *
- * ⚠️ 預設值是 **false（不同意）**，這是刻意的：
- *    沒表態過的使用者，照片一律不離開裝置，由本機離線 OCR 處理。
- *    要提升準確度必須由使用者自己按下開關（見結果頁的隱私說明區）。
+ * ⚠️ 預設值是 `cloud_image` —— 這是使用者在引導頁的預設選項，
+ *    但**沒走過引導頁的人不會用到這個值**（引導頁會先擋在前面）。
+ *    真的沒有存值時（例如 localStorage 被清掉），見 `loadAnalysisMode()` 的保守處理。
+ */
+const STORAGE_ANALYSIS_MODE_KEY = 'labelbuddy_analysis_mode_v1';
+/**
+ * 舊的「是否同意雲端」布林鍵（**只剩遷移用途，不再寫入**）。
+ *
+ * 舊值對應：`true` → `cloud_text`（舊版的雲端就是只送文字）、
+ *           `false` → `local_only`。
  */
 const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
+
+/**
+ * 拍照後的壓縮尺寸上限（長邊像素）。
+ *
+ * 【為什麼「直接雲端」用 1600px，其他模式用 1024px】
+ *   直接雲端把**照片本身**交給視覺模型判讀，解析度直接決定它看不看得清
+ *   營養標示上的小字，所以用 1600px（base64 約 300–500 KB，
+ *   仍在 Cloudflare Workers 與 OpenRouter 的容許範圍內）。
+ *   其他兩個模式要先在本機跑 tesseract OCR，解析度越高越慢 ——
+ *   而且 OCR 的準確度瓶頸在字元辨識而非像素數，所以維持原本的 1024px。
+ */
+const IMAGE_MAX_DIM_CLOUD = 1600;
+const IMAGE_MAX_DIM_OCR = 1024;
+
+/**
+ * 三個分析模式的翻譯鍵與順序，定義在 `src/data/analysisModes.ts`
+ * —— 引導頁與設定頁都要用同一份（見該檔的說明）。
+ */
+
+/**
+ * 讀取分析模式，並處理舊版資料的遷移。
+ *
+ * 【為什麼要遷移而不是直接給預設值】
+ *   已經用過 App 的人，舊的 `labelbuddy_cloud_consent_v1` 記錄了他當時的選擇。
+ *   直接蓋成新的預設值（`cloud_image`）等於**偷偷把「不同意上傳」的人
+ *   改成「照片會上傳」** —— 那是嚴重的隱私問題，不是方便問題。
+ *   所以：有舊值就照舊值對應，真的什麼都沒有才用預設。
+ */
+function loadAnalysisMode(): AnalysisMode {
+  try {
+    const stored = localStorage.getItem(STORAGE_ANALYSIS_MODE_KEY);
+    if (stored === 'cloud_image' || stored === 'cloud_text' || stored === 'local_only') {
+      return stored;
+    }
+    // 舊版遷移：有舊鍵就沿用當時的選擇
+    const legacy = localStorage.getItem(STORAGE_CLOUD_CONSENT_KEY);
+    if (legacy !== null) {
+      return legacy === 'true' ? 'cloud_text' : 'local_only';
+    }
+    // 全新使用者：預設直接雲端（引導頁會明確問過才走到這裡）
+    return 'cloud_image';
+  } catch {
+    return 'local_only';
+  }
+}
 /**
  * 是否已走過首次啟動引導頁。
  *
@@ -473,25 +532,27 @@ export default function App() {
   /**
    * 走完首次啟動引導頁。
    *
-   * 這裡是**唯一的**「預設同意雲端」入口 —— 使用者是在看過私隱說明
-   * （照片不離開裝置、只送文字）之後做的選擇，所以是有效的同意。
-   * 其他地方都不得擅自把 cloudConsent 改成 true。
+   * 這裡是**唯一**能設定分析模式的地方（引導頁）＋ 設定頁的模式切換。
+   * 使用者是在看過「每個模式各自會傳出什麼」的說明之後做的選擇，
+   * 所以是有效的選擇。其他任何地方都不得擅自改動它。
    */
   const handleOnboardingComplete = ({
     profileId,
     gender: chosenGender,
-    cloudConsent: consent,
+    analysisMode: chosenMode,
   }: OnboardingResult) => {
     setLearnerProfileId(profileId);
     setGender(chosenGender);
-    setCloudConsent(consent);
+    setAnalysisMode(chosenMode);
     setOnboarded(true);
 
     try {
       localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
       localStorage.setItem(STORAGE_GENDER_KEY, chosenGender);
-      localStorage.setItem(STORAGE_CLOUD_CONSENT_KEY, String(consent));
+      localStorage.setItem(STORAGE_ANALYSIS_MODE_KEY, chosenMode);
       localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+      // 舊鍵已完成遷移，移除避免日後又被讀到而覆蓋新值
+      localStorage.removeItem(STORAGE_CLOUD_CONSENT_KEY);
     } catch (e) {
       console.warn('儲存引導設定失敗:', e);
     }
@@ -685,6 +746,15 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isNetworkDelayed, setIsNetworkDelayed] = useState<boolean>(false);
+  /**
+   * 這次掃描是否「自動降級」了 —— 也就是使用者選了「直接雲端」，
+   * 但雲端失敗，App 自己改用本機 OCR ＋ 文字重送。
+   *
+   * ⚠️ 一定要顯示給使用者看，不能悄悄降級：
+   *    他選「直接雲端」是為了準確度，結果照片根本沒被用到 ——
+   *    不講的話，他會以為自己一直在用最準的模式。
+   */
+  const [autoDowngraded, setAutoDowngraded] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<LabelAnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -720,21 +790,16 @@ export default function App() {
    *   競賽章程明訂「僅以固定規則模擬 AI」可不予評審，而 AI 技術應用佔 25%。
    *   本機規則引擎當主角，等於自己放棄那一項。
    *
-   * ⚠️ 照片**永遠**不離開裝置 —— 這件事和 cloudConsent 無關。
-   *    本機 OCR 一直是唯一的路徑，這個旗標只決定「文字」要不要送出。
+   * ⚠️ **2026-09-30 起改成三模式**（見 `AnalysisMode`）。
+   *    舊版的註解寫「照片永遠不離開裝置」—— 那句話對 `cloud_image`
+   *    **不成立**，已不再當作通則。每個模式各自的資料流向見 `AnalysisMode` 的表。
    *
-   * ⚠️ 若使用者還沒走過引導頁，一律當作**未同意**（保守）。
-   *    引導頁會明確問過，那才是有效的同意。
+   * ⚠️ 若使用者還沒走過引導頁，一律當作最保守的模式（見 `loadAnalysisMode()`）。
+   *    引導頁會明確問過，那才是有效的選擇。
    */
-  const [cloudConsent, setCloudConsent] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_CLOUD_CONSENT_KEY);
-      if (stored !== null) return stored === 'true';
-      return false;
-    } catch {
-      return false;
-    }
-  });
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(loadAnalysisMode);
+  /** 是否允許呼叫雲端（`local_only` 之外都允許） */
+  const cloudAllowed = analysisMode !== 'local_only';
   /** 是否已走完引導頁。false 時覆蓋整個畫面。 */
   const [onboarded, setOnboarded] = useState<boolean>(() => {
     try {
@@ -863,7 +928,12 @@ export default function App() {
       }
 
       // 前端使用 HTML5 Canvas 壓縮至最大 1024px，JPEG 品質 0.8
-      const compressed = await compressImage(file, 1024, 0.8);
+      // 直接雲端要把照片交給視覺模型判讀 → 解析度直接決定看不看得清小字
+      const compressed = await compressImage(
+        file,
+        analysisMode === 'cloud_image' ? IMAGE_MAX_DIM_CLOUD : IMAGE_MAX_DIM_OCR,
+        0.8
+      );
       setPreviewImage(compressed.base64);
 
       // 開始呼叫分析
@@ -898,20 +968,18 @@ export default function App() {
   };
 
   /**
-   * 切換「允許上傳雲端辨識」。
+   * 切換分析模式（三選一）。引導頁與設定頁共用同一份邏輯。
    *
    * 【為什麼要語音告知】這是會影響隱私的設定。
-   * 只給視覺提示的話，不識字的長者不會知道自己剛剛把照片送出去了。
+   * 只給視覺提示的話，不識字的使用者不會知道自己剛剛把照片送出去了。
    */
-  const handleToggleCloudConsent = (next: boolean) => {
-    setCloudConsent(next);
+  const handleChangeAnalysisMode = (next: AnalysisMode) => {
+    setAnalysisMode(next);
     try {
-      localStorage.setItem(STORAGE_CLOUD_CONSENT_KEY, String(next));
+      localStorage.setItem(STORAGE_ANALYSIS_MODE_KEY, next);
     } catch {}
     speakText(
-      next
-        ? t('scan.savedCloud')
-        : t('scan.savedLocal'),
+      t('mode.savedVoice', { mode: t(MODE_LABEL_KEY[next]) }),
       { rate: 0.9, preferLanguage: ttsLangMandarin }
     );
   };
@@ -926,6 +994,7 @@ export default function App() {
     setIsNetworkDelayed(false);
     setErrorMessage(null);
     setAnalysisResult(null);
+    setAutoDowngraded(false);
 
     // 每秒更新一次已等待秒數，讓載入畫面能顯示具體進度
     setLoadingSeconds(0);
@@ -935,70 +1004,48 @@ export default function App() {
     }, 1000);
 
     // ══════════════════════════════════════════════════════════════════
-    // 第一階段：在瀏覽器端讀出標籤文字
+    // 依「分析模式」決定要不要先做 OCR（2026-09-30 三模式）
     //
-    // 【隱私關鍵】照片在這裡就被讀完了，**從來沒有離開使用者的裝置**。
-    // 送到後端的只有下面那段文字，不是照片。
-    // 這也讓後端可以部署到 Cloudflare Workers 這類免費邊緣平台
-    // （那裡的 CPU 額度跑不動 OCR，但當純文字代理綽綽有餘）。
+    //   cloud_image → **不做 OCR**，直接把照片交給雲端視覺模型判讀。
+    //                 OCR 從「必經之路」變成「後備方案」。
+    //   cloud_text  → 先在本機 OCR，只把文字送給雲端文字模型。
+    //   local_only  → 先在本機 OCR，文字交給本機規則引擎，完全不連網。
     // ══════════════════════════════════════════════════════════════════
-    setLoadingPhase('reading');
-    speakText(t('scan.readingLabel'), {
-      rate: 0.88,
-      preferLanguage: ttsLang,
-    });
 
-    const ocr = await recognizeLabelTextInBrowser(base64Data);
+    /**
+     * 將選取的病史轉換為繁體中文標籤。
+     *
+     * ⚠️⚠️ 這裡**刻意不隨介面語言改變**（2026-09-28 第三階段雙語時確認）。
+     *     這一組字串是「前端 → 後端」的契約：
+     *       - 它是快取鍵的一部分（中英文共用同一包食品的快取要一致）
+     *       - 後端提示詞用中文病名組裝「使用者的慢性病史」段落
+     *     後端的輸出語言是靠 `language` 參數 + 英文覆蓋指示處理的，
+     *     不需要、也不應該把病名翻成英文送過去。
+     *     若日後有人「順手」把它翻成英文，會讓快取分裂、提示詞對不上病名。
+     *
+     * ⚠️ 2026-09-30 從 `postAnalyzeLabel()` 內部**提到外層** ——
+     *    飲食紀錄的 `matched_conditions` 也要用同一份，提到外層才不會兩處各算一次。
+     */
+    const conditionNames = selectedConditions.map((id) => conditionName(id, 'zh-TW'));
 
-    // ══════════════════════════════════════════════════════════════════
-    // 第二階段：把「文字」送去做分析
-    // ══════════════════════════════════════════════════════════════════
-    setLoadingPhase('analyzing');
-
-    // AI 分析狀態語音提示：「正在為您分析」（粵語優先）
-    speakText(t('scan.analyzing'), {
-      rate: 0.88,
-      preferLanguage: ttsLang,
-    });
-
-    // 為了提升長者在訊號不佳的超市內的體驗：
-    // 若偵測到網路連線不穩或延遲（超過 2.5 秒仍未完成），主動語音朗讀安撫，改善長者的等待焦慮
-    if (latencyTimerRef.current) clearTimeout(latencyTimerRef.current);
-    latencyTimerRef.current = setTimeout(() => {
-      setIsNetworkDelayed(true);
-      speakText(t('common.weakSignalSpeech'), {
-        rate: 0.88,
-        preferLanguage: ttsLang,
-      });
-    }, 2500);
-
-    try {
-      /**
-       * 將選取的病史轉換為繁體中文標籤。
-       *
-       * ⚠️⚠️ 這裡**刻意不隨介面語言改變**（2026-09-28 第三階段雙語時確認）。
-       *     這一組字串是「前端 → 後端」的契約：
-       *       - 它是快取鍵的一部分（中英文共用同一包食品的快取要一致）
-       *       - 後端提示詞用中文病名組裝「使用者的慢性病史」段落
-       *     後端的輸出語言是靠 `language` 參數 + 英文覆蓋指示處理的，
-       *     不需要、也不應該把病名翻成英文送過去。
-       *     若日後有人「順手」把它翻成英文，會讓快取分裂、提示詞對不上病名。
-       */
-      const conditionNames = selectedConditions.map((id) => conditionName(id, 'zh-TW'));
-
-      // 呼叫中轉後端 API
+    /**
+     * 送出一次分析請求。成功回傳結果；失敗**丟出錯誤**（由呼叫端決定是否降級）。
+     *
+     * ⚠️ `localOnly` 一律由 `analysisMode` 推導，呼叫端不能自己傳 ——
+     *    否則會出現「使用者選了只在本機，卻因為某個分支忘了帶旗標而上傳」的漏洞。
+     */
+    const postAnalyzeLabel = async (payload: {
+      imageBase64?: string;
+      ocrText?: string;
+      ocrError?: string;
+    }): Promise<LabelAnalysisResult> => {
       const response = await fetch('/api/analyze-label', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // 【只送文字，不送照片】
-          // 照片已經在瀏覽器端讀完了。`ocrText` 是空的代表沒讀到字，
-          // 後端會回「請重拍」，我們不在前端自行捏造結果。
-          ocrText: ocr.ok ? ocr.text : '',
-          // OCR 失敗的原因只在瀏覽器 console 留紀錄，不打擾使用者
-          ocrError: ocr.ok ? undefined : ocr.error,
+          ...payload,
           conditions: conditionNames,
           // 身分會改變 AI 的判斷基準與每日參考值（例如健身族看蛋白質、學生看鈣質）
           profileId: learnerProfileId,
@@ -1008,9 +1055,8 @@ export default function App() {
           // 稱謂（2026-09-29）：只影響後端要怎麼稱呼使用者（先生／小姐／您好），
           // 不影響任何營養判斷，也不會改變快取（快取存的是中性文字）。
           gender,
-          // 【隱私優先】預設 true → 完全不呼叫雲端，由本機規則引擎判斷。
-          // 只有使用者自己打開同意開關（cloudConsent）才會把**文字**送給雲端 AI。
-          localOnly: !cloudConsent,
+          // 只有「只在本機」模式才禁止呼叫雲端。
+          localOnly: analysisMode === 'local_only',
           vitals: {
             systolicBp: physicalIndicators.systolicBp,
             diastolicBp: physicalIndicators.diastolicBp,
@@ -1039,8 +1085,72 @@ export default function App() {
       if (!resultJson.success || !resultJson.data) {
         throw new Error(t('scan.errNoResult'));
       }
+      return resultJson.data as LabelAnalysisResult;
+    };
 
-      const data: LabelAnalysisResult = resultJson.data;
+    /** 網路變慢時主動語音安撫（只有真的會連網的模式才需要） */
+    const armLatencyTimer = () => {
+      if (latencyTimerRef.current) clearTimeout(latencyTimerRef.current);
+      latencyTimerRef.current = setTimeout(() => {
+        setIsNetworkDelayed(true);
+        speakText(t('common.weakSignalSpeech'), {
+          rate: 0.88,
+          preferLanguage: ttsLang,
+        });
+      }, 2500);
+    };
+
+    try {
+      let data: LabelAnalysisResult | null = null;
+      /** 這次真正跑過的 OCR（模式 2、3，或模式 1 降級之後） */
+      let ocr: Awaited<ReturnType<typeof recognizeLabelTextInBrowser>> | null = null;
+
+      // ── 模式 1：直接雲端（照片上傳，不做 OCR）────────────────────
+      if (analysisMode === 'cloud_image') {
+        setLoadingPhase('analyzing');
+        speakText(t('scan.analyzing'), { rate: 0.88, preferLanguage: ttsLang });
+        armLatencyTimer();
+        try {
+          data = await postAnalyzeLabel({ imageBase64: base64Data });
+        } catch (e) {
+          console.warn('直接雲端失敗，改用本機 OCR 重試:', e);
+        }
+        if (!data) {
+          // 自動降級：自己 OCR，改用文字重送。
+          // ⚠️ 一定要告訴使用者 —— 悄悄降級會讓他以為「直接雲端」成功了，
+          //    但其實照片根本沒送出去（或送了卻沒被採用）。
+          setAutoDowngraded(true);
+          speakText(t('scan.autoDowngrade'), { rate: 0.88, preferLanguage: ttsLang });
+        }
+      }
+
+      // ── OCR 階段（模式 2、3，或模式 1 降級後）──────────────────────
+      if (!data) {
+        setLoadingPhase('reading');
+        speakText(t('scan.readingLabel'), {
+          rate: 0.88,
+          preferLanguage: ttsLang,
+        });
+
+        ocr = await recognizeLabelTextInBrowser(base64Data);
+
+        setLoadingPhase('analyzing');
+        // AI 分析狀態語音提示：「正在為您分析」
+        speakText(t('scan.analyzing'), { rate: 0.88, preferLanguage: ttsLang });
+        // 「只在本機」不連網，所以不需要安撫等待
+        if (analysisMode !== 'local_only') armLatencyTimer();
+
+        // 【只送文字，不送照片】`ocrText` 是空的代表沒讀到字，
+        // 後端會回「請重拍」，我們不在前端自行捏造結果。
+        data = await postAnalyzeLabel({
+          ocrText: ocr.ok ? ocr.text : '',
+          // OCR 失敗的原因只在瀏覽器 console 留紀錄，不打擾使用者
+          ocrError: ocr.ok ? undefined : ocr.error,
+        });
+      }
+
+      if (!data) throw new Error(t('scan.errNoResult'));
+
       setAnalysisResult(data);
 
       // ══════════════════════════════════════════════════════════════════
@@ -1088,14 +1198,40 @@ export default function App() {
       };
 
       // ── 紀錄一律使用「標籤本身的語言」（2026-09-29 使用者要求）──────────
-      const labelLanguage = detectLabelLanguage(ocr.text);
+      //
+      // 【直接雲端模式沒有 OCR 原文怎麼辦】
+      //   那個模式刻意不跑 OCR，所以拿不到標籤原文。
+      //   但模型會回傳 `ingredients_detected`（包裝上的成分原文），
+      //   那是同樣有效的語言證據 —— 用它來判斷標籤語言。
+      const labelEvidence =
+        ocr?.text ||
+        (Array.isArray(data.ingredients_detected) ? data.ingredients_detected.join(' ') : '');
+      const labelLanguage = detectLabelLanguage(labelEvidence);
 
-      // 標籤二次解析：品名與（可能的）重新產生都要用，所以只做一次
+      /**
+       * 標籤二次解析：品名與（可能的）重新產生都要用。
+       *
+       * ⚠️ 直接雲端模式下 `ocr` 是 null（刻意不跑 OCR）。
+       *    只有在「標籤語言 ≠ 介面語言」、真的需要重新產生紀錄文字時，
+       *    才會**補跑一次本機 OCR** —— 純本機、免費、不打擾使用者。
+       *    這是刻意的取捨：為了不讓紀錄中英混雜，寧可多花一次本機 OCR。
+       */
+      let ocrTextForRecord = ocr?.text ?? '';
+      if (labelLanguage !== language && !ocrTextForRecord) {
+        try {
+          const lateOcr = await recognizeLabelTextInBrowser(base64Data);
+          ocrTextForRecord = lateOcr.ok ? lateOcr.text : '';
+        } catch (e) {
+          console.warn('補跑 OCR 失敗（僅影響紀錄語言）:', e);
+        }
+      }
       let parsedLabel: ReturnType<typeof buildRecognitionResult> | null = null;
-      try {
-        parsedLabel = buildRecognitionResult(ocr.text);
-      } catch (e) {
-        console.warn('標籤二次解析失敗（不影響主要分析）:', e);
+      if (ocrTextForRecord) {
+        try {
+          parsedLabel = buildRecognitionResult(ocrTextForRecord);
+        } catch (e) {
+          console.warn('標籤二次解析失敗（不影響主要分析）:', e);
+        }
       }
 
       /**
@@ -1893,6 +2029,21 @@ export default function App() {
 
               return (
                 <div className="flex flex-col space-y-[16px] animate-in fade-in duration-200">
+                  {/* 「直接雲端」失敗後自動降級的通知（2026-09-30）。
+                      ⚠️ 一定要顯示：使用者選「直接雲端」是為了準確度，
+                         悄悄降級會讓他以為照片有被用到，其實沒有。 */}
+                  {autoDowngraded && (
+                    <div
+                      role="status"
+                      className={`${CARD_BASE} p-[14px] bg-amber-50 border-amber-500 flex items-start gap-[10px]`}
+                    >
+                      <AlertTriangle className="w-[24px] h-[24px] text-amber-700 shrink-0 mt-[2px]" aria-hidden="true" />
+                      <p className={`${TYPE.body} ${WEIGHT.normal} text-amber-900 leading-snug`}>
+                        {t('result.autoDowngraded')}
+                      </p>
+                    </div>
+                  )}
+
                   {/* ══════════════════════════════════════════════════════
                       第一層：結論 —— 全頁最大的字，只回答「能不能買」
                       ══════════════════════════════════════════════════════ */}
@@ -1994,25 +2145,22 @@ export default function App() {
                             : t('mode.imageLocal')}
                         </span>
 
-                        {/* 同意開關：永遠顯示「目前設定」的相反動作，
-                            不論這次結果走哪條路徑，使用者都隨時改得回來 */}
-                        {cloudConsent ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCloudConsent(false)}
-                            className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-800 text-[16px] font-black"
-                          >
-                            {t('result.switchToLocal')}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCloudConsent(true)}
-                            className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-blue-800 text-white text-[16px] font-black"
-                          >
-                            {t('result.switchToCloud')}
-                          </button>
-                        )}
+                        {/* 模式切換：三模式之後不再用「二選一開關」——
+                            那只涵蓋得了兩種。
+                            改成把使用者帶去設定頁，那裡有完整的三模式說明
+                            （每一個模式「什麼會離開裝置」都寫清楚了）。
+                            ⚠️ 刻意不在這裡直接切換：使用者看不到另外兩個選項的差別。 */}
+                        <button
+                          type="button"
+                          id="btn-result-change-mode"
+                          onClick={() => {
+                            stopSpeech();
+                            setActiveTab('conditions');
+                          }}
+                          className="self-start min-h-[48px] px-[12px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-800 text-[16px] font-black"
+                        >
+                          {t('result.changeMode')}
+                        </button>
                       </div>
                     </div>
 
@@ -2381,6 +2529,18 @@ export default function App() {
               </div>
             </SettingsSection>
 
+            {/* AI 分析模式（2026-09-30 新增）：三選一。
+                ⚠️ 收合時顯示目前模式 —— 這是會影響隱私的設定，
+                   使用者不該需要展開才知道自己選了什麼。 */}
+            <SettingsSection
+              id="settings-mode"
+              icon={<ShieldCheck className="w-[26px] h-[26px]" />}
+              title={t('settings.mode.title')}
+              summary={t(MODE_LABEL_KEY[analysisMode])}
+            >
+              <AnalysisModePicker value={analysisMode} onChange={handleChangeAnalysisMode} />
+            </SettingsSection>
+
             {/* 第二部分：日常生理指標量測（血壓、心跳、血糖等） */}
             <SettingsSection
               id="settings-vitals"
@@ -2400,6 +2560,7 @@ export default function App() {
                 indicators={physicalIndicators}
                 onChangeIndicators={handleUpdateIndicators}
                 gender={gender}
+                analysisMode={analysisMode}
               />
             </SettingsSection>
 
@@ -2809,7 +2970,11 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === 'qa' && (
           <div className="flex flex-col space-y-5">
-            <HealthQASection indicators={physicalIndicators} gender={gender} />
+            <HealthQASection
+              indicators={physicalIndicators}
+              gender={gender}
+              analysisMode={analysisMode}
+            />
           </div>
         )}
       </main>

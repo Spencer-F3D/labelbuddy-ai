@@ -24,9 +24,10 @@
     "check:honorific": "tsx scripts/check-honorific.ts",
     "check:cache": "tsx scripts/check-cache-key.ts",
     "check:diet": "tsx scripts/check-diet-record-lang.ts",
+    "check:mode": "tsx scripts/check-analysis-mode.ts",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
-    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:honorific && npm run check:cache && npm run check:diet"
+    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:honorific && npm run check:cache && npm run check:diet && npm run check:mode"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

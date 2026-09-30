@@ -505,7 +505,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
       : `${indicators.bloodSugar} mmol/L (度)`;
 
     const promptText = `請幫這位使用者分析他今天量到的身體健康指標：
-- 年齡區間：${indicators.ageGroup || '70-79歲長者'}
+- 年齡區間：${indicators.ageGroup || '未提供'}
 - 血壓：上壓 ${indicators.systolicBp} mmHg，下壓 ${indicators.diastolicBp} mmHg
 - 血糖：${sugarDisplay}（狀態：${indicators.bloodSugarTiming === 'fasting' ? '早晨空腹' : '吃飽飯後'}）
 - 尿酸/關節狀況：${indicators.uricAcidStatus}
@@ -515,15 +515,28 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 
 請用最通俗、最溫暖的「大白話」，清楚告訴他現在身體狀況如何，並給出超實用的「超市買菜指南（什麼不能買、什麼可以買）」與語音朗讀摘要。`;
 
-    const aiResult = await callAiModel(req, {
-      systemInstruction:
-        (isEnglish
-          ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
-          : SYSTEM_INSTRUCTION_INDICATORS) + buildAddressRule(addressGender, language),
-      userPrompt: promptText,
-      temperature: 0.3,
-      maxTokens: 1200,
-    });
+    /**
+     * ⚠️ 同意閘門（2026-09-30 補上）。
+     *
+     * 【為什麼現在才補】
+     *   先前這個端點**無條件呼叫雲端** —— 使用者選「只在本機」時，
+     *   血壓、心跳、血糖、自覺症狀照樣會被送到 OpenRouter。
+     *   引導頁與私隱條款卻寫著「身體指標不會上傳」，兩者不符。
+     *   這不是效能問題，是**對使用者的承諾不成立**。
+     */
+    const localOnly = req.body?.localOnly === true;
+
+    const aiResult = localOnly
+      ? null
+      : await callAiModel(req, {
+          systemInstruction:
+            (isEnglish
+              ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
+              : SYSTEM_INSTRUCTION_INDICATORS) + buildAddressRule(addressGender, language),
+          userPrompt: promptText,
+          temperature: 0.3,
+          maxTokens: 1200,
+        });
 
     if (aiResult) {
       aiResult.data.analysis_mode = 'cloud_ai';
@@ -628,15 +641,28 @@ ${contextInfo}
 
 請針對使用者的提問與其體況數字，以 100% 通俗大白話、親切但不過度裝熟的口吻回答他。清楚說明到底「能不能吃/能不能做」、「為什麼」、「該怎麼吃才安全」，並提供一句話結論與語音朗讀文稿。`;
 
-    const aiResult = await callAiModel(req, {
-      systemInstruction:
-        (isEnglish
-          ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
-          : SYSTEM_INSTRUCTION_HEALTH_QA) + buildAddressRule(addressGender, language),
-      userPrompt: promptText,
-      temperature: 0.3,
-      maxTokens: 1000,
-    });
+    /**
+     * ⚠️ 同意閘門（2026-09-30 補上）。
+     *
+     * 【為什麼現在才補】
+     *   先前這個端點**無條件呼叫雲端** —— 使用者選「只在本機」時，
+     *   他打的健康問題（以及當時的身體指標）照樣會送到 OpenRouter。
+     *   使用者的提問往往比標籤文字更私密（例如「我這樣是不是快中風了」），
+     *   所以這個閘門比標籤那邊更需要。
+     */
+    const localOnly = req.body?.localOnly === true;
+
+    const aiResult = localOnly
+      ? null
+      : await callAiModel(req, {
+          systemInstruction:
+            (isEnglish
+              ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
+              : SYSTEM_INSTRUCTION_HEALTH_QA) + buildAddressRule(addressGender, language),
+          userPrompt: promptText,
+          temperature: 0.3,
+          maxTokens: 1000,
+        });
 
     if (aiResult) {
       const parsed = aiResult.data;
@@ -700,26 +726,34 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
 
   res.json({
     status: 'ok',
-    /** 預設模式：本機。前端必須在使用者明確同意後才可送 localOnly:false */
-    defaultMode: 'local_only',
-    /** 兩種模式的共同保證：照片永遠不會離開使用者的裝置 */
-    imageNeverLeavesDevice: true,
+    /**
+     * 預設模式。
+     *
+     * ⚠️ 2026-09-30 起改為三模式。這裡回報的是**引導頁的預設選項**，
+     *    不是「伺服器強制」—— 使用者可以選任何一種，伺服器只照著做。
+     */
+    defaultMode: 'cloud_image',
+    /**
+     * ⚠️ 舊版這裡寫 `imageNeverLeavesDevice: true`，那是**對的**（當時只有 OCR 文字模式）。
+     *    加入「直接雲端」模式之後這句話不再成立，所以改成逐模式列出，
+     *    不再給一個概括的保證 —— 概括的保證在模式增加時最容易變成謊言。
+     */
     modes: {
-      local_only: {
-        id: 'local_only',
-        name: '本機模式（預設）',
-        uploadsImage: false,
+      cloud_image: {
+        id: 'cloud_image',
+        name: '直接雲端（照片上傳）',
+        uploadsImage: true,
         uploadsOcrText: false,
-        uploadsHealthInfo: false,
-        requiresConsent: false,
-        engine: '瀏覽器內建 OCR（tesseract.js）+ 本機食育規則引擎',
+        uploadsHealthInfo: true,
+        requiresConsent: true,
+        available: cloudAvailable,
+        providers: ['Google Gemini', 'OpenRouter'],
         description:
-          '照片在您的手機上就以離線 OCR 讀出文字，照片本身從未離開裝置。接著由本機的規則引擎判斷，不呼叫任何外部服務 —— 連文字也不會上傳。慢性病史同樣留在本機。',
+          '照片會直接上傳給雲端視覺模型判讀（不經過本機 OCR），同時傳送您勾選的慢性病史。準確度最高，因為模型看得到標籤的實際版面。伺服器不落地儲存照片。',
       },
-      cloud: {
-        id: 'cloud',
-        name: '雲端 AI 增強模式',
-        // ⚠️ 照片一律不上傳（兩種模式皆然）。雲端只會收到 OCR 讀出的**文字**。
+      cloud_text: {
+        id: 'cloud_text',
+        name: '本機 OCR ＋ 雲端 AI',
         uploadsImage: false,
         uploadsOcrText: true,
         uploadsHealthInfo: true,
@@ -727,7 +761,18 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
         available: cloudAvailable,
         providers: ['Google Gemini', 'OpenRouter'],
         description:
-          '經您明確同意後，只會把「OCR 讀出的標籤文字」與「您勾選的慢性病史項目名稱」傳送給雲端文字模型。照片仍然不會上傳。可提升判斷準確度，但文字與病史會離開您的裝置。',
+          '照片在您的手機上就以離線 OCR 讀成文字，只有文字與您勾選的慢性病史會傳送給雲端文字模型。照片本身不會上傳。',
+      },
+      local_only: {
+        id: 'local_only',
+        name: '只在本機（完全不上網）',
+        uploadsImage: false,
+        uploadsOcrText: false,
+        uploadsHealthInfo: false,
+        requiresConsent: false,
+        engine: '瀏覽器內建 OCR（tesseract.js）+ 本機食育規則引擎',
+        description:
+          '照片與文字都留在裝置上，由本機規則引擎判斷，不呼叫任何外部服務。身體指標與健康問答同樣不會上傳。',
       },
     },
     serverPolicy: {

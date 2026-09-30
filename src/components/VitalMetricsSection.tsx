@@ -24,7 +24,7 @@ import {
   Volume2,
   Sparkles,
 } from 'lucide-react';
-import { AddressGender, SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
+import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
 import { speakText, stopSpeech } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
@@ -39,6 +39,13 @@ interface VitalMetricsSectionProps {
    * 不影響任何營養或風險判斷。未指定時後端一律用中性的「您好」。
    */
   gender?: AddressGender;
+  /**
+   * 分析模式（2026-09-30）。
+   * ⚠️ 這是**同意閘門**：`local_only` 時後端不會呼叫雲端，
+   *    血壓與症狀只會交給本機規則引擎。
+   *    先前這個端點無條件上傳，與引導頁的承諾不符。
+   */
+  analysisMode?: AnalysisMode;
 }
 
 /** 評估結果：只帶翻譯鍵，字串在 render 時才解析 */
@@ -53,6 +60,7 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
   indicators,
   onChangeIndicators,
   gender,
+  analysisMode,
 }) => {
   const { t, language } = useI18n();
 
@@ -75,7 +83,13 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文結果
         // gender 只影響稱謂（先生／小姐／您好），不影響判斷
-        body: JSON.stringify({ indicators, language, gender }),
+        // localOnly 是同意閘門：只在本機時後端不呼叫雲端
+        body: JSON.stringify({
+          indicators,
+          language,
+          gender,
+          localOnly: analysisMode === 'local_only',
+        }),
       });
       const payload = await response.json();
       if (!response.ok || !payload?.success) throw new Error('bad response');

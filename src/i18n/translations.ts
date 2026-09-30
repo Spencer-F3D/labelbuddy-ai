@@ -122,8 +122,9 @@ const zhTW = {
   'result.noConclusion':
     '沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。',
   'result.why': '為什麼？',
-  'result.switchToLocal': '改回本機模式（文字也不送出）',
-  'result.switchToCloud': '改用雲端分析（更準）',
+  'result.autoDowngraded':
+    '⚠️ 這次雲端沒有回應，已自動改用本機 OCR ＋ 文字分析（照片沒有上傳）。',
+  'result.changeMode': '在設定裡改分析模式',
   'result.stopReading': '⏹️ 停止朗讀',
   'result.readToMe': '🔊 念給我聽',
   'result.moreInfo': '更多資訊與替代建議',
@@ -159,6 +160,26 @@ const zhTW = {
   'mode.localBadge': '📴 本機離線',
   'mode.imageUploaded': '這次的照片有上傳到雲端辨識。',
   'mode.imageLocal': '這次的照片只在這支手機上處理，沒有上傳。',
+
+  /* ── 三種分析模式（2026-09-30）───────────────────────────────
+   * ⚠️ 引導頁與設定頁共用同一組鍵，避免兩邊說法不一致。
+   * `*.Data` 是每個模式**最關鍵的差別**：什麼會離開這台手機。
+   * 每一句都必須與後端實際行為一致（見 server/handlers.ts 的 localOnly 判斷）。 */
+  'mode.title': '要用哪一種 AI？',
+  'mode.body': '三種都可以隨時切換，差別在「什麼會離開這台手機」：',
+  'mode.cloudImage': '直接雲端',
+  'mode.cloudImageNote': '最準：AI 直接看照片，連標籤排版都看得到。',
+  'mode.cloudImageData': '離開手機：照片、慢性病史',
+  'mode.cloudText': '本機 OCR ＋ 雲端 AI',
+  'mode.cloudTextNote': '手機先把照片讀成文字，只把文字送給 AI。',
+  'mode.cloudTextData': '離開手機：標籤文字、慢性病史',
+  'mode.localOnly': '只在本機',
+  'mode.localOnlyNote': '完全不上網，最快也最私密，但建議比較簡單。',
+  'mode.localOnlyData': '離開手機：無',
+  'mode.changeLater': '之後可以在設定裡隨時改，不用重來。',
+  'mode.savedVoice': '已切換為「{mode}」',
+  'mode.currentLabel': '目前的模式',
+  'settings.mode.title': 'AI 分析模式',
 
   /* 營養素長條圖 */
   'nutrient.amount': '這包有 {value} {unit}',
@@ -325,19 +346,10 @@ const zhTW = {
   'onboard.how3Body':
     '如果剛好沒有網路，App 會改用內建的規則給您建議，不會整個不能用。',
   'onboard.privacyTitle': '私隱與 AI 使用方式',
-  'onboard.privacyPromiseTitle': '我們的承諾',
-  'onboard.privacy1': '您拍的照片**從頭到尾都不會離開這台手機**。',
-  'onboard.privacy2': 'App 在手機上把照片讀成文字，只把**文字**送出去分析。',
-  'onboard.privacy3': '雲端 AI 用您的文字給建議，不會收到您的照片。',
-  'onboard.privacyNote':
-    '您可以隨時在設定裡改成「只用本機」，那樣連文字也不會送出去。',
-  'onboard.modeTitle': '要用哪一種 AI？',
-  'onboard.modeBody': '兩種都可以隨時切換：',
-  'onboard.modeCloud': '雲端 AI（建議）',
-  'onboard.modeCloudNote': '答案最準、最完整。',
-  'onboard.modeLocal': '只用本機（完全不上網）',
-  'onboard.modeLocalNote': '最快也最私隱，但建議比較簡單。',
-  'onboard.modeChangeLater': '之後可以在設定裡隨時改，不用重來。',
+  'onboard.privacyPromiseTitle': '無論選哪一種，這些都不變',
+  'onboard.privacy1': '伺服器**不保存任何照片**：不落地儲存、不寫入資料庫，處理完就忘掉。',
+  'onboard.privacy2': '沒有帳號、沒有廣告、沒有第三方追蹤。',
+  'onboard.privacy3': '紀錄只存在這台裝置，你可以隨時在設定裡清除。',
   'onboard.next': '下一步',
   'onboard.back': '上一步',
   'onboard.start': '開始使用',
@@ -346,9 +358,9 @@ const zhTW = {
    * ⚠️ 這一段的字級刻意用 12px，是全站唯一的例外。
    *    理由與風險見 src/components/LegalNotice.tsx 的檔頭註解。 */
   'legal.privacy.title': '私隱條款',
-  'legal.privacy.1': '照片永遠不會離開你的裝置。標籤辨識（OCR）完全在你的瀏覽器內完成。',
-  'legal.privacy.2': '只有在你按下同意後，辨識出的「文字」才會送到雲端 AI 分析；照片本身從不上傳。',
-  'legal.privacy.3': '你勾選的慢性病、身體指標與飲食紀錄只存在你自己的裝置上，不會上傳，也不會與任何人共享。',
+  'legal.privacy.1': '照片會不會離開裝置，取決於你在上面選的分析模式 —— 每一個模式都寫明了「什麼會離開手機」。',
+  'legal.privacy.2': '伺服器不保存任何照片：不落地儲存、不寫入資料庫，處理完就丟棄。',
+  'legal.privacy.3': '飲食紀錄與身分設定只存在這台裝置；雲端模式只會把標籤內容與慢性病史送去判斷，不會保存，也不會與任何人共享。',
   'legal.privacy.4': '本 App 沒有帳號、沒有廣告、沒有第三方追蹤，也不收集任何個人身分資料。',
   'legal.privacy.5': '你隨時可以在設定中改回「只在本機分析」，或按「清除所有資料」把一切刪除。',
   'legal.disclaimer.title': '免責聲明',
@@ -445,9 +457,9 @@ const zhTW = {
   'advice.green.habit': '長期小習慣：每天定時喝足溫開水、多吃五色蔬果，維持長壽活力。',
 
   /* ── 掃描流程的提示與錯誤訊息（第三階段）───────────────────── */
-  'scan.savedCloud': '已開啟雲端辨識。之後拍的照片會上傳到雲端分析。',
-  'scan.savedLocal': '已改回本機模式，照片不會離開這支手機。',
   'scan.readingLabel': '正在讀取標籤文字',
+  /* 「直接雲端」失敗時的自動降級提示（一定要讓使用者知道，不能悄悄降級） */
+  'scan.autoDowngrade': '雲端忙線中，已改用本機辨識重試。',
   'scan.analyzing': '正在為您分析',
   'scan.errBusy': '網絡繁忙，請稍後再試',
   'scan.errUnclear': '照片看不清楚，請重新拍一次',
@@ -693,8 +705,9 @@ const en: Record<TranslationKey, string> = {
   'result.noConclusion':
     'I could not read enough nutrition numbers, so I am not giving a verdict this time — that way I will not guess wrong.',
   'result.why': 'Why?',
-  'result.switchToLocal': 'Switch back to on-device (nothing is sent out)',
-  'result.switchToCloud': 'Use cloud analysis (more accurate)',
+  'result.autoDowngraded':
+    'The cloud did not respond, so this used on-device OCR and text analysis instead. Your photo was not uploaded.',
+  'result.changeMode': 'Change mode in Settings',
   'result.stopReading': '⏹️ Stop reading',
   'result.readToMe': '🔊 Read it to me',
   'result.moreInfo': 'More details and alternatives',
@@ -728,6 +741,23 @@ const en: Record<TranslationKey, string> = {
   'mode.localBadge': '📴 On-device',
   'mode.imageUploaded': 'This photo was uploaded for cloud analysis.',
   'mode.imageLocal': 'This photo was processed only on this phone — it was not uploaded.',
+
+  /* ── The three analysis modes (2026-09-30) ───────────────────── */
+  'mode.title': 'Which kind of AI?',
+  'mode.body': 'You can switch any time. The difference is what leaves your phone:',
+  'mode.cloudImage': 'Cloud (photo)',
+  'mode.cloudImageNote': 'Most accurate: the AI reads the photo itself, layout and all.',
+  'mode.cloudImageData': 'Leaves your phone: photo, conditions',
+  'mode.cloudText': 'On-device OCR + cloud AI',
+  'mode.cloudTextNote': 'Your phone turns the photo into text first; only the text is sent.',
+  'mode.cloudTextData': 'Leaves your phone: label text, conditions',
+  'mode.localOnly': 'On-device only',
+  'mode.localOnlyNote': 'No internet at all — fastest and most private, but simpler advice.',
+  'mode.localOnlyData': 'Leaves your phone: nothing',
+  'mode.changeLater': 'You can change this in Settings later — no need to start over.',
+  'mode.savedVoice': 'Switched to {mode}',
+  'mode.currentLabel': 'Current mode',
+  'settings.mode.title': 'AI analysis mode',
 
   'nutrient.amount': 'This pack has {value} {unit}',
   'nutrient.dailyMax': ', daily limit {limit} {unit}',
@@ -900,20 +930,10 @@ const en: Record<TranslationKey, string> = {
   'onboard.how3Body':
     'If you happen to have no connection, the app switches to built-in rules instead of failing completely.',
   'onboard.privacyTitle': 'Privacy and how the AI is used',
-  'onboard.privacyPromiseTitle': 'Our promise',
-  'onboard.privacy1': 'Your photo **never leaves this phone** \u2014 not at any point.',
-  'onboard.privacy2':
-    'The app reads the photo into text on your phone, and only the **text** is sent out.',
-  'onboard.privacy3': 'The cloud AI works from that text. It never receives your photo.',
-  'onboard.privacyNote':
-    'You can switch to "on-device only" in Settings at any time \u2014 then even the text stays on your phone.',
-  'onboard.modeTitle': 'Which AI would you like?',
-  'onboard.modeBody': 'You can switch between these at any time:',
-  'onboard.modeCloud': 'Cloud AI (recommended)',
-  'onboard.modeCloudNote': 'The most accurate and complete answers.',
-  'onboard.modeLocal': 'On-device only (no internet at all)',
-  'onboard.modeLocalNote': 'Fastest and most private, but simpler advice.',
-  'onboard.modeChangeLater': 'You can change this in Settings later \u2014 no need to start over.',
+  'onboard.privacyPromiseTitle': 'These hold true in every mode',
+  'onboard.privacy1': 'The server **never stores photos** \u2014 no disk, no database, gone after processing.',
+  'onboard.privacy2': 'No accounts, no ads, no third-party tracking.',
+  'onboard.privacy3': 'Records stay on this device and you can clear them any time in Settings.',
   'onboard.next': 'Next',
   'onboard.back': 'Back',
   'onboard.start': 'Get started',
@@ -923,11 +943,11 @@ const en: Record<TranslationKey, string> = {
    *    See the header comment in src/components/LegalNotice.tsx. */
   'legal.privacy.title': 'Privacy notice',
   'legal.privacy.1':
-    'Your photo never leaves your device. Label recognition (OCR) runs entirely inside your browser.',
+    'Whether your photo leaves the phone depends on the analysis mode you choose above \u2014 each mode states exactly what leaves your phone.',
   'legal.privacy.2':
-    'Only the recognised text is sent to the cloud AI, and only after you agree. The photo itself is never uploaded.',
+    'The server never stores photos: no disk, no database, discarded after processing.',
   'legal.privacy.3':
-    'The conditions you tick, your body measurements and your diet records stay on your own device. They are never uploaded or shared with anyone.',
+    'Diet records and your profile stay on this device. Cloud modes send only the label content and your conditions for judgement \u2014 never stored, never shared.',
   'legal.privacy.4':
     'This app has no accounts, no ads, no third-party tracking, and collects no personally identifying data.',
   'legal.privacy.5':
@@ -1035,9 +1055,8 @@ const en: Record<TranslationKey, string> = {
   'advice.green.habit':
     'Long-term habit: drink enough warm water at set times each day and eat vegetables and fruit of many colours.',
 
-  'scan.savedCloud': 'Cloud AI is now on. Photos you take will be uploaded for analysis.',
-  'scan.savedLocal': 'Back to on-device mode. Photos will not leave this phone.',
   'scan.readingLabel': 'Reading the label text',
+  'scan.autoDowngrade': 'The cloud is busy \u2014 retrying with on-device recognition.',
   'scan.analyzing': 'Analysing for you',
   'scan.errBusy': 'The network is busy — please try again shortly',
   'scan.errUnclear': 'The photo is not clear enough — please take another one',

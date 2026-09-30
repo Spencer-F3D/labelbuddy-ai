@@ -23,7 +23,7 @@
 
 import React, { useState } from 'react';
 import { MessageCircleQuestion, Volume2 } from 'lucide-react';
-import { AddressGender, SeniorPhysicalIndicators, HealthQuestionAnswer } from '../types';
+import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, HealthQuestionAnswer } from '../types';
 import { speakText, stopSpeech } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 
@@ -35,9 +35,20 @@ interface HealthQASectionProps {
    * 不影響任何營養或風險判斷。未指定時後端一律用中性的「您好」。
    */
   gender?: AddressGender;
+  /**
+   * 分析模式（2026-09-30）。
+   * ⚠️ 這是**同意閘門**：`local_only` 時後端不會呼叫雲端。
+   *    使用者的提問往往比標籤文字更私密（例如「我這樣是不是快中風了」），
+   *    所以這個閘門比標籤那邊更需要。
+   */
+  analysisMode?: AnalysisMode;
 }
 
-export const HealthQASection: React.FC<HealthQASectionProps> = ({ indicators, gender }) => {
+export const HealthQASection: React.FC<HealthQASectionProps> = ({
+  indicators,
+  gender,
+  analysisMode,
+}) => {
   const { t, language } = useI18n();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<HealthQuestionAnswer | null>(null);
@@ -55,7 +66,14 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ indicators, ge
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文回答
         // gender 只影響稱謂（先生／小姐／您好），不影響判斷
-        body: JSON.stringify({ question: q, indicators, language, gender }),
+        // localOnly 是同意閘門：只在本機時後端不呼叫雲端
+        body: JSON.stringify({
+          question: q,
+          indicators,
+          language,
+          gender,
+          localOnly: analysisMode === 'local_only',
+        }),
       });
       const payload = await response.json();
       if (!response.ok || !payload?.success) throw new Error('bad response');

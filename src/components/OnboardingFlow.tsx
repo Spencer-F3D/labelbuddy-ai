@@ -31,11 +31,12 @@ import {
   ArrowLeft,
   Check,
 } from 'lucide-react';
-import { AddressGender, LearnerProfileId } from '../types';
+import { AddressGender, AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
 import { GenderPicker } from './GenderPicker';
 import { LegalNotice } from './LegalNotice';
+import { AnalysisModePicker } from './AnalysisModePicker';
 
 /**
  * 性別。
@@ -55,7 +56,11 @@ export type Gender = AddressGender;
 export interface OnboardingResult {
   profileId: LearnerProfileId;
   gender: Gender;
-  cloudConsent: boolean;
+  /**
+   * 使用者選的分析模式（2026-09-30 起為三選一）。
+   * 舊版這裡是 `cloudConsent: boolean`，只有兩種可能。
+   */
+  analysisMode: AnalysisMode;
 }
 
 interface OnboardingFlowProps {
@@ -75,7 +80,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const [step, setStep] = useState(0);
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
   const [gender, setGender] = useState<Gender>('unspecified');
-  const [cloudConsent, setCloudConsent] = useState(true);
+  /**
+   * 分析模式。
+   *
+   * ⚠️ 預設 `cloud_image`（直接雲端）—— 這是使用者指定的預設。
+   *    但這代表**預設會上傳照片**，所以模式卡片上的
+   *    「離開手機：照片、慢性病史」一定要在選擇當下就看得見。
+   */
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('cloud_image');
   /**
    * 是否已勾選「我已閱讀並同意私隱條款與免責聲明」。
    *
@@ -89,7 +101,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
   const isLast = step === TOTAL_STEPS - 1;
 
-  const finish = () => onComplete({ profileId, gender, cloudConsent });
+  const finish = () => onComplete({ profileId, gender, analysisMode });
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
@@ -211,59 +223,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                     </li>
                   ))}
                 </ol>
-
-                <p className="text-[16px] font-bold text-slate-700 leading-relaxed bg-slate-50 rounded-xl p-3">
-                  {t('onboard.privacyNote')}
-                </p>
               </div>
 
-              {/* AI 模式同意：預設「雲端為主」，但把後備講清楚 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-3">
-                <h2 className="text-[19px] font-black text-slate-950">
-                  {t('onboard.modeTitle')}
-                </h2>
-
-                <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
-                  {t('onboard.modeBody')}
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCloudConsent(true)}
-                    className={`min-h-[48px] rounded-xl px-4 py-3 text-left border-2 flex items-center gap-3 ${
-                      cloudConsent
-                        ? 'bg-blue-800 text-white border-blue-800'
-                        : 'bg-white text-slate-800 border-slate-300'
-                    }`}
-                  >
-                    <Cloud className="w-6 h-6 shrink-0" aria-hidden="true" />
-                    <span className="text-[18px] font-black flex-1">
-                      {t('onboard.modeCloud')}
-                    </span>
-                    {cloudConsent && <Check className="w-6 h-6 shrink-0" aria-hidden="true" />}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCloudConsent(false)}
-                    className={`min-h-[48px] rounded-xl px-4 py-3 text-left border-2 flex items-center gap-3 ${
-                      !cloudConsent
-                        ? 'bg-amber-600 text-white border-amber-600'
-                        : 'bg-white text-slate-800 border-slate-300'
-                    }`}
-                  >
-                    <WifiOff className="w-6 h-6 shrink-0" aria-hidden="true" />
-                    <span className="text-[18px] font-black flex-1">
-                      {t('onboard.modeLocal')}
-                    </span>
-                    {!cloudConsent && <Check className="w-6 h-6 shrink-0" aria-hidden="true" />}
-                  </button>
-                </div>
-
-                <p className="text-[16px] font-bold text-slate-700 leading-relaxed">
-                  {t('onboard.modeChangeLater')}
-                </p>
+              {/* AI 分析模式：三選一（2026-09-30）
+                  ⚠️ 用共用元件（設定頁也用同一份），選項與說明才不會兩邊漂移。
+                  ⚠️ 預設是「直接雲端」（使用者的選擇），它會上傳照片，
+                     所以「離開手機：照片、慢性病史」必須在選擇當下就看得見。 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
+                <AnalysisModePicker value={analysisMode} onChange={setAnalysisMode} />
               </div>
 
               {/* 私隱條款與免責聲明 ＋ 明確同意（2026-09-29 使用者要求）

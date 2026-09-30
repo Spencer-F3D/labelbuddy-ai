@@ -38,6 +38,27 @@ export type DataHandling = 'cloud' | 'local_only';
 export type AddressGender = 'male' | 'female' | 'unspecified';
 
 /**
+ * 分析模式（三選一，2026-09-30 起）。
+ *
+ * 【為什麼從「同意／不同意」變成三選一】
+ *   舊版只有一個布林值 `cloudConsent`，但雲端其實有兩種截然不同的用法：
+ *   「把照片傳上去讓 AI 自己看」與「只傳 OCR 讀出的文字」。
+ *   這兩者的準確度與隱私代價差很多，卻被同一個開關綁在一起 ——
+ *   使用者無從選擇，而我們也只能承諾最保守的那一種。
+ *   拆成三模式後，每一種都能誠實說明「什麼會離開裝置」。
+ *
+ * | 模式 | 照片 | OCR 文字 | 慢性病史／身體指標 | 判斷引擎 |
+ * | --- | --- | --- | --- | --- |
+ * | `cloud_image` | **上傳** | 不需要 | 上傳 | 雲端視覺 AI |
+ * | `cloud_text`  | 留在裝置 | 上傳 | 上傳 | 雲端文字 AI |
+ * | `local_only`  | 留在裝置 | 留在裝置 | 留在裝置 | 本機規則引擎 |
+ *
+ * ⚠️ `local_only` 時**連身體指標與健康問答都不會上傳** ——
+ *    這正是 2026-09-30 補上的閘門（先前那兩個端點無條件呼叫雲端）。
+ */
+export type AnalysisMode = 'cloud_image' | 'cloud_text' | 'local_only';
+
+/**
  * 單一慢性病的專屬提醒。
  *
  * 【為什麼不跟 nutrient_facts 混在一起】

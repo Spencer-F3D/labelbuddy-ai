@@ -268,6 +268,8 @@ try {
     //    沒勾就按不動「開始使用」（按下只會顯示提醒，不會前進）。
     //    所以這裡必須先勾選，否則整個引導頁會卡住、後面每個畫面都拍到引導頁。
     await sleep(800);
+    // 最後一步是「私隱 ＋ 三種分析模式 ＋ 同意」，值得單獨拍一張存證
+    await capture('00-onboarding-step3');
     const agreed = await cdp.eval(`
       (() => {
         const cb = document.querySelector('input[type="checkbox"]');
@@ -399,6 +401,38 @@ try {
   /* ── 設定頁最下方：私隱條款 ＋ 免責聲明（12px）＋ 清除所有資料 ──
    * 這兩塊在頁面最底，不捲到底掃不到 —— 不掃等於沒有被驗證過。
    */
+  console.log('\n── 設定頁：AI 分析模式（三選一）──────────');
+  await openMenu();
+  await sleep(900);
+  await clickByText('Health settings');
+  await sleep(1800);
+  // 展開「AI 分析模式」區塊（預設收合）
+  const modeOpen = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('button, [role="button"]')].find(e =>
+        /AI analysis mode|AI 分析模式/i.test(e.textContent || ''));
+      if (!el) return false;
+      el.click();
+      return true;
+    })()
+  `);
+  await sleep(1200);
+  if (!modeOpen) console.log('  ⚠️  找不到「AI 分析模式」區塊');
+  // ⚠️ 展開後一定要把區塊捲進畫面 —— 它在設定頁最上方，
+  //    但頁面可能還停在上一段的捲動位置，不捲就只會拍到別的東西（實測就是這樣）。
+  const modeScrolled = await cdp.eval(`
+    (() => {
+      const el = [...document.querySelectorAll('h2, span, div')].find(e =>
+        /^(AI analysis mode|AI 分析模式)$/.test((e.textContent || '').trim()));
+      if (!el) return false;
+      el.scrollIntoView({ block: 'center' });
+      return true;
+    })()
+  `);
+  await sleep(1000);
+  if (!modeScrolled) console.log('  ⚠️  無法捲到「AI 分析模式」標題');
+  await capture('04g-analysis-mode');
+
   console.log('\n── 設定頁底部（條款與清除資料）──────────');
   await openMenu();
   await sleep(900);
