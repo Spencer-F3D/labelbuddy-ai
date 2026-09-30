@@ -19,16 +19,14 @@
 
 **評審比重**：問題與教育價值 20%｜創意原創 20%｜**AI 技術應用 25%**｜原型測試成效 20%｜英文表達 10%｜倫理安全私隱 5%
 
-**四條致命規則**
-1. 「未使用英文」→ 可不予評審（App 雙語不可省）
-2. 「不能只提交概念、簡報、普通資料庫，或僅以固定規則模擬 AI」→ **雲端真實 AI 必須是主角**
-3. 報告須列明生成式 AI 工具名稱／版本／用途／學生完成部分 → 隱瞞**直接取消資格**
-4. 「不得提交學生不能合理理解及操作的系統」→ 評審可即場提問程式細節
+**四條致命規則**：① 未用英文可不予評審（App 雙語不可省）② **雲端真實 AI 必須是主角**
+③ 報告須列明 AI 工具名稱／版本／用途／學生分工，隱瞞**直接取消資格**
+④ 不得提交學生不能理解的系統（評審可即場提問程式細節）
 
 **四份交付物**：`ProjectIntroduction`（≤2頁）／`ResearchReport`（6–12頁）／
 `Poster`（0.8×1.1m 直向）／`DemoVideo`（≤5分鐘），檔名皆加 `_LabelBuddyAI`。
 
-**排程**：09-28 雙語四階段 ✅｜09-29 引導頁＋接回功能＋身分中性化＋稱謂＋條款 ✅ →
+**排程**：09-28 雙語 ✅｜09-29 中性化＋稱謂＋條款 ✅｜09-30 三模式＋引導頁 ✅ →
 **10-01~10-02 APK 打包（硬期限）** → 10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**
 
 ## 🚀 部署（09-28 上線，每次任務完成自動執行）
@@ -41,10 +39,8 @@
 - 版控 GitHub `Spencer-F3D/labelbuddy-ai`（Private）｜手機測試 `連線到手機.bat`（Tunnel，網址每次不同）
 
 ⚠️⚠️ **`git commit` 只是本機動作 —— 不上 GitHub、更不上線。** 每次任務完成**自動**跑：
-1. `git push origin main`（背景執行）
-2. `node node_modules/vite/bin/vite.js build` → `dist/`
-3. `node node_modules/wrangler/bin/wrangler.js deploy`（只上傳變動檔，約 30 秒）
-4. **驗證**：線上首頁引用的 `assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名
+`git push origin main` → `vite build` → `wrangler deploy` →
+**驗證**線上首頁引用的 `assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名。
 
 ## 🔒 隱私架構與 AI 模式（09-30 改為三模式）
 
@@ -94,14 +90,9 @@
   通則：**快取鍵一定要用「這次請求真正獨特的內容」**（見 `analysisCacheContent()`）。
 
 ## 📋 飲食紀錄（DietRecord）
-★ **紀錄跟隨「標籤本身的語言」**，與介面語言無關（09-29 使用者定案：
-「他拍照的照片是甚麼便是甚麼語言」）。`lang` 欄位在建立時固定。
-- `detectLabelLanguage()`（`src/utils/labelLanguage.ts`）：OCR 含漢字 → `zh-TW`
-- 介面語言 ≠ 標籤語言時，用**本機引擎就地重新產生** ——
-  `smartNutritionAnalyzer`／`labelParser`／`localEngineEn` 都是**純函式**，
-  可直接 import 進前端。完全離線、**不花任何 API 額度**（代價：bundle +13.5KB gzip）
-- `localizeDietRecord()` 遇到**有 `lang` 的紀錄一律不動**；只有 6 筆示範資料走 ID 對照表
-- 品名用 `labelParser` 的 `extractFoodName`（**標籤原文品名**），失敗才退回關鍵字猜測
+★ **紀錄跟隨「標籤本身的語言」**，與介面語言無關（09-29 定案：「照片是什麼語言，
+紀錄就是什麼語言」）。`lang` 在建立時固定；介面語言 ≠ 標籤語言時用**本機引擎就地重新產生**
+（純函式、離線、不花額度）。品名用 `extractFoodName`（**標籤原文品名**）。詳見 `ARCHITECTURE.md`。
 
 ## ⛔ Gemini 區域封鎖（已定案，不必重查）
 使用者在中國澳門；Gemini 支援區域**不含中國澳門／香港／大陸**。
@@ -110,46 +101,53 @@
 （完整錯誤碼對照見 `ARCHITECTURE.md`）
 
 ## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）
-現役主力 **OpenRouter**；Gemini 程式碼保留，遇區域錯誤自動冷卻 6 小時。
-`DEFAULT_MODEL_CHAIN`（**上限 3 個**）：`dots-studio/dots-3-note-preview:free`（品質最佳）／
-`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`（最快）／`qwen/qwen3.8-27b:free`（常 429）
-- **免費模型會變動** → 失敗時先查 `GET /api/v1/models` 過濾 `pricing.prompt == 0`
-  且 `input_modalities` 含 `image`。完整型號與實測秒數見 `ARCHITECTURE.md`
-- OpenRouter 會快取相同請求 → 驗證延遲時提示詞要加唯一編號
-
-## 💰 額度節省（四層）
-雙供應商輪替｜健康冷卻（連續失敗 2 次→10 分；永久性→6 小時）｜
-**回應快取**（最有效，TTL 24h：5065ms → 7ms）｜額度預檢（`GET /api/v1/key`，不耗額度）。
-
-⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。
+現役主力 **OpenRouter**（Gemini 冷卻中）。`DEFAULT_MODEL_CHAIN` **上限 3 個**。
+★ **免費模型會變動** → 失敗時先查 `GET /api/v1/models` 過濾 `pricing.prompt == 0`
+  且 `input_modalities` 含 `image`（三個現役模型都支援圖片）。
+★ 額度四層：雙供應商輪替｜健康冷卻｜**回應快取**（最有效）｜額度預檢。
+⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。詳見 `ARCHITECTURE.md`。
 
 ## 🎓 6 身分（`LearnerProfileId`）
-`senior` 長者｜`child` 兒童 6–12｜`teen` 青少年 13–18｜`fitness` 健身增肌｜
-`takeout` 年輕人｜`student` 學生。
-定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**（不得引入瀏覽器／Node API）。
-- ★ **名稱不得含評價性字眼**（09-29 使用者要求）：「長者三高」→**長者**（不尊重）、「年輕外食」→**年輕人**。
-  **身分卡片不得顯示說明文字**（`audience` 欄位已刪）。
-- ⚠️ 兒童／青少年鈉糖上限明顯低於成人（鈉 1200/1600 vs 2000）
-- ⚠️ **快取鍵必須含身分**（同一包高蛋白粉對健身族綠燈、對腎臟病患紅燈）
-- `numericLimits` 供百分比換算；`targets[].target` 是給人看的字串，**不能做數學運算**
+`senior`／`child` 6–12／`teen` 13–18／`fitness`／`takeout` 年輕人／`student`。
+定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**。
+★ 名稱不得含評價性字眼（「長者三高」→**長者**、「年輕外食」→**年輕人**）；
+身分卡片不得顯示說明文字（`audience` 已刪）。
+⚠️ 兒童／青少年鈉糖上限明顯低於成人；**快取鍵必須含身分**；
+`targets[].target` 是給人看的字串，**不能做數學運算**。
 
-## 🗣️ 稱謂機制（性別，09-29 新增）
+## 🗣️ 稱謂機制（性別）
 `gender`（`male`/`female`/`unspecified`）**只影響怎麼稱呼，不影響任何判斷**。
-雲端用 `buildAddressRule()` 追加 system prompt；本機用 `applyHonorific*()` **確定性後處理**
-（只改「開頭的第一個『您好』」）。
-- ★ **性別刻意不進快取鍵** —— 快取存**中性**文字，稱謂在輸出最後一步插入。
-  若改成「把稱謂寫進快取內容」，**必須**把 gender 加進鍵
-- 英文一律不加稱謂（"Mr Hello!" 是錯的）
-- ⚠️ `QA_TEXT_FIELDS` **不含 `question`** —— 那是使用者自己的話，不能改
+雲端用 `buildAddressRule()` 追加 prompt；本機用 `applyHonorific*()` 確定性後處理。
+★ **性別刻意不進快取鍵**（快取存中性文字，稱謂在輸出最後一步插入）；
+英文一律不加稱謂；`QA_TEXT_FIELDS` **不含 `question`**。
 
-## 🎨 字級縮放（非長者，09-29 新增）
-`<html data-density="compact|comfortable">`，由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換。
-`index.css` 用 `html[data-density='compact'] [class~='text-[16px]']` 精準命中，
-對應 16→14／18→16／19→17／20→18 px（**全域只有這 4 種字級**）。
-- ⚠️ **新增第 5 種字級必須回來補一行**，否則那個字級不會縮
-- 寫在 `<html>` 而非包 div：側邊選單／彈窗／引導頁都是 fixed，包 div 蓋不到
-- ★ **唯一例外：12px**（私隱條款／免責聲明，`LegalNotice.tsx`，09-29 使用者指定）。
-  不在上面四個 class 內 → **不會**被縮放影響（刻意）。理由見 `UI_RULES.md`。
+## 🎨 字級縮放（非長者）
+`<html data-density>` 由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換，
+`index.css` 精準命中 16→14／18→16／19→17／20→18（**全域只有這 4 種**）。
+⚠️ **新增第 5 種字級必須回來補一行**；寫在 `<html>` 而非包 div（fixed 元素蓋不到）。
+★ **唯一例外：12px**（`LegalNotice.tsx`），刻意不受縮放影響 → `UI_RULES.md`。
+
+## 📷 選圖入口
+**兩個 hidden input**：一個有 `capture="environment"`（拍照）、一個**沒有**（相簿）。
+★ 加了 `capture` 就等於拿掉「選相簿」（手機會直接開鏡頭）。
+
+## 🚪 首次啟動引導頁（09-30 改版）
+**頁數依身分**：長者 **9 頁**（教學分 3 頁）／其他 **7 頁**（教學 1 頁）。
+順序：介紹→身分→**慢性病與過敏**→性別→教學→AI 方式→私隱。
+★ 用 `StepId` 陣列而不是數字（寫死 `step === 4` 加一頁就全錯位）；
+頁數在選完身分後才確定 → 進度指示總數會變；回頭改身分**必須對 step 夾取**；
+`selectedConditions` 的 state **必須宣告在 `handleOnboardingComplete` 之前**。
+
+## 🔤 難字簡化（09-30 使用者指定）
+鈉→**鹽分**、膳食纖維→**纖維**、飽和脂肪→**動物油**、添加糖→**糖**（碳水化合物不變）。
+★ **單一對照表**（`src/data/bilingual.ts` 的 `NUTRIENT_NAME_SIMPLE`）+ **進出邊界轉換**：
+  提示詞給模型看簡化名稱；內部鍵（`numericLimits`／本機引擎／教學點）保持 **canonical**；
+  `nutrient_facts.name` 輸出 canonical → 前端再依語言顯示。
+  ★ 若在後端就寫死簡化名稱，**英文介面會露出中文**。
+★ `nutrientName()` 會先 `canonicalNutrientName()` 再查表（兩個方向都安全）。
+⚠️ **1mg 鈉 ≈ 2.5mg 鹽**，兩者不是同一件事，而且標籤印的是「鈉」——
+  已在使用者知情下採用，結果頁加一行說明當安全網。
+⚠️ **改中文文案時必須同步改 `localEngineEn.ts` 的對照鍵**（本專案已踩 4 次）。
 
 ## 💾 儲存鍵與「清除所有資料」
 全部以 `labelbuddy` 開頭（語言／身分／性別／**分析模式**／慢性病／指標／紀錄／同意／引導頁／學習進度）。
@@ -157,27 +155,28 @@
 清完用 `location.reload()` 而非逐一重設 state（逐一重設會漏且不報錯）。
 詳見 `ARCHITECTURE.md`。
 
-## 📊 nutrient_facts 管線
-★ **鐵則：模型只讀出「含量」，百分比一律由後端重算**（小模型算 `2480÷2000×100` 會錯且無聲）。
-★ **三條路徑都要套用**：雲端成功、**快取命中**、本機備援（漏掉快取會回傳舊格式）。
+## 📊 後端數值與文字處理
+★ **鐵則：模型只讀出「含量」，百分比一律由後端重算**（`normalizeNutrientFacts`），
+  而且**三條路徑都要套用**：雲端成功／**快取命中**／本機備援（漏掉快取會回傳舊格式）。
 ⚠️ **limit 與 target 方向相反**（鈉 120% 是壞事、蛋白質 120% 是好事）。
-細節見 `ARCHITECTURE.md`。
+⚠️ 簡繁表只收「一對一無歧義」的字（后/後、干/乾、里/裡、面/麵、只/隻、發/髮 不列）。
+  看到簡體字先查是不是新字不在表內，**別急著換模型**。細節見 `ARCHITECTURE.md`。
 
-## 🔤 簡繁後處理
-`core.ts` 的 `SIMPLIFIED_TO_TRADITIONAL` 只收「簡繁一對一無歧義」的字（現約 438 字，
-后/後、干/乾、里/裡、面/麵、只/隻、发/發/髮 **一律不列**）。
-**看到簡體字先查是不是新字不在表內，別急著換模型。**
-
-## 🧪 驗證機制（**改動翻譯／稱謂／快取／模式後必跑**）
-`npm run check:i18n`（引擎輸出掃 CJK）｜`npm run check:honorific`（稱謂 29 項）
-｜`npm run check:cache`（快取鍵 11 項）｜`npm run check:diet`（紀錄語言 15 項）
-｜`npm run check:mode`（**同意閘門 12 項，會實際啟動伺服器**）
-｜`npm run check:ui`（真實 Chrome 走 **16 畫面**）｜`npm run verify:all`（全部）
+## 🧪 驗證機制（**改動翻譯／稱謂／快取／模式／引導頁後必跑**）
+`check:i18n`（引擎輸出掃 CJK 15 組）｜`check:honorific`（29）｜`check:cache`（11）
+｜`check:diet`（15）｜`check:mode`（**同意閘門 12，會實際啟動伺服器**）
+｜`check:ui`（真實 Chrome 走 **17 畫面**）｜`verify:all`（全部）
 
 ★★ **靜態掃描（grep）只能找線索，不能當驗收。** 分不出條件分支（**假警報**）、
   抓不到執行時組出的字串（**漏報**）。最終一定要用瀏覽器實際渲染。
+★★★ **「假通過」比紅燈危險得多。** 09-30 實例：`check-ui-cjk.mjs` 的引導頁偵測
+  寫死 `Step 1 of 3`，引導頁改成 9 頁後偵測不到 → 15 個「畫面」全拍到引導頁，
+  卻因為引導頁是英文而**全部通過**。已加防護：沒離開引導頁就 `process.exit(1)`。
+  → **檢查腳本裡的「頁數／步驟數」一律用 `\d+`，不要寫死。**
 ★ `check-ui-cjk.mjs` 的引導頁段落**必須先勾同意勾選框**才能按「開始使用」，
-  否則會卡在引導頁、後面每個畫面都拍到它（全部誤判）。
+  否則會卡在引導頁（全部誤判）。
+★ 跑檢查時**不要用 `| head`** —— SIGPIPE 會殺掉 node 腳本，看起來像跑完了。
+  要導到檔案再 `cat`。
 
 ## 使用者決策與節奏
 1. **🚀 每次任務完成後自動部署上線（09-29）**

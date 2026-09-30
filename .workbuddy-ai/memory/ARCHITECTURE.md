@@ -262,3 +262,87 @@ Cloudflare Worker 沒有 tesseract.js → 圖片模式雲端失敗會回 `400 OC
 ⚠️ 多開金鑰／帳號**無效**（官方：capacity 是全域治理，多開違反條款）。
 真實用量看 `GET /api/v1/key` 的 `free_model_daily_requests`
 （`limit` / `limit_remaining` 是 per-key 信用上限，容易混淆）。
+
+## 引導頁（2026-09-30 改版）
+
+**頁數依身分決定** —— 長者 9 頁、其他身分 7 頁：
+
+| 對象 | 頁面 |
+| --- | --- |
+| 長者（9） | 介紹／身分／慢性病與過敏／性別／**教學 ×3（分步）**／AI 方式／私隱 |
+| 其他（7） | 介紹／身分／慢性病與過敏／性別／**教學 ×1（一次過）**／AI 方式／私隱 |
+
+### 實作要點
+
+- `StepId` 聯合型別 + `buildSteps(profileId)` 回傳**步驟陣列**
+  （不用數字 —— 寫死 `step === 4` 的話，加一頁就全部錯位且不會報錯）
+- ★ 頁數在**第 2 頁選完身分後**才確定 → 進度指示的總數會變（刻意設計）
+- ★ 使用者回頭改身分會讓陣列從 9 變 7 → **必須 `Math.min(step, steps.length - 1)` 夾取**，
+  否則 `steps[step]` 是 `undefined`，整頁空白
+- 教學三步用同一份文案（`onboard.how1/2/3Title/Body`），
+  長者逐頁顯示、其他身分用三卡並列顯示
+
+### 第 3 頁：慢性病與過敏
+
+12 項（8 慢性病 + 4 過敏原），與設定頁**共用 `PHYSICAL_INDICATORS` 與儲存鍵**。
+UI 刻意分成兩份：
+- 引導頁 = 精簡版（只有名稱 + 勾選框），目的是「一次選好」
+- 設定頁 = 完整版（分類篩選、釘選已選、展開詳情），目的是「日常管理」
+
+★ 資料來源只有一份，所以不會有資料層面的漂移；差異只在呈現。
+
+★ `selectedConditions` 的 state **必須宣告在 `handleOnboardingComplete` 之前**，
+  因為引導頁會回傳勾選結果，那個 handler 要寫入它（否則 TS 報「用於宣告之前」）。
+
+## 選圖入口（2026-09-30）
+
+```
+<input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" />  拍照
+<input ref={galleryInputRef} type="file" accept="image/*" />                        相簿
+```
+
+★ **兩個 input 缺一不可**：`capture="environment"` 在手機上會**直接開鏡頭**，
+  等於拿掉「選相簿」。桌面瀏覽器兩者都會開檔案選取器（正常）。
+★ 按鈕樣式：拍照用主要（`FOOTER_CTA_CLASS`，藍底），
+  相簿用次要（`FOOTER_SECONDARY_CLASS`，白底深框）——
+  兩個一樣醒目會讓長者不知道按哪個。但**觸控高度都維持 72px**。
+
+## 難字簡化（2026-09-30）
+
+| 標籤上的字（canonical） | 中文顯示 | 英文顯示 |
+| --- | --- | --- |
+| 鈉 | 鹽分 | Sodium |
+| 膳食纖維 | 纖維 | Dietary fiber |
+| 飽和脂肪 | 動物油 | Saturated fat |
+| 添加糖 | 糖 | Added sugar |
+| 碳水化合物 | **不變** | Carbohydrate |
+
+### 單一對照表 + 進出邊界轉換
+
+`src/data/bilingual.ts`：
+- `NUTRIENT_NAME_SIMPLE`（canonical → 簡化）
+- `SIMPLE_TO_CANONICAL`（反向，自動產生）
+- `canonicalNutrientName()` / `nutrientName()`
+
+| 位置 | 用哪個名稱 | 為什麼 |
+| --- | --- | --- |
+| 提示詞的 `numericLines` | **簡化**（`nutrientName`） | 讓模型自然寫出好懂的字 |
+| `numericLimits` 的鍵 | **canonical** | 內部契約，不能動 |
+| `normalizeNutrientFacts` 查表 | 先 `canonicalNutrientName()` 再查 | 模型給的是簡化名稱 |
+| `nutrient_facts[].name` 輸出 | **canonical** | 前端才能依語言顯示（否則英文介面會露中文） |
+| 前端 `nutrientName()` | 先還原再查表 | 快取裡可能有舊名稱 |
+| `LOCAL_KNOWLEDGE_POINTS` 的鍵 | **canonical** | 查表前先還原 |
+
+★ **改中文文案時必須同步改 `localEngineEn.ts` 的對照鍵** ——
+  本專案已因這個踩過 **4 次**（`check:i18n` 會抓到，但要知道去哪裡改）。
+
+⚠️ **1 毫克鈉 ≈ 2.5 毫克鹽**，兩者不是同一件事。使用者知情後選擇「直接寫鹽分」，
+  結果頁加一行說明當安全網（「包裝上印的是『鈉』…看標籤時請認包裝上的字」）。
+  百分比不受影響：分子分母都是鈉，比例相同。
+
+## 檢查腳本的兩個教訓（2026-09-30）
+
+★ **不要寫死頁數／步驟數。** `check-ui-cjk.mjs` 原本用 `Step 1 of 3` 偵測引導頁，
+  引導頁改成 9 頁後偵測不到 → 15 個「畫面」全拍到引導頁，
+  卻因為引導頁是英文而**全部通過**。已改成 `\d+` 並加 `process.exit(1)` 防護。
+★ **不要用 `| head` 接 node 腳本** —— SIGPIPE 會殺掉它，看起來像跑完了。
