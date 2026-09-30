@@ -248,28 +248,45 @@ try {
    * ⚠️ 順序很重要：一定要在 capture('01-home') 之前處理掉，
    *    否則後面每一個畫面都會拍到引導頁，全部誤判。
    */
+  /**
+   * ⚠️⚠️ 這裡的正則**不可以寫死頁數**。
+   *
+   * 2026-09-30 引導頁從 3 頁變成 9 頁（長者）／7 頁（其他身分），
+   * 而偵測字串原本是寫死的 `Step 1 of 3` —— 於是偵測不到引導頁、
+   * 整個 onboarding 區塊被跳過，**後面 15 個「畫面」全部拍到引導頁**，
+   * 卻因為引導頁本身是英文而全部「通過」。
+   *
+   * 那是一次**假通過**：真正的首頁、紀錄、學堂、設定都沒被驗證到。
+   * 所以改成 `\d+`，並在下面加一道防護（若第一張不是首頁就報錯）。
+   */
   const onboardVisible = await cdp.eval(`
-    (() => !!document.body.textContent.match(/Step 1 of 3|第 1 步，共 3 步/))()
+    (() => !!document.body.textContent.match(/Step 1 of \\d+|第 1 步，共 \\d+ 步/))()
   `);
   if (onboardVisible) {
     await capture('00-onboarding-step1');
-    // 逐步按到底：下一步 ×2 →（勾同意）→ 開始使用
-    for (const label of ['Next', 'Next']) {
+    /**
+     * ⚠️ 2026-09-30 起引導頁是 **9 頁（長者）／7 頁（其他身分）**，
+     *    不能再寫死「按兩次下一步」。
+     *    改成一直按到「Next」消失（＝只剩「Get started」）為止，並設上限防呆。
+     */
+    for (let i = 0; i < 12; i++) {
       await sleep(700);
-      await cdp.eval(`
+      const clicked = await cdp.eval(`
         (() => {
           const b = [...document.querySelectorAll('button')].find(e =>
-            (e.textContent || '').trim() === ${JSON.stringify(label)});
-          if (b) b.click();
+            (e.textContent || '').trim() === 'Next');
+          if (!b) return false;
+          b.click();
+          return true;
         })()
       `);
+      if (!clicked) break;
     }
+    await sleep(900);
     // ⚠️ 2026-09-29 起，引導頁最後一步有「我已閱讀並同意私隱條款與免責聲明」勾選框，
     //    沒勾就按不動「開始使用」（按下只會顯示提醒，不會前進）。
     //    所以這裡必須先勾選，否則整個引導頁會卡住、後面每個畫面都拍到引導頁。
-    await sleep(800);
-    // 最後一步是「私隱 ＋ 三種分析模式 ＋ 同意」，值得單獨拍一張存證
-    await capture('00-onboarding-step3');
+    await capture('00-onboarding-last');
     const agreed = await cdp.eval(`
       (() => {
         const cb = document.querySelector('input[type="checkbox"]');
@@ -291,6 +308,24 @@ try {
     // 否則第一個畫面（選單尚未就緒）會間歇性抓不到
     await sleep(3000);
     console.log('  ✅ 00-onboarding（已走完引導頁）');
+  }
+
+  /**
+   * ⚠️⚠️ 防護：確認真的離開引導頁了。
+   *
+   * 【為什麼一定要這道】
+   *   引導頁本身是英文的 —— 如果它沒被正確關掉，
+   *   後面每一個畫面都會拍到它，而檢查會**全部通過**。
+   *   2026-09-30 就真的發生過一次：偵測字串寫死「共 3 步」，
+   *   引導頁改成 9 頁後偵測不到，於是 15 個畫面全拍到引導頁卻全綠。
+   *   這是**假通過**，比紅燈危險得多，所以這裡直接中止。
+   */
+  const leftOnboarding = await cdp.eval(`
+    (() => !/Step \\d+ of \\d+|第 \\d+ 步，共 \\d+ 步/.test(document.body.textContent || ''))()
+  `);
+  if (!leftOnboarding) {
+    console.error('  ❌ 仍卡在引導頁 —— 後續畫面全部會誤判，中止檢查');
+    process.exit(1);
   }
 
   console.log('\n── 逐頁掃描 ──────────────────────────────');

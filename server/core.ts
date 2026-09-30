@@ -62,7 +62,14 @@ import {
 import { getLearnerProfile } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞的營養素名稱是封閉清單，
 // 若清單是中文，模型輸出的 nutrient_facts.name 就會是中文。
-import { nutrientName, unitName, profileName } from '../src/data/bilingual';
+// 難字簡化（2026-09-30）：提示詞給模型看的是「鹽分／纖維／動物油／糖」，
+// 但內部鍵仍是 canonical（鈉／膳食纖維…），所以進邊界要還原。
+import {
+  nutrientName,
+  unitName,
+  profileName,
+  canonicalNutrientName,
+} from '../src/data/bilingual';
 
 /* ---------------------------------------------------------------------------
  * 平台無關的型別
@@ -941,12 +948,23 @@ export function normalizeNutrientFacts(
 
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
-    const name = typeof (item as any).name === 'string' ? (item as any).name.trim() : '';
+    const rawName = typeof (item as any).name === 'string' ? (item as any).name.trim() : '';
     const value = Number((item as any).value);
-    if (!name || !Number.isFinite(value) || value <= 0) continue;
+    if (!rawName || !Number.isFinite(value) || value <= 0) continue;
 
-    // 名稱必須對得上每日參考值清單，否則無法換算，直接略過
-    const limit = numericLimits[name];
+    /**
+     * ⚠️ 名稱必須先還原成 canonical 再查表。
+     *
+     * 提示詞給模型看的是**簡單說法**（鹽分／纖維／動物油／糖），
+     * 但 `numericLimits` 的鍵是 canonical 名稱（鈉／膳食纖維／飽和脂肪／添加糖）。
+     * 不還原就會查不到 → 這一項被靜默略過 → 長者少看到一個警示。
+     * （本專案踩過三次「對照表鍵對不上」的 bug，都是這種形狀。）
+     *
+     * 輸出的 `name` 一律用 **canonical**：前端再依介面語言決定要顯示
+     * 「鹽分」還是 "Sodium"。若這裡就寫死簡化名稱，英文介面會露出中文。
+     */
+    const canonical = canonicalNutrientName(rawName);
+    const limit = numericLimits[canonical];
     if (!limit || !Number.isFinite(limit.value) || limit.value <= 0) continue;
 
     const percent = Math.min(999, Math.round((value / limit.value) * 100));
@@ -954,7 +972,7 @@ export function normalizeNutrientFacts(
     if (percent < 30) continue;
 
     facts.push({
-      name,
+      name: canonical,
       value: Math.round(value * 10) / 10,
       unit: typeof (item as any).unit === 'string' && (item as any).unit
         ? (item as any).unit

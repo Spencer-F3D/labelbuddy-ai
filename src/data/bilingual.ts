@@ -94,12 +94,55 @@ export const RISK_LABEL_EN: Record<string, string> = {
 };
 
 /**
- * 取營養素名稱。找不到英文對照時**安全退回中文**，
+ * 難字 → 簡單說法（**只給中文顯示用**，2026-09-30 使用者指定）。
+ *
+ * 【為什麼要做這件事】
+ *   「鈉」「膳食纖維」「飽和脂肪」對長者幾乎沒有意義。
+ *   使用者實測後要求改用日常說法。
+ *
+ * 【⚠️ 只改顯示，絕對不動內部鍵】
+ *   `numericLimits`、提示詞、本機引擎、`LOCAL_KNOWLEDGE_POINTS` 的鍵
+ *   **一律保持 canonical 名稱**（鈉、膳食纖維…）。
+ *   本專案已經踩過三次「對照表鍵對不上」的 bug ——
+ *   那種錯不會報錯，只會靜默地少一個警示或回中文。
+ *   所以改名一律走這個單一對照表，並在**進出邊界**轉換：
+ *     進（模型/前端送來）→ `canonicalNutrientName()`
+ *     出（要顯示）      → `nutrientDisplayName()`
+ *
+ * ⚠️ **碳水化合物刻意不改**（使用者指定）。
+ */
+export const NUTRIENT_NAME_SIMPLE: Record<string, string> = {
+  鈉: '鹽分',
+  膳食纖維: '纖維',
+  飽和脂肪: '動物油',
+  添加糖: '糖',
+};
+
+/** 簡單說法 → canonical 名稱（進邊界時用） */
+export const SIMPLE_TO_CANONICAL: Record<string, string> = Object.fromEntries(
+  Object.entries(NUTRIENT_NAME_SIMPLE).map(([canonical, simple]) => [simple, canonical])
+);
+
+/**
+ * 把使用者／模型看到的說法還原成內部 canonical 名稱。
+ * 查不到就原樣回傳（可能本來就是 canonical，或是新名稱）。
+ */
+export function canonicalNutrientName(name: string): string {
+  return SIMPLE_TO_CANONICAL[name] ?? name;
+}
+
+/**
+ * 取營養素名稱。找不到對照時**安全退回原名**，
  * 而不是回傳 undefined（會讓畫面出現空白或 "undefined"）。
+ *
+ * ⚠️ 中文會走「難字簡化」對照；英文走 NUTRIENT_NAME_EN。
  */
 export function nutrientName(name: string, language: Language): string {
-  if (language !== 'en') return name;
-  return NUTRIENT_NAME_EN[name] ?? name;
+  // ⚠️ 先還原成 canonical 再查表：快取裡可能存著簡化前的舊名稱（或模型自己
+  //    寫了簡化後的說法），不先還原就會查不到而露出中文。
+  const canonical = canonicalNutrientName(name);
+  if (language === 'en') return NUTRIENT_NAME_EN[canonical] ?? canonical;
+  return NUTRIENT_NAME_SIMPLE[canonical] ?? canonical;
 }
 
 /** 取單位名稱。同樣安全退回中文。 */

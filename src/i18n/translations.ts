@@ -72,6 +72,9 @@ const zhTW = {
 
   /* ── 底部固定按鈕 ─────────────────────────────────────────── */
   'footer.homeCamera': '拍照辨識',
+  /* 從相簿／檔案選圖（2026-09-30）：只有 capture 的 input 會強制開鏡頭，
+     使用者需要另一個入口才能選已經拍好的照片。 */
+  'footer.pickFromGallery': '從相簿選',
   'footer.scanCamera': '一鍵拍照',
   'footer.scanRetake': '重新拍照',
   'footer.goScan': '前往拍照辨識',
@@ -122,6 +125,9 @@ const zhTW = {
   'result.noConclusion':
     '沒有讀到足夠的營養數字，所以我這次不給結論 —— 這樣才不會猜錯。',
   'result.why': '為什麼？',
+  /* 難字簡化的說明（安全網：長條圖用簡單說法，但包裝上印的是另一組字） */
+  'result.labelWordingNote':
+    '包裝上印的是「鈉」「膳食纖維」這些字，這裡用比較好懂的說法顯示。看標籤時請認包裝上的字。',
   'result.autoDowngraded':
     '⚠️ 這次雲端沒有回應，已自動改用本機 OCR ＋ 文字分析（照片沒有上傳）。',
   'result.changeMode': '在設定裡改分析模式',
@@ -167,10 +173,10 @@ const zhTW = {
    * 每一句都必須與後端實際行為一致（見 server/handlers.ts 的 localOnly 判斷）。 */
   'mode.title': '要用哪一種 AI？',
   'mode.body': '三種都可以隨時切換，差別在「什麼會離開這台手機」：',
-  'mode.cloudImage': '直接雲端',
+  'mode.cloudImage': '雲端',
   'mode.cloudImageNote': '最準：AI 直接看照片，連標籤排版都看得到。',
   'mode.cloudImageData': '離開手機：照片、慢性病史',
-  'mode.cloudText': '本機 OCR ＋ 雲端 AI',
+  'mode.cloudText': '本機圖像識別',
   'mode.cloudTextNote': '手機先把照片讀成文字，只把文字送給 AI。',
   'mode.cloudTextData': '離開手機：標籤文字、慢性病史',
   'mode.localOnly': '只在本機',
@@ -323,9 +329,21 @@ const zhTW = {
   'onboard.stepOf': '第 {n} 步，共 {total} 步',
   'onboard.welcomeTitle': '歡迎使用 LabelBuddy AI',
   'onboard.welcomeBody': '拍一張食品包裝後面的營養標籤，我幫您看這個東西適不適合您吃。',
+  /* ── 第 1 頁：超簡單介紹（2026-09-30）── */
+  'onboard.introTitle': '拍一張，我幫您看',
+  'onboard.introBody': '拍下包裝後面那張營養標籤，我告訴您這個東西適不適合您吃。',
+  'onboard.introPoint1': '不用自己算數字',
+  'onboard.introPoint2': '用綠、黃、紅告訴您能不能買',
+  'onboard.introPoint3': '看不懂的字，我用白話講給您聽',
+  /* ── 第 3 頁：慢性病與過敏（2026-09-30）── */
+  'onboard.conditionsTitle': '您有下面這些情形嗎？',
+  'onboard.conditionsBody': '有的話請打勾。沒有的話直接按下一步就好。',
+  'onboard.conditionsChronic': '慢性病',
+  'onboard.conditionsAllergy': '食物過敏',
+  'onboard.conditionsAllergyNote': '過敏是「絕對不能吃到」，請務必打勾。',
   'onboard.identityTitle': '先問一下：您是誰？',
   'onboard.identityBody':
-    '這個答案很重要。同一包食物，對不同的人結論可能完全相反 —— 例如高蛋白粉對健身的人是綠燈，對腎臟不好的人卻是紅燈。',
+    '這個答案很重要。同一包食物，對不同的人結論可能完全相反。',
   'onboard.genderTitle': '要怎麼稱呼您？',
   'onboard.genderBody':
     '只影響我們跟您說話時的稱呼，不影響任何營養判斷。不想說也可以選「不用特別稱呼」。',
@@ -337,14 +355,14 @@ const zhTW = {
   'gender.shortFemale': '小姐',
   'gender.shortNone': '不指定',
   'onboard.howTitle': '這個 App 怎麼用',
-  'onboard.how1Title': '① 拍照',
-  'onboard.how1Body': '對著包裝背後的營養標籤拍一張，或從相簿選一張。',
-  'onboard.how2Title': '② 看結果',
+  'onboard.how1Title': '第一步：拍照',
+  'onboard.how1Body': '對著包裝後面那張表拍一張。光線亮一點、手不要晃。也可以從相簿選已經拍好的照片。',
+  'onboard.how2Title': '第二步：看顏色',
   'onboard.how2Body':
-    'AI 會用白話告訴您這個能不能買、為什麼，還會列出該注意的成分。看不懂可以按「唸給我聽」。',
-  'onboard.how3Title': '③ 沒網路也能用',
+    '綠色可以買。黃色少吃一點。紅色先放回去。我會用白話講為什麼，也可以唸給您聽。',
+  'onboard.how3Title': '第三步：沒網路的時候',
   'onboard.how3Body':
-    '如果剛好沒有網路，App 會改用內建的規則給您建議，不會整個不能用。',
+    '收訊不好也不怕。沒網路時，我會用手機裡的方法先幫您看，只是講得比較簡單。',
   'onboard.privacyTitle': '私隱與 AI 使用方式',
   'onboard.privacyPromiseTitle': '無論選哪一種，這些都不變',
   'onboard.privacy1': '伺服器**不保存任何照片**：不落地儲存、不寫入資料庫，處理完就忘掉。',
@@ -660,6 +678,7 @@ const en: Record<TranslationKey, string> = {
   'home.currentProfile': 'Current profile',
 
   'footer.homeCamera': 'Scan a label',
+  'footer.pickFromGallery': 'From gallery',
   'footer.scanCamera': 'Take a photo',
   'footer.scanRetake': 'Retake photo',
   'footer.goScan': 'Go to scanner',
@@ -705,6 +724,8 @@ const en: Record<TranslationKey, string> = {
   'result.noConclusion':
     'I could not read enough nutrition numbers, so I am not giving a verdict this time — that way I will not guess wrong.',
   'result.why': 'Why?',
+  'result.labelWordingNote':
+    'Packaging prints terms like \u201csodium\u201d and \u201cdietary fibre\u201d; we show them in plainer words. Look for the packaging wording on the label itself.',
   'result.autoDowngraded':
     'The cloud did not respond, so this used on-device OCR and text analysis instead. Your photo was not uploaded.',
   'result.changeMode': 'Change mode in Settings',
@@ -745,10 +766,10 @@ const en: Record<TranslationKey, string> = {
   /* ── The three analysis modes (2026-09-30) ───────────────────── */
   'mode.title': 'Which kind of AI?',
   'mode.body': 'You can switch any time. The difference is what leaves your phone:',
-  'mode.cloudImage': 'Cloud (photo)',
+  'mode.cloudImage': 'Cloud',
   'mode.cloudImageNote': 'Most accurate: the AI reads the photo itself, layout and all.',
   'mode.cloudImageData': 'Leaves your phone: photo, conditions',
-  'mode.cloudText': 'On-device OCR + cloud AI',
+  'mode.cloudText': 'On-device image recognition',
   'mode.cloudTextNote': 'Your phone turns the photo into text first; only the text is sent.',
   'mode.cloudTextData': 'Leaves your phone: label text, conditions',
   'mode.localOnly': 'On-device only',
@@ -906,9 +927,21 @@ const en: Record<TranslationKey, string> = {
   'onboard.welcomeTitle': 'Welcome to LabelBuddy AI',
   'onboard.welcomeBody':
     'Take a photo of the nutrition label on the back of any food package, and I will tell you whether it suits you.',
+  /* ── Page 1: very short intro (2026-09-30) ── */
+  'onboard.introTitle': 'Take one photo \u2014 I will check it for you',
+  'onboard.introBody': 'Photograph the nutrition label on the back of the pack, and I will tell you whether it suits you.',
+  'onboard.introPoint1': 'No numbers to work out yourself',
+  'onboard.introPoint2': 'Green, yellow or red tells you if you can buy it',
+  'onboard.introPoint3': 'Hard words explained in plain language',
+  /* ── Page 3: conditions and allergies (2026-09-30) ── */
+  'onboard.conditionsTitle': 'Do any of these apply to you?',
+  'onboard.conditionsBody': 'Tick the ones that apply. If none do, just tap Next.',
+  'onboard.conditionsChronic': 'Long-term conditions',
+  'onboard.conditionsAllergy': 'Food allergies',
+  'onboard.conditionsAllergyNote': 'An allergy means "must never eat" \u2014 please do tick these.',
   'onboard.identityTitle': 'First, who are you?',
   'onboard.identityBody':
-    'This answer matters. The same food can get opposite verdicts for different people \u2014 protein powder is a green light for a gym-goer but a red light for someone with kidney trouble.',
+    'This answer matters. The same food can get opposite verdicts for different people.',
   'onboard.genderTitle': 'How should we address you?',
   'onboard.genderBody':
     'This only changes how we speak to you. It does not affect any nutrition judgement. If you would rather not say, choose "No particular title".',
@@ -920,15 +953,15 @@ const en: Record<TranslationKey, string> = {
   'gender.shortFemale': 'Ms',
   'gender.shortNone': 'Unspecified',
   'onboard.howTitle': 'How this app works',
-  'onboard.how1Title': '① Take a photo',
+  'onboard.how1Title': 'Step 1: Take a photo',
   'onboard.how1Body':
-    'Point at the nutrition label on the back of the package, or pick a photo from your album.',
-  'onboard.how2Title': '② Read the result',
+    'Photograph the table on the back of the pack. Good light, steady hand. You can also pick a photo you already took.',
+  'onboard.how2Title': 'Step 2: Read the colour',
   'onboard.how2Body':
-    'The AI tells you in plain words whether you can buy it and why, and lists the ingredients to watch. Tap "Read this to me" if reading is tiring.',
-  'onboard.how3Title': '③ It works offline too',
+    'Green: fine to buy. Yellow: keep the portion small. Red: put it back. I will explain why in plain words, and can read it aloud.',
+  'onboard.how3Title': 'Step 3: When there is no internet',
   'onboard.how3Body':
-    'If you happen to have no connection, the app switches to built-in rules instead of failing completely.',
+    'Weak signal is fine. Without internet I use what is built into your phone \u2014 the advice is just simpler.',
   'onboard.privacyTitle': 'Privacy and how the AI is used',
   'onboard.privacyPromiseTitle': 'These hold true in every mode',
   'onboard.privacy1': 'The server **never stores photos** \u2014 no disk, no database, gone after processing.',

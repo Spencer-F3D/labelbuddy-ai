@@ -10,6 +10,9 @@
  */
 
 import { LabelAnalysisResult, RiskLevel, NutrientFact } from '../src/types';
+// 難字簡化（2026-09-30）：查教學點前先把名稱還原成 canonical，
+// 避免日後有人把簡化名稱直接餵進來時靜默查不到（本專案踩過三次同型 bug）。
+import { canonicalNutrientName, nutrientName } from '../src/data/bilingual';
 
 /**
  * 本機引擎使用的營養輪廓。
@@ -194,20 +197,28 @@ export function buildLocalNutrientFacts(
  *   三條路徑（雲端成功 / 快取命中 / 本機備援）都必須齊備。
  * ------------------------------------------------------------------------- */
 
-/** 每個營養項目對應的一句「為什麼」，依實際超標項目挑選 */
+/**
+ * 每個營養項目對應的一句「為什麼」，依實際超標項目挑選。
+ *
+ * ⚠️ 鍵是**內部 canonical 名稱**（鈉／膳食纖維…），不是顯示用的簡化名稱。
+ *    提示詞給模型看的是簡化名稱，但 `normalizeNutrientFacts` 會還原成
+ *    canonical 才輸出，所以這裡用 canonical 查表是對的。
+ * ⚠️ 文案本身要用**簡單的字**，並在必要時說出「標籤上寫的是什麼」——
+ *    長者要拿包裝對照，兩邊的字必須接得起來。
+ */
 const LOCAL_KNOWLEDGE_POINTS: Record<string, string> = {
-  鈉: '包裝上的「鈉」就是鹽分。一包泡麵的鈉常常就等於一整天的上限，所以不能天天當正餐。',
-  添加糖: '成分表上的「糖」是外加的精緻糖，不是食物天然的甜。一杯含糖飲料常等於好幾顆方糖。',
-  飽和脂肪: '飽和脂肪多來自動物油與棕櫚油，吃多了血液會變黏稠，心臟比較吃力。',
+  鈉: '包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。',
+  添加糖: '成分表上的「糖」是外加的精緻糖，不是食物天生的甜。一杯含糖飲料常等於好幾顆方糖。',
+  飽和脂肪: '動物油（標籤上叫「飽和脂肪」）吃多了血液會變黏稠，心臟比較吃力。',
   熱量: '熱量要看「整包」不是「每份」。很多包裝寫的是每份，整包其實是好幾份。',
   蛋白質: '蛋白質要看「蛋白質對熱量」的比例，不要只看正面的大字宣稱。',
-  膳食纖維: '膳食纖維一天要 25 公克以上。成分表越短、越接近原型食物，纖維通常越多。',
-  鈣: '鈣和骨頭有關，和鹽分的「鈉」是兩個完全不同的字，看標籤時不要看錯。',
+  膳食纖維: '纖維（標籤上叫「膳食纖維」）一天要 25 公克以上。成分表越短、越接近天然食物，纖維通常越多。',
+  鈣: '鈣和骨頭有關；它和鹽分是兩回事，看標籤時不要看錯。',
 };
 
 /** 通用的讀標籤動作，任何產品都適用 */
 const LOCAL_LABEL_TIP =
-  '先找「鈉」那一列看是幾毫克，再找「糖」那一列看是幾公克。這兩列就能判斷一大半。';
+  '先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。';
 
 /** 把最嚴重的那一項換算成「佔您一天上限幾 %」的白話句 */
 function buildLocalDailyLimitContext(facts: NutrientFact[], foodName?: string): string {
@@ -216,13 +227,27 @@ function buildLocalDailyLimitContext(facts: NutrientFact[], foodName?: string): 
   }
   const top = facts[0];
   const subject = foodName ? `這包${foodName}的` : '這包的';
-  return `${subject}${top.name}是 ${top.value} ${top.unit}，等於您一天上限的 ${top.percent}%。`;
+  /**
+   * ⚠️ 顯示用**簡化名稱**（鹽分／纖維…），但 `fact.name` 是 canonical（鈉…）。
+   *
+   * 【為什麼這裡改動是安全的】
+   *   `localEngineEn.ts` 有兩條樣板規則在比對這個句子：
+   *     /^這包(.+?)的(.+?)是 (.+?) (\S+)，等於您一天上限的 (\d+)%。$/
+   *   它把捕獲到的名稱交給 `nutrientName(name, 'en')`，
+   *   而那個函式會**先還原成 canonical 再查英文表** ——
+   *   所以「鹽分」照樣會翻成 "Sodium"，不會漏翻。
+   * ⚠️ 但**日後改這個句子時，一定要同步檢查那兩條 regex**（本專案踩過三次同型 bug）。
+   */
+  const displayName = nutrientName(top.name, 'zh-TW');
+  return `${subject}${displayName}是 ${top.value} ${top.unit}，等於您一天上限的 ${top.percent}%。`;
 }
 
 /** 依超標項目挑一句教學；都沒有超標時，談「怎麼看標籤」這個更基本的觀念 */
 function pickLocalKnowledgePoint(facts: NutrientFact[]): string {
   for (const fact of facts) {
-    const point = LOCAL_KNOWLEDGE_POINTS[fact.name];
+    // ⚠️ 先還原成 canonical 再查表：快取裡可能存著簡化後的舊名稱（鹽分），
+    //    不還原就會查不到而落到下面的通用句。
+    const point = LOCAL_KNOWLEDGE_POINTS[canonicalNutrientName(fact.name)];
     if (point) return point;
   }
   return '標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。';

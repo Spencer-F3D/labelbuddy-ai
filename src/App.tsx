@@ -376,6 +376,20 @@ const FOOTER_CTA_CLASS =
 const FOOTER_CTA_ICON = 'w-[28px] h-[28px] shrink-0';
 
 /**
+ * 底部列的次要按鈕樣式（2026-09-30 新增，用於「從相簿選擇」）。
+ *
+ * 【為什麼次要按鈕不做成跟主按鈕一樣大】
+ *   同一列出現兩個同樣醒目的按鈕，長者會不知道該按哪一個。
+ *   拍照是主要路徑（絕大多數情況），相簿是替代路徑，
+ *   所以用白底＋深色框降低視覺權重，但**觸控高度仍維持 72px**（無障礙要求）。
+ */
+const FOOTER_SECONDARY_CLASS =
+  'shrink-0 min-h-[72px] px-[14px] rounded-2xl font-black text-[16px] leading-tight ' +
+  'bg-white hover:bg-slate-50 active:bg-slate-100 text-blue-950 ' +
+  'flex flex-col items-center justify-center gap-[2px] shadow-md border-4 border-blue-900 ' +
+  'cursor-pointer transition-all active:scale-[0.98]';
+
+/**
  * 去掉標題開頭的裝飾性 emoji／符號。
  *
  * 【為什麼要處理】模型習慣在 warning_title 前面加 ⚠️ / ✅ / 🛑，
@@ -529,40 +543,11 @@ export default function App() {
     }
   };
 
-  /**
-   * 走完首次啟動引導頁。
-   *
-   * 這裡是**唯一**能設定分析模式的地方（引導頁）＋ 設定頁的模式切換。
-   * 使用者是在看過「每個模式各自會傳出什麼」的說明之後做的選擇，
-   * 所以是有效的選擇。其他任何地方都不得擅自改動它。
-   */
-  const handleOnboardingComplete = ({
-    profileId,
-    gender: chosenGender,
-    analysisMode: chosenMode,
-  }: OnboardingResult) => {
-    setLearnerProfileId(profileId);
-    setGender(chosenGender);
-    setAnalysisMode(chosenMode);
-    setOnboarded(true);
-
-    try {
-      localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
-      localStorage.setItem(STORAGE_GENDER_KEY, chosenGender);
-      localStorage.setItem(STORAGE_ANALYSIS_MODE_KEY, chosenMode);
-      localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
-      // 舊鍵已完成遷移，移除避免日後又被讀到而覆蓋新值
-      localStorage.removeItem(STORAGE_CLOUD_CONSENT_KEY);
-    } catch (e) {
-      console.warn('儲存引導設定失敗:', e);
-    }
-
-    try {
-      navigator.vibrate([40, 60, 40]);
-    } catch {}
-  };
-
   // 1. 個人慢性病設定：預設全選或讀取本地儲存
+  //
+  // ⚠️ 這個 state 必須宣告在 `handleOnboardingComplete` **之前** ——
+  //    引導頁第 3 頁（2026-09-30 新增）會回傳勾選結果，那個 handler 要寫入它。
+  //    放在後面的話，TypeScript 會報「用於宣告之前」。
   const [selectedConditions, setSelectedConditions] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -578,6 +563,43 @@ export default function App() {
     // 預設勾選四個最常見的慢性病與過敏原
     return ['hypertension', 'diabetes', 'kidney_disease', 'peanut_allergy'];
   });
+
+  /**
+   * 走完首次啟動引導頁。
+   *
+   * 這裡是**唯一**能設定分析模式的地方（引導頁）＋ 設定頁的模式切換。
+   * 使用者是在看過「每個模式各自會傳出什麼」的說明之後做的選擇，
+   * 所以是有效的選擇。其他任何地方都不得擅自改動它。
+   */
+  const handleOnboardingComplete = ({
+    profileId,
+    gender: chosenGender,
+    analysisMode: chosenMode,
+    conditions: chosenConditions,
+  }: OnboardingResult) => {
+    setLearnerProfileId(profileId);
+    setGender(chosenGender);
+    setAnalysisMode(chosenMode);
+    setSelectedConditions(chosenConditions);
+    setOnboarded(true);
+
+    try {
+      localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
+      localStorage.setItem(STORAGE_GENDER_KEY, chosenGender);
+      localStorage.setItem(STORAGE_ANALYSIS_MODE_KEY, chosenMode);
+      // 引導頁第 3 頁的慢性病與過敏（與設定頁共用同一個鍵）
+      localStorage.setItem(STORAGE_CONDITIONS_KEY, JSON.stringify(chosenConditions));
+      localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+      // 舊鍵已完成遷移，移除避免日後又被讀到而覆蓋新值
+      localStorage.removeItem(STORAGE_CLOUD_CONSENT_KEY);
+    } catch (e) {
+      console.warn('儲存引導設定失敗:', e);
+    }
+
+    try {
+      navigator.vibrate([40, 60, 40]);
+    } catch {}
+  };
 
   // 1.0.1 清單 UI 狀態：分類篩選、展開說明的項目（單一展開）、舊版設定遷移提示
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -871,6 +893,16 @@ export default function App() {
 
   // 隱藏相機 input ref
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  /**
+   * 從相簿／檔案選擇的 input（2026-09-30 新增）。
+   *
+   * 【為什麼一定要另外一個 input，不能共用】
+   *   原本的 input 帶了 `capture="environment"`，在手機上會**直接開鏡頭**，
+   *   使用者完全沒有機會選相簿。加了 `capture` 就等於拿掉了「選相簿」這個選項。
+   *   所以需要兩個 input：一個有 capture（拍照）、一個沒有（選相簿）。
+   *   ⚠️ 桌面瀏覽器兩者都會開檔案選取器，這是正常的。
+   */
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // 儲存勾選狀態至 localStorage
   const handleToggleCondition = (id: string) => {
@@ -908,6 +940,13 @@ export default function App() {
   const handleTriggerCamera = () => {
     if (cameraInputRef.current) {
       cameraInputRef.current.click();
+    }
+  };
+
+  /** 開啟相簿／檔案選擇（2026-09-30） */
+  const handleTriggerGallery = () => {
+    if (galleryInputRef.current) {
+      galleryInputRef.current.click();
     }
   };
 
@@ -1414,6 +1453,7 @@ export default function App() {
       {!onboarded && (
         <OnboardingFlow
           initialProfileId={learnerProfileId}
+          initialConditions={selectedConditions}
           onComplete={handleOnboardingComplete}
         />
       )}
@@ -1442,6 +1482,17 @@ export default function App() {
         type="file"
         accept="image/*"
         capture="environment"
+        className="hidden"
+        aria-hidden="true"
+        onChange={handleFileChange}
+      />
+
+      {/* 隱藏的原生相簿 input（2026-09-30 新增）
+          ⚠️ **絕對不要加 `capture`** —— 加了就會變成開鏡頭，等於沒有相簿選項。 */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
         className="hidden"
         aria-hidden="true"
         onChange={handleFileChange}
@@ -2173,6 +2224,14 @@ export default function App() {
                         language
                       )}
                     />
+
+                    {/* 難字簡化的一行說明（2026-09-30）。
+                        ⚠️ 這一行是**安全網**，不是裝飾：長條圖把「鈉」顯示成「鹽分」，
+                           但包裝上印的是「鈉」。不講清楚，長者拿包裝對照時會找不到。
+                        ⚠️ 也順帶提醒：鹽分的數字單位是「鈉」，不要拿鹽的每日建議量直接比。 */}
+                    <p className={`${TYPE.body} ${WEIGHT.normal} text-slate-600 leading-snug`}>
+                      {t('result.labelWordingNote')}
+                    </p>
 
                     <p className={`${TYPE.body} ${WEIGHT.normal} text-slate-900 leading-relaxed`}>
                       {analysisResult.plain_summary}
@@ -3092,16 +3151,29 @@ export default function App() {
       {/* ======================================================== */}
       <footer className="sticky bottom-0 left-0 right-0 z-30 w-full p-[8px] bg-white/95 backdrop-blur-md border-t-4 border-blue-900 shadow-[0_-8px_25px_rgba(0,0,0,0.2)] min-[520px]:shrink-0">
         {activeTab === 'home' ? (
-          /* 主頁的主要動作與頁面中央的大按鈕一致，讓長者不用思考「該按哪一個」 */
-          <button
-            type="button"
-            id="btn-home-footer-camera"
-            onClick={handleTriggerCamera}
-            className={FOOTER_CTA_CLASS}
-          >
-            <Camera className={FOOTER_CTA_ICON} />
-            <span>📸 {t('footer.homeCamera')}</span>
-          </button>
+          /* 主頁的主要動作與頁面中央的大按鈕一致，讓長者不用思考「該按哪一個」。
+             2026-09-30 加入相簿入口，與拍照頁一致（見下方 scan 分支的說明）。 */
+          <div className="flex items-stretch gap-[8px]">
+            <button
+              type="button"
+              id="btn-home-footer-camera"
+              onClick={handleTriggerCamera}
+              className={`${FOOTER_CTA_CLASS} flex-1 min-w-0`}
+            >
+              <Camera className={FOOTER_CTA_ICON} />
+              <span>📸 {t('footer.homeCamera')}</span>
+            </button>
+            <button
+              type="button"
+              id="btn-home-footer-gallery"
+              onClick={handleTriggerGallery}
+              aria-label={t('footer.pickFromGallery')}
+              className={FOOTER_SECONDARY_CLASS}
+            >
+              <FileImage className={FOOTER_CTA_ICON} />
+              <span>{t('footer.pickFromGallery')}</span>
+            </button>
+          </div>
         ) : activeTab === 'scan' ? (
           analysisResult ? (
             <button
@@ -3114,16 +3186,32 @@ export default function App() {
               <span>📸 {t('footer.scanRetake')}</span>
             </button>
           ) : (
-            <button
-              type="button"
-              id="btn-one-click-camera"
-              onClick={handleTriggerCamera}
-              disabled={isLoading}
-              className={`${FOOTER_CTA_CLASS} disabled:opacity-60`}
-            >
-              <Camera className={FOOTER_CTA_ICON} />
-              <span>📸 {t('footer.scanCamera')}</span>
-            </button>
+            /* 兩個入口並排：拍照（主要）＋ 從相簿選（次要）。
+               ⚠️ 為什麼一定要有相簿：拍螢幕、拍舊包裝、或使用者已經先拍好照片的情況
+                  都很常見；只有 `capture` 的 input 會強制開鏡頭，使用者無從選擇。 */
+            <div className="flex items-stretch gap-[8px]">
+              <button
+                type="button"
+                id="btn-one-click-camera"
+                onClick={handleTriggerCamera}
+                disabled={isLoading}
+                className={`${FOOTER_CTA_CLASS} flex-1 min-w-0 disabled:opacity-60`}
+              >
+                <Camera className={FOOTER_CTA_ICON} />
+                <span>📸 {t('footer.scanCamera')}</span>
+              </button>
+              <button
+                type="button"
+                id="btn-pick-from-gallery"
+                onClick={handleTriggerGallery}
+                disabled={isLoading}
+                aria-label={t('footer.pickFromGallery')}
+                className={`${FOOTER_SECONDARY_CLASS} disabled:opacity-60`}
+              >
+                <FileImage className={FOOTER_CTA_ICON} />
+                <span>{t('footer.pickFromGallery')}</span>
+              </button>
+            </div>
           )
         ) : activeTab === 'conditions' ? (
           <button

@@ -110,21 +110,21 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
   //      原本這幾條寫成 `鈉:` / `添加糖:` 這種「營養素名」，永遠查不到，
   //      結果英文介面的食育卡片一直顯示中文 —— 而且不會報錯。
   //      這是 2026-09-29 用 API 實測才抓到的。
-  '包裝上的「鈉」就是鹽分。一包泡麵的鈉常常就等於一整天的上限，所以不能天天當正餐。':
+  '包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。':
     'The "sodium" on the label is salt. One pack of instant noodles often equals a whole day\'s limit, so it should not be a daily meal.',
   '成分表上的「糖」是外加的精緻糖，不是食物天然的甜。一杯含糖飲料常等於好幾顆方糖。':
     'The "sugar" in the ingredient list is added refined sugar, not the natural sweetness of food. One sugary drink often equals several sugar cubes.',
-  '飽和脂肪多來自動物油與棕櫚油，吃多了血液會變黏稠，心臟比較吃力。':
-    'Saturated fat mostly comes from animal fat and palm oil. Too much makes your blood thicker and your heart work harder.',
+  '動物油（標籤上叫「飽和脂肪」）吃多了血液會變黏稠，心臟比較吃力。':
+    'Animal fat (called "saturated fat" on the label) makes your blood thicker and your heart work harder if you eat too much.',
   '熱量要看「整包」不是「每份」。很多包裝寫的是每份，整包其實是好幾份。':
     'Look at the calories for the WHOLE pack, not per serving. Many packages list per serving, but the pack actually holds several.',
   '蛋白質要看「蛋白質對熱量」的比例，不要只看正面的大字宣稱。':
     'Look at the ratio of protein to calories — do not just trust the big claim on the front of the package.',
-  '膳食纖維一天要 25 公克以上。成分表越短、越接近原型食物，纖維通常越多。':
-    'You need at least 25 g of fibre a day. The shorter the ingredient list and the closer to whole food, the more fibre it usually has.',
-  '鈣和骨頭有關，和鹽分的「鈉」是兩個完全不同的字，看標籤時不要看錯。':
+  '纖維（標籤上叫「膳食纖維」）一天要 25 公克以上。成分表越短、越接近天然食物，纖維通常越多。':
+    'Fibre (called "dietary fibre" on the label) \u2014 you need at least 25 g a day. The shorter the ingredient list and the closer to whole food, the more fibre it usually has.',
+  '鈣和骨頭有關；它和鹽分是兩回事，看標籤時不要看錯。':
     'Calcium is about bones. It is a completely different word from the sodium in salt — do not mix them up when reading a label.',
-  '先找「鈉」那一列看是幾毫克，再找「糖」那一列看是幾公克。這兩列就能判斷一大半。':
+  '先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。':
     'First find the "sodium" row and read the milligrams, then find the "sugar" row and read the grams. Those two rows tell you most of what you need.',
   '標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。':
     'Every row in the nutrition table is one number. If you can read just the "sodium" and "sugar" rows, you can judge most products.',

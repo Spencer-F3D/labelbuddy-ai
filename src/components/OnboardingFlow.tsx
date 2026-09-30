@@ -5,38 +5,41 @@
  * ============================================================================
  * 首次啟動引導頁（First-run onboarding）
  * ============================================================================
- * 只在使用者第一次打開時出現，問三件事：
- *   ① 你是誰（決定營養門檻與建議語氣）
- *   ② 這個 App 怎麼用（使用介紹）
- *   ③ 私隱條款 ＋ 同不同意用雲端 AI
+ * 只在使用者第一次打開時出現。
  *
- * 【為什麼要「先問身分」】
- *   同一個食品對不同身分的判定結果完全相反（高蛋白粉對健身族綠燈、
- *   對腎臟病患紅燈）。先問清楚，後面的每次分析才有正確的基準。
+ * 【★ 為什麼頁數會依身分不同（2026-09-30 使用者指定）】
+ *   長者需要「一步一步」的教學，年輕人可以一次看完。
+ *   所以：
+ *     長者（senior）→ 9 頁：介紹／身分／慢性病／性別／教學×3／AI／私隱
+ *     其他身分      → 7 頁：介紹／身分／慢性病／性別／教學×1／AI／私隱
+ *   ⚠️ 頁數在第 2 頁選完身分之後才會確定 —— 也就是**進度指示的總數會變**。
+ *      這是刻意的：把身分放前面，後面的教學才能配合對象調整。
+ *      實作上用 `buildSteps()` 依 profileId 算出步驟陣列，並對 step 做夾取，
+ *      避免使用者回頭改身分時索引爆掉。
  *
- * 【為什麼私隱條款要跟 AI 模式放在同一頁】
+ * 【★ 為什麼私隱條款要跟 AI 模式放在同一頁】
  *   使用者會問「為什麼要連雲端？我的照片會不會外流？」
  *   —— 那正是同一件事。拆成兩頁會讓他按「同意」時不知道自己在同意什麼。
+ *
+ * 【★ 用字原則（長者版）】
+ *   避免容易誤會或太技術的字：
+ *     辨識→認出、分析→看、模式→方式、設定→改、上傳→送出去、掃描→拍、儲存→存
+ *   保留「AI」「雲端」「營養標示」—— 前兩者是模式名稱，後者印在包裝上，
+ *   改了反而對不上。
  *
  * ★ 本頁的每一段文字都必須雙語（章程要求全英文材料，App 也不能例外）。
  */
 
 import React, { useState } from 'react';
-import {
-  ShieldCheck,
-  Camera,
-  Cloud,
-  WifiOff,
-  ArrowRight,
-  ArrowLeft,
-  Check,
-} from 'lucide-react';
+import { ShieldCheck, Camera, Cloud, WifiOff, ArrowRight, ArrowLeft, Check, HeartPulse, AlertTriangle } from 'lucide-react';
 import { AddressGender, AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
 import { GenderPicker } from './GenderPicker';
 import { LegalNotice } from './LegalNotice';
 import { AnalysisModePicker } from './AnalysisModePicker';
+import { PHYSICAL_INDICATORS } from '../data/conditions';
+import { conditionName } from '../data/bilingual';
 
 /**
  * 性別。
@@ -46,45 +49,73 @@ import { AnalysisModePicker } from './AnalysisModePicker';
  *   但這題**不該強迫作答** —— 使用者可能不想講、也可能覺得沒必要。
  *   所以第三個選項不是裝飾，是為了讓「不想說」也能走下去。
  *   `unspecified` 時一律用中性的「您好」，不要猜。
- *
- * 【為什麼是別名而不是重新定義一次】
- *   型別定義在 `src/types.ts`，與後端 `server/core.ts` 的 AddressGender
- *   對應。這裡保留 `Gender` 這個名字，只是為了讓既有 import 不用改。
  */
 export type Gender = AddressGender;
 
 export interface OnboardingResult {
   profileId: LearnerProfileId;
   gender: Gender;
-  /**
-   * 使用者選的分析模式（2026-09-30 起為三選一）。
-   * 舊版這裡是 `cloudConsent: boolean`，只有兩種可能。
-   */
+  /** 使用者選的分析模式（2026-09-30 起為三選一）。 */
   analysisMode: AnalysisMode;
+  /** 第 3 頁勾選的慢性病與過敏原（與設定頁共用同一個儲存鍵）。 */
+  conditions: string[];
 }
 
 interface OnboardingFlowProps {
   /** 預設身分（通常是 senior） */
   initialProfileId: LearnerProfileId;
+  /** 既有的慢性病勾選（重跑引導頁時沿用，不該被清空） */
+  initialConditions: string[];
   /** 走完引導時呼叫 */
   onComplete: (result: OnboardingResult) => void;
 }
 
-const TOTAL_STEPS = 3;
+/**
+ * 引導頁的步驟識別碼。
+ *
+ * ⚠️ 用「識別碼」而不是數字：頁數會依身分變動，
+ *    寫死 `step === 4` 的話，加一頁就會全部錯位（而且不會報錯）。
+ */
+type StepId =
+  | 'intro'
+  | 'profile'
+  | 'conditions'
+  | 'gender'
+  | 'how1'
+  | 'how2'
+  | 'how3'
+  | 'howAll'
+  | 'mode'
+  | 'privacy';
+
+/** 依身分決定步驟序列。長者把教學拆成 3 頁，其他身分合併成 1 頁。 */
+function buildSteps(profileId: LearnerProfileId): StepId[] {
+  const common: StepId[] = ['intro', 'profile', 'conditions', 'gender'];
+  const tail: StepId[] = ['mode', 'privacy'];
+  return profileId === 'senior'
+    ? [...common, 'how1', 'how2', 'how3', ...tail]
+    : [...common, 'howAll', ...tail];
+}
+
+/** 教學三步（長者逐頁用，年輕版一次過用同一份內容） */
+const HOW_STEPS = ['how1', 'how2', 'how3'] as const;
 
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   initialProfileId,
+  initialConditions,
   onComplete,
 }) => {
   const { t, language } = useI18n();
   const [step, setStep] = useState(0);
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
   const [gender, setGender] = useState<Gender>('unspecified');
+  /** 第 3 頁的勾選（與設定頁共用同一個儲存鍵，由 App 負責存） */
+  const [conditions, setConditions] = useState<string[]>(initialConditions);
   /**
    * 分析模式。
    *
-   * ⚠️ 預設 `cloud_image`（直接雲端）—— 這是使用者指定的預設。
-   *    但這代表**預設會上傳照片**，所以模式卡片上的
+   * ⚠️ 預設 `cloud_image`（雲端）—— 這是使用者指定的預設。
+   *    但這代表**預設會把照片送出去**，所以模式卡片上的
    *    「離開手機：照片、慢性病史」一定要在選擇當下就看得見。
    */
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('cloud_image');
@@ -99,110 +130,242 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   /** 使用者按了「開始使用」卻還沒勾同意時，才顯示提醒（不一開始就紅字嚇人） */
   const [showAgreeWarning, setShowAgreeWarning] = useState(false);
 
-  const isLast = step === TOTAL_STEPS - 1;
+  const steps = buildSteps(profileId);
+  /**
+   * ⚠️ 夾取：使用者可能回頭把身分從「長者」改成別的，
+   *    此時 steps 會從 9 個變 7 個，原本的 step 可能超出範圍。
+   *    不夾取就會拿到 undefined → 整頁空白（而且不會報錯）。
+   */
+  const current = Math.min(step, steps.length - 1);
+  const stepId = steps[current];
+  const isLast = current === steps.length - 1;
 
-  const finish = () => onComplete({ profileId, gender, analysisMode });
+  const finish = () => onComplete({ profileId, gender, analysisMode, conditions });
+
+  const toggleCondition = (id: string) =>
+    setConditions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  /** 慢性病（非過敏原）與食物過敏原分開列 —— 兩者的後果等級完全不同 */
+  const chronicItems = PHYSICAL_INDICATORS.filter((c) => c.category !== 'allergen');
+  const allergenItems = PHYSICAL_INDICATORS.filter((c) => c.category === 'allergen');
+
+  /** 一列勾選項（引導頁精簡版：只有名稱與勾選框，詳情留給設定頁） */
+  const renderConditionRow = (id: string, isAllergen: boolean) => {
+    const on = conditions.includes(id);
+    const name = conditionName(id, PHYSICAL_INDICATORS.find((c) => c.id === id)?.name ?? id, language);
+    return (
+      <button
+        key={id}
+        type="button"
+        role="checkbox"
+        aria-checked={on}
+        onClick={() => toggleCondition(id)}
+        className={`w-full min-h-[56px] px-4 py-2 rounded-xl border-2 flex items-center gap-3 text-left transition-all active:scale-[0.99] cursor-pointer ${
+          on
+            ? isAllergen
+              ? 'bg-[#FCEBEB] border-[#A32D2D]'
+              : 'bg-blue-50 border-blue-900'
+            : 'bg-white border-slate-300'
+        }`}
+      >
+        <span
+          className={`flex-1 min-w-0 text-[20px] font-black leading-tight ${
+            isAllergen ? 'text-[#501313]' : 'text-blue-950'
+          }`}
+        >
+          {name}
+        </span>
+        <span
+          aria-hidden="true"
+          className={`w-[44px] h-[44px] rounded-[10px] border-[3px] flex items-center justify-center shrink-0 ${
+            on
+              ? isAllergen
+                ? 'bg-[#A32D2D] border-[#A32D2D] text-white'
+                : 'bg-blue-900 border-blue-900 text-white'
+              : 'bg-white border-slate-400'
+          }`}
+        >
+          {on && <Check className="w-[26px] h-[26px] stroke-[4]" />}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto">
       <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-4 gap-4">
         {/* 進度指示：讓使用者知道還剩幾步，不會覺得沒完沒了 */}
         <div className="flex items-center gap-2 pt-2">
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          {steps.map((s, i) => (
             <div
-              key={`dot-${i}`}
-              className={`h-2 flex-1 rounded-full ${
-                i <= step ? 'bg-blue-800' : 'bg-slate-300'
-              }`}
+              key={`dot-${s}`}
+              className={`h-2 flex-1 rounded-full ${i <= current ? 'bg-blue-800' : 'bg-slate-300'}`}
             />
           ))}
         </div>
         <p className="text-[16px] font-black text-slate-600 text-center">
-          {t('onboard.stepOf', { n: step + 1, total: TOTAL_STEPS })}
+          {t('onboard.stepOf', { n: current + 1, total: steps.length })}
         </p>
 
         <div className="flex-1 flex flex-col gap-4">
-          {step === 0 && (
+          {/* ── 1. 產品超簡單介紹 ─────────────────────────────────── */}
+          {stepId === 'intro' && (
             <>
               <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-5">
-                <h1 className="text-[20px] font-black">{t('onboard.welcomeTitle')}</h1>
+                <h1 className="text-[20px] font-black">{t('onboard.introTitle')}</h1>
                 <p className="text-[16px] font-bold mt-2 leading-relaxed">
-                  {t('onboard.welcomeBody')}
+                  {t('onboard.introBody')}
                 </p>
               </div>
 
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-3">
+                {(['1', '2', '3'] as const).map((n) => (
+                  <div key={n} className="flex items-start gap-3">
+                    <span className="w-8 h-8 rounded-full bg-blue-900 text-white text-[16px] font-black flex items-center justify-center shrink-0">
+                      {n}
+                    </span>
+                    <p className="text-[18px] font-black text-slate-900 leading-snug pt-1">
+                      {t(`onboard.introPoint${n}` as 'onboard.introPoint1')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── 2. 身分選擇 ──────────────────────────────────────── */}
+          {stepId === 'profile' && (
+            <>
               <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-2">
-                <h2 className="text-[19px] font-black text-slate-950">
+                <h1 className="text-[20px] font-black text-slate-950">
                   {t('onboard.identityTitle')}
-                </h2>
+                </h1>
                 <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
                   {t('onboard.identityBody')}
                 </p>
               </div>
-
               <LearnerProfilePicker selectedId={profileId} onSelect={setProfileId} />
+            </>
+          )}
 
-              {/* 性別：只影響「怎麼稱呼您」，不影響任何營養判斷。
-                  ⚠️ 不要把它跟身分混在一起 —— 身分決定門檻，性別只決定稱謂。
-                  ⚠️ 用共用元件（設定頁也用同一份），選項才不會兩邊漂移。 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
-                <GenderPicker value={gender} onChange={setGender} />
+          {/* ── 3. 慢性病與過敏 ──────────────────────────────────── */}
+          {stepId === 'conditions' && (
+            <>
+              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-2">
+                <h1 className="text-[20px] font-black text-slate-950">
+                  {t('onboard.conditionsTitle')}
+                </h1>
+                <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
+                  {t('onboard.conditionsBody')}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex flex-col gap-3">
+                <h2 className="text-[19px] font-black text-blue-950 flex items-center gap-2">
+                  <HeartPulse className="w-6 h-6 shrink-0" aria-hidden="true" />
+                  {t('onboard.conditionsChronic')}
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {chronicItems.map((c) => renderConditionRow(c.id, false))}
+                </div>
+              </div>
+
+              {/* 過敏原用紅色：後果等級與慢性病完全不同（絕對不能吃 vs 少吃一點） */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-[#A32D2D] flex flex-col gap-3">
+                <h2 className="text-[19px] font-black text-[#501313] flex items-center gap-2">
+                  <AlertTriangle className="w-6 h-6 shrink-0" aria-hidden="true" />
+                  {t('onboard.conditionsAllergy')}
+                </h2>
+                <p className="text-[16px] font-bold text-[#791F1F] leading-snug">
+                  {t('onboard.conditionsAllergyNote')}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {allergenItems.map((c) => renderConditionRow(c.id, true))}
+                </div>
               </div>
             </>
           )}
 
-          {step === 1 && (
+          {/* ── 4. 性別 ─────────────────────────────────────────── */}
+          {stepId === 'gender' && (
+            <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
+              <GenderPicker value={gender} onChange={setGender} />
+            </div>
+          )}
+
+          {/* ── 5~7（長者）／5（其他）：使用教學 ──────────────────── */}
+          {HOW_STEPS.includes(stepId as (typeof HOW_STEPS)[number]) && (
             <>
               <h1 className="text-[20px] font-black text-slate-950">
                 {t('onboard.howTitle')}
               </h1>
-
-              {/* 三個步驟各一張卡：圖示 ＋ 一句話，長者不用讀長文 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex gap-3">
-                <Camera className="w-7 h-7 text-blue-800 shrink-0 mt-0.5" aria-hidden="true" />
-                <div>
-                  <p className="text-[18px] font-black text-slate-950">
-                    {t('onboard.how1Title')}
-                  </p>
-                  <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
-                    {t('onboard.how1Body')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex gap-3">
-                <ShieldCheck className="w-7 h-7 text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" />
-                <div>
-                  <p className="text-[18px] font-black text-slate-950">
-                    {t('onboard.how2Title')}
-                  </p>
-                  <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
-                    {t('onboard.how2Body')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex gap-3">
-                <WifiOff className="w-7 h-7 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
-                <div>
-                  <p className="text-[18px] font-black text-slate-950">
-                    {t('onboard.how3Title')}
-                  </p>
-                  <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
-                    {t('onboard.how3Body')}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const idx = HOW_STEPS.indexOf(stepId as (typeof HOW_STEPS)[number]);
+                const TitleKey = `onboard.how${idx + 1}Title` as 'onboard.how1Title';
+                const BodyKey = `onboard.how${idx + 1}Body` as 'onboard.how1Body';
+                const Icon = idx === 0 ? Camera : idx === 1 ? ShieldCheck : WifiOff;
+                const tone =
+                  idx === 0
+                    ? 'border-blue-900 text-blue-800'
+                    : idx === 1
+                    ? 'border-emerald-700 text-emerald-700'
+                    : 'border-amber-700 text-amber-700';
+                return (
+                  <div className={`bg-white rounded-2xl p-5 border-2 ${tone.split(' ')[0]} flex flex-col gap-3`}>
+                    <Icon className={`w-12 h-12 ${tone.split(' ')[1]}`} aria-hidden="true" />
+                    <p className="text-[20px] font-black text-slate-950">{t(TitleKey)}</p>
+                    <p className="text-[18px] font-bold text-slate-800 leading-relaxed">
+                      {t(BodyKey)}
+                    </p>
+                  </div>
+                );
+              })()}
             </>
           )}
 
-          {step === 2 && (
+          {/* ── 5（其他身分）：一次過說明 ─────────────────────────── */}
+          {stepId === 'howAll' && (
+            <>
+              <h1 className="text-[20px] font-black text-slate-950">
+                {t('onboard.howTitle')}
+              </h1>
+              {[
+                { n: 1, Icon: Camera, tone: 'text-blue-800' },
+                { n: 2, Icon: ShieldCheck, tone: 'text-emerald-700' },
+                { n: 3, Icon: WifiOff, tone: 'text-amber-700' },
+              ].map(({ n, Icon, tone }) => (
+                <div
+                  key={`how-${n}`}
+                  className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex gap-3"
+                >
+                  <Icon className={`w-7 h-7 ${tone} shrink-0 mt-0.5`} aria-hidden="true" />
+                  <div>
+                    <p className="text-[18px] font-black text-slate-950">
+                      {t(`onboard.how${n}Title` as 'onboard.how1Title')}
+                    </p>
+                    <p className="text-[16px] font-bold text-slate-800 leading-relaxed mt-1">
+                      {t(`onboard.how${n}Body` as 'onboard.how1Body')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* ── 8／6. AI 方式（三選一）───────────────────────────── */}
+          {stepId === 'mode' && (
+            <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
+              <AnalysisModePicker value={analysisMode} onChange={setAnalysisMode} />
+            </div>
+          )}
+
+          {/* ── 9／7. 私隱條款與免責聲明 ＋ 明確同意 ──────────────── */}
+          {stepId === 'privacy' && (
             <>
               <h1 className="text-[20px] font-black text-slate-950">
                 {t('onboard.privacyTitle')}
               </h1>
 
-              {/* 私隱條款：用「照片 → 文字 → 雲端」的順序講，因為那是最容易誤解的地方 */}
               <div className="bg-white rounded-2xl p-4 border-2 border-emerald-700 flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-6 h-6 text-emerald-700" aria-hidden="true" />
@@ -225,16 +388,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 </ol>
               </div>
 
-              {/* AI 分析模式：三選一（2026-09-30）
-                  ⚠️ 用共用元件（設定頁也用同一份），選項與說明才不會兩邊漂移。
-                  ⚠️ 預設是「直接雲端」（使用者的選擇），它會上傳照片，
-                     所以「離開手機：照片、慢性病史」必須在選擇當下就看得見。 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
-                <AnalysisModePicker value={analysisMode} onChange={setAnalysisMode} />
-              </div>
-
-              {/* 私隱條款與免責聲明 ＋ 明確同意（2026-09-29 使用者要求）
-                  ⚠️ 這一段的字級是 12px，是全站唯一的例外（見 LegalNotice.tsx）。
+              {/* ⚠️ 條款本文是 12px —— 全站唯一例外（見 LegalNotice.tsx）。
                   ⚠️ 未勾選同意就不能完成引導頁。 */}
               <LegalNotice
                 showAgree
@@ -251,10 +405,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
         {/* 底部按鈕：固定在最後，長者不必找 */}
         <div className="flex items-center gap-3 pb-2">
-          {step > 0 && (
+          {current > 0 && (
             <button
               type="button"
-              onClick={() => setStep((s) => s - 1)}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
               className="min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-slate-400 text-slate-800 text-[18px] font-black whitespace-nowrap cursor-pointer flex items-center gap-2"
             >
               <ArrowLeft className="w-5 h-5" aria-hidden="true" />
