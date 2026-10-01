@@ -175,12 +175,74 @@ try {
 
   // ── 先到 origin 設 localStorage，再重新載入 ──────────────────
   console.log(`\n開啟 ${BASE} …`);
-  await cdp.send('Page.navigate', { url: BASE });
-  await sleep(3000);
+
+  /**
+   * ⚠️⚠️ **必須先等到 App 真的載入，才能碰 localStorage**（2026-10-01 修正）
+   *
+   * 【踩到的情況】
+   *   沙箱環境有一個代理，第一個請求偶爾會回 `502 upstream connect failed`。
+   *   這時候頁面是**代理的錯誤頁**（不是本機 origin），
+   *   於是 `localStorage` 直接丟
+   *   `SecurityError: Access is denied for this document` → 整支腳本掛掉。
+   *
+   * 【修法】重試導覽直到 `#root` 真的渲染出東西為止。
+   *   順帶解決了「伺服器還沒準備好就開始測試」的問題。
+   */
+  let ready = false;
+  for (let attempt = 1; attempt <= 8; attempt++) {
+    await cdp.send('Page.navigate', { url: BASE });
+    await sleep(2500);
+    const ok = await cdp.eval(`
+      (() => {
+        try {
+          const root = document.getElementById('root');
+          return !!(root && root.children.length > 0) && location.origin === new URL(${JSON.stringify(BASE)}).origin;
+        } catch { return false; }
+      })()
+    `);
+    if (ok) { ready = true; break; }
+    console.log(`  … 第 ${attempt} 次載入還沒成功，重試`);
+    await sleep(2500);
+  }
+  if (!ready) {
+    console.error('\n❌ 重試 8 次仍無法載入 App。');
+    console.error(`   請確認伺服器仍在 ${BASE} 上執行（且 dist/ 已建置）。`);
+    process.exit(3);
+  }
 
   await cdp.eval(`localStorage.setItem('labelbuddy-language', 'en'); 'ok'`);
   await cdp.send('Page.navigate', { url: BASE });
   await sleep(4000);
+
+  /**
+   * ⚠️⚠️ **連線失敗防護**（2026-10-01 新增，這是本專案最危險的假通過模式）
+   *
+   * 【踩到的情況】
+   *   開發伺服器在檢查途中死掉 → 之後每一頁都變成**瀏覽器的錯誤頁**
+   *   （「無法連上這個網站 / ERR_CONNECTION_REFUSED」）。
+   *   那個錯誤頁是**英文**的，所以 CJK 掃描掃不到任何中文 →
+   *   **整份報告回報「0 處中文」並 EXIT 0**，但其實什麼都沒驗到。
+   *
+   *   更糟的是：後續每一項「找不到選單項目」「找不到區塊」都只印 ⚠️ 警告，
+   *   不影響 exit code —— 所以失敗看起來像成功。
+   *
+   * 【防護】載入後檢查 root 有沒有真的渲染出東西；沒有就立刻中止。
+   */
+  const appLoaded = await cdp.eval(`
+    (() => {
+      const root = document.getElementById('root');
+      if (!root || root.children.length === 0) return false;
+      // 瀏覽器錯誤頁沒有 #root，或 body 只有錯誤訊息
+      if (/ERR_CONNECTION|無法連上|拒絕連線|This site can.t be reached/i.test(document.body.innerText || '')) return false;
+      return true;
+    })()
+  `);
+  if (!appLoaded) {
+    console.error('\n❌ App 沒有載入成功（連線失敗或 root 是空的）。');
+    console.error('   中止檢查 —— 繼續跑下去只會得到「全部通過」的假結果。');
+    console.error(`   請確認伺服器仍在 ${BASE} 上執行。`);
+    process.exit(3);
+  }
 
   const lang = await cdp.eval(`document.documentElement.lang`);
   console.log(`介面語言（<html lang>）: ${lang}`);

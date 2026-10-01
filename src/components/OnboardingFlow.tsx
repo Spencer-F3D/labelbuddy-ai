@@ -523,12 +523,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           </button>
         </div>
 
-        {/* 語言切換提示：引導頁本身就看得到語言選項，英文使用者不會卡住 */}
-        <p className="text-[16px] font-bold text-slate-500 text-center pb-2">
-          {language === 'en'
-            ? 'You can change the language any time in Settings.'
-            : '之後可以隨時在設定裡換語言。'}
-        </p>
+        {/* ⚠️ 2026-10-01 使用者要求：刪除「之後可以隨時在設定裡換語言」提示。
+            理由：引導頁最前面已經有語言閘門（而且有「之後可以隨時更改」的說明），
+            每一頁底部再重複一次只是噪音。 */}
       </div>
     </div>
   );

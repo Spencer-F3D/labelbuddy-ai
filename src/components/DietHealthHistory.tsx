@@ -27,7 +27,6 @@ import {
   Volume2,
   VolumeX,
   TrendingUp,
-  RotateCcw,
   Clock,
   Trash2,
   Layers,
@@ -38,7 +37,7 @@ import {
   FileText,
   X,
 } from 'lucide-react';
-import { DietRecord, SeniorPhysicalIndicators } from '../types';
+import { DietRecord } from '../types';
 import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { speakText, stopSpeech } from '../utils/tts';
 // 雙語（2026-09-28 第三階段）：介面文字走 t()，慢性病名稱查共用對照表
@@ -50,8 +49,6 @@ import { localizeDietRecord } from '../data/bilingualContent';
 interface DietHealthHistoryProps {
   records: DietRecord[];
   onClearRecords: () => void;
-  onResetSampleRecords: () => void;
-  indicators?: SeniorPhysicalIndicators;
   selectedConditions?: string[];
 }
 
@@ -60,8 +57,6 @@ type GradeFilter = 'all' | 'green' | 'yellow' | 'red';
 export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
   records,
   onClearRecords,
-  onResetSampleRecords,
-  indicators,
   selectedConditions = [],
 }) => {
   const { t, language } = useI18n();
@@ -97,8 +92,18 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
     const yellowPercent = total > 0 ? Math.round((yellowCount / total) * 100) : 0;
     const redPercent = total > 0 ? Math.round((redCount / total) * 100) : 0;
 
-    // 計算綜合健康把關分數 (綠燈 100分, 黃燈 60分, 紅燈 0分)
-    const score = total > 0 ? Math.round((greenCount * 100 + yellowCount * 60) / total) : 85;
+    /**
+     * 綜合健康把關分數（綠燈 100 分、黃燈 60 分、紅燈 0 分）。
+     *
+     * ⚠️ 沒有紀錄時**不給分**（2026-10-01 修正）。
+     *    原本是 `total > 0 ? … : 85` —— 0 筆直接拿 85 分 → 顯示「Grade A」。
+     *    那個預設值是在「一定有 6 筆示範紀錄」的年代寫的；
+     *    示範資料移除後，新使用者一打開就會看到「Grade A (Excellent)」，
+     *    而他一筆都沒掃過 —— 那是**假的評價**。
+     *    現在改成 0 分並用 `hasData` 把整個評級藏起來。
+     */
+    const hasData = total > 0;
+    const score = hasData ? Math.round((greenCount * 100 + yellowCount * 60) / total) : 0;
 
     let gradeLetter = 'A';
     let gradeTitleKey: TranslationKey = 'history.gradeA';
@@ -115,6 +120,7 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
     }
 
     return {
+      hasData,
       total,
       greenCount,
       yellowCount,
@@ -166,38 +172,17 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
             .join(t('common.listSeparator'))
         : t('history.report.noConditions');
 
-    let vitalsStr = '';
-    if (indicators) {
-      const bpComment =
-        indicators.systolicBp >= 140 || indicators.diastolicBp >= 90
-          ? t('history.report.bpHigh')
-          : indicators.systolicBp >= 130
-          ? t('history.report.bpElevated')
-          : t('history.report.bpNormal');
-      const bsTiming =
-        indicators.bloodSugarTiming === 'fasting'
-          ? t('history.report.fasting')
-          : t('history.report.postMeal');
-      vitalsStr =
-        [
-          t('history.report.vitalsHeader'),
-          t('history.report.bp', {
-            sys: indicators.systolicBp,
-            dia: indicators.diastolicBp,
-            comment: bpComment,
-          }),
-          t('history.report.hr', { hr: indicators.heartRate || 72 }),
-          t('history.report.bs', {
-            bs: indicators.bloodSugar,
-            unit: indicators.bloodSugarUnit || 'mmol/L',
-            timing: bsTiming,
-          }),
-          t('history.report.conditions', { list: conditionListStr }),
-          '',
-        ].join('\n') + '\n';
-    } else {
-      vitalsStr = t('history.report.conditionsOnly', { list: conditionListStr }) + '\n';
-    }
+    /**
+     * ⚠️ 2026-10-01 使用者要求：**移除血壓／心跳／血糖**這三項。
+     *
+     * 原本這裡會把「本週生理指標」（收縮壓／舒張壓、心跳、血糖）
+     * 寫進分享給家人的文字報告。使用者要求拿掉 ——
+     * 這份報告是「飲食紀錄」，生理數值屬於健康設定的範疇，
+     * 而且分享出去時血壓血糖是比較敏感的資訊。
+     *
+     * 保留「目前追蹤的慢性病」那一行：那是判斷依據，家人看得懂也該知道。
+     */
+    const vitalsStr = t('history.report.conditions', { list: conditionListStr }) + '\n';
 
     const itemsSummary =
       pastWeekRecords.length > 0
@@ -225,10 +210,15 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
       t('history.report.date', { date: dateStr }),
       '',
       vitalsStr,
-      t('history.report.gradeHeader', {
-        letter: stats.gradeLetter,
-        title: t(stats.gradeTitleKey),
-      }),
+      // ⚠️ 沒有紀錄時不印評級 —— 見 hasData 的說明
+      ...(stats.hasData
+        ? [
+            t('history.report.gradeHeader', {
+              letter: stats.gradeLetter,
+              title: t(stats.gradeTitleKey),
+            }),
+          ]
+        : []),
       t('history.report.total', { n: stats.total }),
       t('history.report.greenRow', { n: stats.greenCount, pct: stats.greenPercent }),
       t('history.report.yellowRow', { n: stats.yellowCount, pct: stats.yellowPercent }),
@@ -243,7 +233,7 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
       t('history.report.tip3'),
     ].join('\n');
     // t 與 language 都要進依賴：切語言時週報文字必須重新產生
-  }, [pastWeekRecords, stats, indicators, selectedConditions, t, language]);
+  }, [pastWeekRecords, stats, selectedConditions, t, language]);
 
   // 執行複製到剪貼簿
   const handleCopyText = async () => {
@@ -362,16 +352,19 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
             <span>{t('history.export')}</span>
           </button>
 
-          {/* 飲食分級評等 Badge */}
-          <div className={`px-3 py-1.5 rounded-2xl border-2 whitespace-nowrap flex items-center gap-1.5 shadow-xs ${stats.gradeBadgeClass}`}>
-            <Award className="w-5 h-5 shrink-0" />
-            <span className="text-[16px] font-black">
-              {t('history.gradeBadge', {
-                letter: stats.gradeLetter,
-                title: t(stats.gradeTitleKey),
-              })}
-            </span>
-          </div>
+          {/* 飲食分級評等 Badge
+              ⚠️ 只在「有紀錄」時顯示 —— 0 筆卻顯示 Grade A 是假的評價。 */}
+          {stats.hasData && (
+            <div className={`px-3 py-1.5 rounded-2xl border-2 whitespace-nowrap flex items-center gap-1.5 shadow-xs ${stats.gradeBadgeClass}`}>
+              <Award className="w-5 h-5 shrink-0" />
+              <span className="text-[16px] font-black">
+                {t('history.gradeBadge', {
+                  letter: stats.gradeLetter,
+                  title: t(stats.gradeTitleKey),
+                })}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -665,18 +658,11 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
         )}
       </div>
 
-      {/* 5. 底部輔助工具列 (精簡重設與清除) */}
+      {/* 5. 底部輔助工具列（分享／清除）
+          ⚠️ 2026-10-01 使用者要求：**移除「恢復示範記錄」按鈕**。
+             理由：使用者不要假的示範資料（同時也移除了預設種子資料），
+             那顆按鈕只會把假資料放回來。 */}
       <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
-        <button
-          type="button"
-          id="btn-reset-sample-records"
-          onClick={onResetSampleRecords}
-          className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[16px] flex items-center gap-1.5 cursor-pointer border border-slate-300 active:scale-95"
-        >
-          <RotateCcw className="w-4 h-4 text-slate-600" />
-          <span>{t('history.resetSample')}</span>
-        </button>
-
         <button
           type="button"
           onClick={() => setShowExportModal(true)}

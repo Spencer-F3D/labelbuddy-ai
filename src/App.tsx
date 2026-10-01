@@ -104,7 +104,6 @@ import {
 } from './data/bilingualContent';
 import { speakText, stopSpeech } from './utils/tts';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
-import { getInitialDietRecords } from './data/initialDietRecords';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
 import { HealthQASection } from './components/HealthQASection';
@@ -480,13 +479,17 @@ export default function App() {
   const { t, language } = useI18n();
 
   /**
-   * 語音朗讀要挑哪個語音（2026-09-28 第三階段）。
+   * 語音朗讀要挑哪個語音。
    *
-   * ⚠️ 中文模式維持原本行為（粵語 / 國語各自對應），只有英文模式改成英文語音。
-   *    不這樣做的話，切到英文後會用中文腔念英文句子 —— 決賽的英文 Demo 影片會很難聽。
+   * ⚠️ 2026-10-01 使用者指定：**中文模式一律用粵語**。
+   *    原本這裡有兩個變數（`ttsLang` 粵語 / `ttsLangMandarin` 國語），
+   *    有 4 處誤用了國語 —— 已全部統一，`ttsLangMandarin` 移除。
+   *    使用者的情境是澳門，粵語才是他與家人實際聽的語言。
+   *
+   * ⚠️ 英文模式要換成英文語音，否則會用中文腔念英文句子 ——
+   *    決賽的英文 Demo 影片會很難聽。
    */
   const ttsLang = language === 'en' ? ('english' as const) : ('cantonese' as const);
-  const ttsLangMandarin = language === 'en' ? ('english' as const) : ('mandarin' as const);
 
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
@@ -521,7 +524,7 @@ export default function App() {
     }
 
     const next = getLearnerProfile(id);
-    speakText(t('settings.profileSwitched', { name: localizedProfileName(next.id, next.name, language) }), { rate: 0.9, preferLanguage: ttsLangMandarin });
+    speakText(t('settings.profileSwitched', { name: localizedProfileName(next.id, next.name, language) }), { rate: 0.9, preferLanguage: ttsLang });
   };
 
   /**
@@ -665,7 +668,7 @@ export default function App() {
       localStorage.setItem(STORAGE_CONDITIONS_MIGRATED_KEY, 'true');
     } catch {}
     setShowMigrationPrompt(false);
-    speakText(t('settings.savedKeptToast'), { rate: 0.9, preferLanguage: ttsLangMandarin });
+    speakText(t('settings.savedKeptToast'), { rate: 0.9, preferLanguage: ttsLang });
   };
 
   /** 改用新版資料的預設勾選（高血壓／糖尿病／高血脂），不設成空清單。 */
@@ -677,7 +680,7 @@ export default function App() {
       localStorage.setItem(STORAGE_CONDITIONS_MIGRATED_KEY, 'true');
     } catch {}
     setShowMigrationPrompt(false);
-    speakText(t('settings.savedResetToast'), { rate: 0.9, preferLanguage: ttsLangMandarin });
+    speakText(t('settings.savedResetToast'), { rate: 0.9, preferLanguage: ttsLang });
   };
 
   // 1.1 長者生理指標量測設定（血壓、心跳、血糖等）
@@ -746,13 +749,30 @@ export default function App() {
         const saved = localStorage.getItem(STORAGE_DIET_RECORDS_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          /**
+           * ⚠️ 這裡**不可以**寫成 `parsed.length > 0`（2026-10-01 修正）。
+           *
+           * 原本的寫法是「空陣列 = 沒有存過」，於是：
+           *   使用者按「清除所有資料」→ 存進 `"[]"` → 重新載入時
+           *   讀到空陣列 → 判定「沒存過」→ **重新種入 6 筆假紀錄**。
+           *   這就是使用者回報的「清除後再進入仍存在」。
+           *
+           * 空陣列是**有效資料**（代表「使用者真的清空了」），要照用。
+           */
+          if (Array.isArray(parsed)) return parsed;
         }
       } catch (e) {
         console.warn('讀取飲食紀錄失敗:', e);
       }
     }
-    return getInitialDietRecords();
+    /**
+     * ⚠️ 2026-10-01 使用者要求：**不再預先種入示範紀錄**。
+     *    原本這裡回傳 `getInitialDietRecords()`（6 筆假的燕麥片／泡麵紀錄），
+     *    讓使用者一打開就看到「本週分析」。但那是假資料 ——
+     *    使用者反映「首次使用時已有飲食記錄」，要求刪除。
+     *    → 改回傳空陣列，讓紀錄頁從「真的掃過的東西」開始累積。
+     */
+    return [];
   });
 
   // 3. 應用狀態管理與導航 Bar
@@ -879,15 +899,6 @@ export default function App() {
     setDietRecords([]);
     try {
       localStorage.setItem(STORAGE_DIET_RECORDS_KEY, JSON.stringify([]));
-    } catch {}
-  };
-
-  // 恢復預設一週健康飲食範例紀錄
-  const handleResetSampleDietRecords = () => {
-    const initial = getInitialDietRecords();
-    setDietRecords(initial);
-    try {
-      localStorage.setItem(STORAGE_DIET_RECORDS_KEY, JSON.stringify(initial));
     } catch {}
   };
 
@@ -1019,7 +1030,7 @@ export default function App() {
     } catch {}
     speakText(
       t('mode.savedVoice', { mode: t(MODE_LABEL_KEY[next]) }),
-      { rate: 0.9, preferLanguage: ttsLangMandarin }
+      { rate: 0.9, preferLanguage: ttsLang }
     );
   };
 
@@ -1325,8 +1336,21 @@ export default function App() {
       const newRecord: DietRecord = {
         id: `rec-${Date.now()}`,
         timestamp: Date.now(),
-        // ⚠️ 日期也跟隨標籤語言，否則會出現「中文品名 ＋ 英文日期」的混雜
-        dateString: formatScanTime(labelLanguage, new Date()),
+        /**
+         * ⚠️ 日期用**介面語言**，不是標籤語言（2026-10-01 修正）。
+         *
+         * 【原本錯在哪】
+         *   這裡原本傳 `labelLanguage`，理由是「避免中文品名配英文日期」。
+         *   但那個理由把兩件不同性質的事混在一起了：
+         *     - 紀錄的**內容**（品名、說明）→ 屬於標籤 → 跟標籤語言 ✅
+         *     - 紀錄的**時間**（幾月幾日幾點）→ 屬於**使用者** → 跟介面語言
+         *   時間是「我什麼時候掃的」，跟包裝上印什麼語言無關。
+         *
+         * 【實際後果】中文介面 + 英文標籤 → 時間變成「9/30 PM 11:30」，
+         *   中文使用者看不懂。這是 09-29「紀錄跟隨標籤語言」那個決定
+         *   被套用到**多一個欄位**造成的 —— 規則本身沒錯，是適用範圍錯了。
+         */
+        dateString: formatScanTime(language, new Date()),
         foodName: labelFoodName || extractFoodName(data.warning_title, data.plain_summary),
         risk_level: data.risk_level,
         warning_title: recordText.warning_title,
@@ -2996,8 +3020,6 @@ export default function App() {
             <DietHealthHistory
               records={dietRecords}
               onClearRecords={handleClearDietRecords}
-              onResetSampleRecords={handleResetSampleDietRecords}
-              indicators={physicalIndicators}
               selectedConditions={selectedConditions}
             />
           </div>
