@@ -23,11 +23,17 @@
 
 **四份交付物**：`ProjectIntroduction`（≤2頁）／`ResearchReport`（6–12頁）／
 `Poster`（0.8×1.1m 直向）／`DemoVideo`（≤5分鐘），檔名皆加 `_LabelBuddyAI`。
+⚠️ 這四份是**必交**，不能為了功能而壓縮（章程：未用英文可不予評審）。
+
+⚠️ **APK 打包工具還沒建**（2026-10-01 查證）：`package.json` 裡**沒有 Capacitor／
+Cordova／任何 Android 設定** → 打包是*從零開始的工程任務*（JDK／Android SDK／
+外殼專案／相機權限），不是「執行一個指令」。
 
 **排程**：09-28 雙語 ✅｜09-29 中性化＋稱謂＋條款 ✅｜09-30 三模式＋引導頁 ✅ →
 **10-01~10-02 APK 打包（硬期限）** → 10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**
 
 ## 🚀 部署（09-28 上線，每次任務完成自動執行）
+
 
 **正式網址：`https://app.labelbuddy-ai.workers.dev`**
 - Worker 名稱 = `wrangler.toml` 的 `name`（`app`）｜**唯一可靠來源是 `wrangler deploy` 最後一行**
