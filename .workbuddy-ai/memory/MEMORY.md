@@ -102,8 +102,7 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 ## 🗣️ 稱謂機制（性別）
 `gender` **只影響怎麼稱呼，不影響任何判斷**。雲端用 `buildAddressRule()` 追加 prompt；
 本機用 `applyHonorific*()` 確定性後處理。
-★ **性別刻意不進快取鍵**（快取存中性文字，稱謂在輸出最後一步插入）；
-英文一律不加稱謂；`QA_TEXT_FIELDS` **不含 `question`**。
+★ **性別刻意不進快取鍵**；英文一律不加稱謂；`QA_TEXT_FIELDS` **不含 `question`**。
 
 ## 🎨 字級縮放（**兩個密度模式**，2026-10-02 起）
 `<html data-density>` 由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換，
