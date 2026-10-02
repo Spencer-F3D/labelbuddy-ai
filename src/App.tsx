@@ -62,7 +62,7 @@ import {
   Activity as ActivityIcon,
   MessageCircleQuestion,
 } from 'lucide-react';
-import { LabelAnalysisResult, DietRecord, SeniorPhysicalIndicators, LearnerProfileId, AnalysisMode } from './types';
+import { LabelAnalysisResult, DietRecord, LearnerProfileId, AnalysisMode } from './types';
 import { compressImage } from './utils/imageCompression';
 // OCR 在瀏覽器端執行：照片不會離開使用者的裝置，只有讀出的文字會送到後端。
 import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser';
@@ -106,7 +106,6 @@ import {
 import { speakText, stopSpeech, ttsLanguageFor } from './utils/tts';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
-import { VitalMetricsSection } from './components/VitalMetricsSection';
 import { HealthQASection } from './components/HealthQASection';
 import { OnboardingFlow, type OnboardingResult, type Gender } from './components/OnboardingFlow';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
@@ -192,7 +191,6 @@ const MENU_ITEMS: Array<{
 const STORAGE_CONDITIONS_KEY = 'labelbuddy_selected_conditions';
 const STORAGE_CONDITIONS_MIGRATED_KEY = 'labelbuddy_conditions_migrated_v1';
 const STORAGE_DIET_RECORDS_KEY = 'labelbuddy_diet_records_v1';
-const STORAGE_INDICATORS_KEY = 'labelbuddy_senior_indicators_v2';
 const STORAGE_PROFILE_KEY = 'labelbuddy_learner_profile_v1';
 /**
  * 分析模式（三選一，2026-09-30 起）。
@@ -706,63 +704,21 @@ export default function App() {
   };
 
   // 1.1 長者生理指標量測設定（血壓、心跳、血糖等）
-  const [physicalIndicators, setPhysicalIndicators] = useState<SeniorPhysicalIndicators>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(STORAGE_INDICATORS_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed.systolicBp === 'number') {
-            return {
-              heartRate: 72,
-              ...parsed,
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('讀取生理指標失敗:', e);
-      }
-    }
-    return {
-      systolicBp: 136,
-      diastolicBp: 86,
-      heartRate: 72,
-      bloodSugar: 7.2,
-      bloodSugarUnit: 'mmol/L',
-      bloodSugarTiming: 'post_meal',
-      uricAcidStatus: 'normal',
-      cholesterolStatus: 'borderline',
-      kidneyStatus: 'normal',
-      symptoms: ['容易疲倦'],
-      ageGroup: '70-79歲',
-    };
-  });
-
-  // 更新生理指標並儲存至本地
-  const handleUpdateIndicators = (updated: SeniorPhysicalIndicators) => {
-    setPhysicalIndicators(updated);
-    try {
-      localStorage.setItem(STORAGE_INDICATORS_KEY, JSON.stringify(updated));
-    } catch {}
-
-    // 自動與慢性病把關連動：若血壓偏高自動勾選高血壓，若血糖偏高自動勾選糖尿病
-    setSelectedConditions((prev) => {
-      let next = [...prev];
-      if ((updated.systolicBp >= 135 || updated.diastolicBp >= 88) && !next.includes('hypertension')) {
-        next.push('hypertension');
-      }
-      const isBsElevated =
-        (updated.bloodSugarUnit === 'mmol/L' && updated.bloodSugar >= 7.0) ||
-        (updated.bloodSugarUnit === 'mg/dL' && updated.bloodSugar >= 126);
-      if (isBsElevated && !next.includes('diabetes')) {
-        next.push('diabetes');
-      }
-      try {
-        localStorage.setItem(STORAGE_CONDITIONS_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  };
+  //
+  // ⚠️ 2026-10-02 使用者指定：**整個「日常生理指標」區塊移除**。
+  //
+  // 移除的理由（不只是「用不到」）：
+  //   ① 這是 App 裡**唯一會收集醫療數值**的地方，而它與「超市食品標籤」的
+  //      核心定位無關 —— 使用者要判斷的是「這包能不能買」，不是「我的血壓多少」。
+  //   ② `handleUpdateIndicators` 會**依血壓／血糖自動勾選高血壓／糖尿病**。
+  //      那是替使用者做了一個他沒說的健康宣告（本專案已列為反模式）。
+  //   ③ 資料流有四條（掃描請求的 vitals、健康問答的背景、設定朗讀稿、
+  //      儲存鍵），刪一處留三處等於承諾與行為不一致。
+  //
+  // 一併移除的資料流見下方 `vitals`（掃描請求）、`settings.speech`（朗讀稿）、
+  // `HealthQASection` 的 indicators prop，以及本元件的 physicalIndicators state。
+  // 後端 `/api/analyze-indicators` 與其本機引擎**保留**（`check:mode` 直接測它，
+  // 且它是「斷網後備」的證明），但已無前端呼叫者。
 
   // 2. 『我的飲食健康紀錄』狀態管理（過去一週歷史與掃描累積）
   const [dietRecords, setDietRecords] = useState<DietRecord[]>(() => {
@@ -1129,14 +1085,10 @@ export default function App() {
           gender,
           // 只有「只在本機」模式才禁止呼叫雲端。
           localOnly: analysisMode === 'local_only',
-          vitals: {
-            systolicBp: physicalIndicators.systolicBp,
-            diastolicBp: physicalIndicators.diastolicBp,
-            heartRate: physicalIndicators.heartRate || 72,
-            bloodSugar: physicalIndicators.bloodSugar,
-            bloodSugarUnit: physicalIndicators.bloodSugarUnit,
-            bloodSugarTiming: physicalIndicators.bloodSugarTiming,
-          },
+          // ⚠️ 2026-10-02：不再附帶 `vitals`（血壓／心跳／血糖）。
+          //    設定頁的生理指標區塊已移除，App 不再收集醫療數值 ——
+          //    若這裡還留著，就會把「預設值」當成使用者的真實數據送給模型，
+          //    等於用假數字去污染判斷，而且**畫面完全看不出來**。
         }),
       });
 
@@ -2647,31 +2599,9 @@ export default function App() {
               <AnalysisModePicker value={analysisMode} onChange={handleChangeAnalysisMode} />
             </SettingsSection>
 
-            {/* 第二部分：日常生理指標量測（血壓、心跳、血糖等） */}
-            <SettingsSection
-              id="settings-vitals"
-              icon={<ActivityIcon className="w-[26px] h-[26px]" />}
-              title={t('settings.vitals.title')}
-              /* 收合時顯示血壓與血糖，長者不必展開就知道自己填了什麼 */
-              summary={
-                physicalIndicators.systolicBp
-                  ? t('settings.summary.vitals', {
-                      bp: `${physicalIndicators.systolicBp}/${physicalIndicators.diastolicBp}`,
-                      sugar: `${physicalIndicators.bloodSugar}`,
-                    })
-                  : t('settings.notSet')
-              }
-            >
-              <VitalMetricsSection
-                indicators={physicalIndicators}
-                onChangeIndicators={handleUpdateIndicators}
-                gender={gender}
-                analysisMode={analysisMode}
-              />
-            </SettingsSection>
-
-            {/* 第三部分原本是「健康問答」——
-                2026-09-29 使用者要求搬到功能選單，因為它是功能不是設定。 */}
+            {/* 第二部分原本是「日常生理指標量測」（血壓／心跳／血糖／尿酸／血脂
+                與 AI 分析）—— 2026-10-02 使用者指定整區移除，見上方 state 的說明。
+                現在設定頁的順序：身分 → 分析模式 → 慢性病與過敏 → 性別 → 私隱。 */}
 
             {/* 第二部分：常見慢性病與過敏原把關清單 */}
             <SettingsSection
@@ -2999,17 +2929,9 @@ export default function App() {
                           n: selectedConditions.length,
                           list: preview,
                         });
-                  const text = t('settings.speech', {
-                    sys: physicalIndicators.systolicBp,
-                    dia: physicalIndicators.diastolicBp,
-                    hr: physicalIndicators.heartRate || 72,
-                    bs: physicalIndicators.bloodSugar,
-                    bsUnit:
-                      physicalIndicators.bloodSugarUnit === 'mmol/L'
-                        ? t('vitals.speech.unitMmol')
-                        : t('vitals.speech.unitMgdl'),
-                    condPart,
-                  });
+                  // ⚠️ 2026-10-02：朗讀稿不再含血壓／心跳／血糖
+                  //    （設定頁的生理指標區塊已整區移除）。
+                  const text = t('settings.speech', { condPart });
                   speakText(text, { preferLanguage: ttsLang });
                 }}
                 className="w-full min-h-[56px] py-3 px-4 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-950 font-black text-[18px] border-3 border-amber-400 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
@@ -3075,7 +2997,6 @@ export default function App() {
         {activeTab === 'qa' && (
           <div className="flex flex-col space-y-5">
             <HealthQASection
-              indicators={physicalIndicators}
               gender={gender}
               analysisMode={analysisMode}
             />

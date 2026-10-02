@@ -488,42 +488,17 @@ try {
     await sleep(600);
   }
 
-  /* ── 生理指標的 AI 分析區塊 ────────────────────────────────────
-   * 它收合在「日常生理指標」手風琴裡，預設看不到 ——
-   * 不展開就掃不到，等於整塊沒有被驗證過。
-   * 這裡展開後截圖，讓「有沒有正確渲染」有憑據。
+  /* ── 生理指標的 AI 分析區塊 —— 2026-10-02 移除 ─────────────────
+   * 原本這裡會展開「日常生理指標」手風琴、捲到 AI 深入分析區塊、
+   * 再拍一張 `04b-vitals-ai`。
+   *
+   * 但該區塊已依使用者要求（2026-10-02）**整區從設定頁移除**，
+   * 連帶 `VitalMetricsSection.tsx` 與所有 `vitals.*` 翻譯鍵一併刪除。
+   * 留著這段的話，每次跑都會印「找不到區塊」的警告 ——
+   * 而**永遠為真的警告等於沒有警告**，只會讓真正的問題被雜訊蓋掉。
+   *
+   * ⚠️ 若日後又新增會收集身體數值的區塊，這裡必須補回對應的導覽與截圖。
    */
-  console.log('\n── 生理指標 AI 分析區塊 ──────────────');
-  await openMenu();
-  await sleep(900);
-  await clickByText('Health settings');
-  await sleep(1500);
-  const vitalsOpen = await cdp.eval(`
-    (() => {
-      const el = [...document.querySelectorAll('button, summary, [role="button"]')].find(e =>
-        /Daily health measurements|日常生理指標/i.test(e.textContent || ''));
-      if (!el) return false;
-      el.click();
-      return true;
-    })()
-  `);
-  await sleep(1500);
-  if (!vitalsOpen) console.log('  ⚠️  找不到「Daily health measurements」區塊');
-  // 捲到 AI 分析區塊（它在四張指標卡下方，不捲看不到）
-  // ⚠️ 一定要挑「最內層」的元素：用 'div' 會先命中包住整個區塊的大容器，
-  //    scrollIntoView 之後畫面只會停在中間，看不到標題（實測就是這樣）。
-  const scrolled = await cdp.eval(`
-    (() => {
-      const title = [...document.querySelectorAll('span')].find(e =>
-        /Let the AI take a closer look|讓 AI 幫您深入看一次/i.test(e.textContent || ''));
-      if (!title) return false;
-      title.scrollIntoView({ block: 'start' });
-      return true;
-    })()
-  `);
-  await sleep(1200);
-  if (!scrolled) console.log('  ⚠️  找不到「AI 深入分析」區塊 —— 可能沒有渲染出來');
-  await capture('04b-vitals-ai');
 
   /* ── 健康問答：已搬到功能選單，上面的 NAV 迴圈已經拍過 04c-health-qa ──
    * （2026-09-29 之前它收合在設定頁的手風琴裡，需要展開才掃得到；

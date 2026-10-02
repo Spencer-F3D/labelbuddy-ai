@@ -5,17 +5,15 @@
  * ============================================================================
  * 健康問答（Health Q&A）
  * ============================================================================
- * 長者用白話問一個健康或飲食問題，AI 依他的身體數字回答。
+ * 長者用白話問一個健康或飲食問題，AI 依他的慢性病清單回答。
  * 例：「我有高血壓，喝咖啡可以嗎？」「血糖高可以吃香蕉嗎？」
  *
- * 【為什麼是「新做」而不是「還原舊元件」】
- *   舊的 SeniorHealthQASection（549 行）是死檔，且**完全沒有 i18n**
- *   （713 個中文字）。還原它等於先把 1,800 字翻譯補上，
- *   不如用現行的雙語模式重寫一份小的。
- *
- * 【為什麼放在健康設定頁而不是新分頁】
- *   問答會用到 physicalIndicators（血壓／血糖…）當背景，
- *   放在同一頁就不必把資料再傳一層，使用者也不必切來切去。
+ * 【為什麼不帶身體數字（2026-10-02 調整）】
+ *   原本問答會一起送出 `physicalIndicators`（血壓／心跳／血糖）當背景。
+ *   但設定頁那個生理指標區塊已整區移除 —— App 不再收集醫療數值。
+ *   若這裡還留著，就會把「元件預設值」當成使用者的真實數據送出去，
+ *   等於用假數字回答他，而且**畫面完全看不出來**。
+ *   現在的背景只有「他已勾選的慢性病」，那也是他真正告訴過我們的東西。
  *
  * ⚠️ 語音「輸入」尚未實作（需要 Web Speech Recognition，目前專案沒有）。
  *    語音「輸出」（唸給我聽）已經有了。
@@ -24,12 +22,11 @@
 import React, { useState } from 'react';
 import { apiUrl } from '../utils/apiBase';
 import { MessageCircleQuestion, Volume2 } from 'lucide-react';
-import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, HealthQuestionAnswer } from '../types';
+import { AddressGender, AnalysisMode, HealthQuestionAnswer } from '../types';
 import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 
 interface HealthQASectionProps {
-  indicators: SeniorPhysicalIndicators;
   /**
    * 稱謂用的性別（2026-09-29）。
    * 只影響 AI 回答與語音怎麼稱呼使用者（先生／小姐／您好），
@@ -46,7 +43,6 @@ interface HealthQASectionProps {
 }
 
 export const HealthQASection: React.FC<HealthQASectionProps> = ({
-  indicators,
   gender,
   analysisMode,
 }) => {
@@ -68,9 +64,9 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文回答
         // gender 只影響稱謂（先生／小姐／您好），不影響判斷
         // localOnly 是同意閘門：只在本機時後端不呼叫雲端
+        // ⚠️ 不再送 indicators（血壓／心跳／血糖）—— 見檔頭說明。
         body: JSON.stringify({
           question: q,
-          indicators,
           language,
           gender,
           localOnly: analysisMode === 'local_only',

@@ -91,10 +91,8 @@ const zhTW = {
   'settings.title': '健康設定',
   'settings.collapseHint': '點一下收起',
   'settings.profile.title': '學習者身分',
-  'settings.vitals.title': '日常生理指標',
   'settings.selectedCount': '已選 {n} 項',
   'settings.notSet': '尚未設定',
-  'settings.summary.vitals': '血壓 {bp} · 血糖 {sugar}',
   'settings.language.title': '語言',
   /* 2026-09-28 使用者要求：不要解釋文字，只要兩個選項。
      原本的 desc（「選擇您習慣閱讀的語言…」）與兩個 hint 都已移除。 */
@@ -232,90 +230,6 @@ const zhTW = {
   'profile.picker.selected': '目前選擇',
   'profile.picker.selectAria': '選擇身分：{name}',
 
-  /* ── 日常生理指標（第三階段）───────────────────────────────── */
-  'vitals.title': '日常身體量測指標',
-  'vitals.subtitle': '血壓・心跳・血糖（點擊 ＋/－ 輕鬆調整）',
-  'vitals.speak': '🔊 朗讀指標',
-  'vitals.quickPick': '常用快選：',
-
-  'vitals.bp.title': '🩸 血壓指標 (mmHg)',
-  'vitals.bp.systolic': '上壓 (收縮壓)',
-  'vitals.bp.diastolic': '下壓 (舒張壓)',
-  'vitals.bp.minusSys': '減少上壓 5',
-  'vitals.bp.plusSys': '增加上壓 5',
-  'vitals.bp.minusDia': '減少下壓 5',
-  'vitals.bp.plusDia': '增加下壓 5',
-  'vitals.bp.presetNormal': '標準 (118/78)',
-  'vitals.bp.presetSlight': '稍高 (136/86)',
-  'vitals.bp.presetHigh': '偏高 (152/95)',
-  'vitals.bp.statusHigh': '⚠️ 偏高（需控鈉）',
-  'vitals.bp.statusSlight': '⚡ 稍偏高（注意清淡）',
-  'vitals.bp.statusNormal': '✅ 正常理想',
-  'vitals.bp.adviceHigh':
-    '血壓偏高，在超市購物時請特別注意「低鈉」，避開重鹹醃漬品與高鈉調味包！',
-  'vitals.bp.adviceSlight': '血壓稍偏高，建議多選擇天然原型食材，少吃泡麵與加工火鍋料。',
-  'vitals.bp.adviceNormal': '血壓維持得很棒！請繼續保持少油少鹽的清淡好習慣。',
-
-  'vitals.hr.title': '💓 心跳脈搏 (次/分 bpm)',
-  'vitals.hr.label': '靜態心跳脈搏',
-  'vitals.hr.unit': 'bpm (次/分)',
-  'vitals.hr.minus': '減少心跳 2',
-  'vitals.hr.plus': '增加心跳 2',
-  'vitals.hr.presetRest': '靜息平穩 (65)',
-  'vitals.hr.presetNormal': '標準常態 (75)',
-  'vitals.hr.presetActive': '活動稍快 (88)',
-  'vitals.hr.presetFast': '心跳偏快 (105)',
-  'vitals.hr.statusFast': '⚠️ 偏快（避免刺激）',
-  'vitals.hr.statusSlow': '⚡ 偏慢（注意保暖）',
-  'vitals.hr.statusNormal': '✅ 平穩正常',
-  'vitals.hr.adviceFast': '靜止心跳稍快，請避免高咖啡因飲品、濃茶或能量飲料，多喝溫開水。',
-  'vitals.hr.adviceSlow': '心跳稍微偏慢，若有頭暈請及時休息，飲食保持營養均衡。',
-  'vitals.hr.adviceNormal': '心跳脈搏非常平穩（正常範圍 60～100 bpm），元氣滿分！',
-
-  'vitals.bs.title': '🍬 血糖指標',
-  'vitals.bs.fasting': '🌅 空腹量測',
-  'vitals.bs.postMeal': '🍱 飯後 2 小時',
-  'vitals.bs.unitMmol': 'mmol/L (港/國際)',
-  'vitals.bs.unitMgdl': 'mg/dL (台)',
-  'vitals.bs.fastingValue': '空腹血糖值',
-  'vitals.bs.postMealValue': '飯後血糖值',
-  'vitals.bs.minus': '減少血糖',
-  'vitals.bs.plus': '增加血糖',
-  'vitals.bs.presetFasting': '空腹正常 ({v})',
-  'vitals.bs.presetPostMeal': '飯後正常 ({v})',
-  'vitals.bs.presetHigh': '血糖偏高 ({v})',
-  'vitals.bs.statusHigh': '⚠️ 偏高（嚴格控糖）',
-  'vitals.bs.statusSlight': '⚡ 稍偏高（減少甜食）',
-  'vitals.bs.statusNormal': '✅ 血糖理想',
-  'vitals.bs.adviceHigh': '血糖偏高，超市選購請認明「無加糖、高纖維」，嚴防含糖飲料與精緻糕點！',
-  'vitals.bs.adviceSlight': '血糖稍微偏高，飯後建議多走動，點心少吃高糖水果與甜餅乾。',
-  'vitals.bs.adviceNormal': '血糖控制得相當理想，請維持定時定量、多吃蔬菜好習慣。',
-
-  'vitals.extra.title': '🩺 關節尿酸與血脂狀態',
-  'vitals.extra.uricAcid': '痛風 / 尿酸指數',
-  'vitals.extra.uricNormal': '正常',
-  'vitals.extra.uricHigh': '偏高/常痛風',
-  'vitals.extra.cholesterol': '血脂 / 膽固醇',
-  'vitals.extra.cholNormal': '正常',
-  'vitals.extra.cholHigh': '稍高/偏高',
-
-  // ── AI 深入分析（2026-09-29 接回）──────────────────────────────
-  'vitals.ai.title': '🤖 讓 AI 幫您深入看一次',
-  'vitals.ai.hint':
-    '上面的評估是用固定標準算的。按下按鈕，AI 會把您今天量到的數字、勾選的症狀一起看過，給您更完整的解釋與超市買菜建議。',
-  'vitals.ai.button': '讓 AI 幫我看一次',
-  'vitals.ai.busy': 'AI 正在看您的數字…',
-  'vitals.ai.readAloud': '唸給我聽',
-  'vitals.ai.resultTitle': 'AI 怎麼看',
-  'vitals.ai.doNotBuy': '🛒 超市千萬不要買',
-  'vitals.ai.recommended': '✅ 超市可以安心買',
-  'vitals.ai.tips': '💡 生活貼心小叮嚀',
-  'vitals.ai.linked': '🔗 已同步到食品標籤掃描',
-  'vitals.ai.linkedNote': '下次掃食品標籤時，會特別幫您盯這些項目。',
-  'vitals.ai.modeCloud': '☁️ 雲端 AI',
-  'vitals.ai.modeLocal': '📴 離線分析（目前沒有連線，用內建規則給您建議）',
-  'vitals.ai.error': '目前連不上 AI，請稍後再試一次。',
-
   // ── 健康問答（2026-09-29 接回）────────────────────────────────
   'settings.qa.title': '問健康問題',
   'settings.qa.summary': '有問題就問，AI 用白話回答',
@@ -425,21 +339,14 @@ const zhTW = {
   'clear.step1Body': '以下資料會從這台裝置永久刪除，而且無法復原：',
   'clear.item1': '身分與稱謂（先生／小姐）',
   'clear.item2': '慢性病與過敏原設定',
-  'clear.item3': '身體指標（血壓、心跳、血糖）',
-  'clear.item4': '飲食紀錄與一週統計',
-  'clear.item5': '食育學堂的學習進度',
-  'clear.item6': '雲端分析同意設定與介面語言',
+  'clear.item3': '飲食紀錄與一週統計',
+  'clear.item4': '食育學堂的學習進度',
+  'clear.item5': '雲端分析同意設定與介面語言',
   'clear.step2Title': '最後確認',
   'clear.step2Body': '真的要刪除全部資料嗎？刪除後無法復原，App 會回到一開始的引導頁。',
   'clear.continue': '我了解，繼續',
   'clear.confirmDelete': '確定全部刪除',
   'clear.cancel': '取消',
-
-  /* 語音朗讀用的單位（拼接給 TTS，不是畫面文字） */
-  'vitals.speech.unitMmol': '毫摩爾每升',
-  'vitals.speech.unitMgdl': '毫克每分升',
-  'vitals.speech':
-    '身體量測指標報告：您的血壓上壓為 {sys}，下壓為 {dia}，評估為 {bpStatus}。心跳為每分鐘 {hr} 次，評估為 {hrStatus}。血糖為 {bs} {bsUnit}，評估為 {bsStatus}。AI 已為您同步設定超市把關重點！',
 
   /* ── 慢性病與過敏原清單（第三階段）─────────────────────────── */
   'conditions.filterAria': '依分類篩選健康項目',
@@ -473,7 +380,7 @@ const zhTW = {
   'settings.upgradeReselect': '重新選擇',
   /* 語音朗讀整份健康設定（拼接給 TTS，不是畫面文字） */
   'settings.speech':
-    '您好！您的健康指標設定為：收縮壓 {sys}，舒張壓 {dia}，心跳每分鐘 {hr} 次，血糖 {bs} {bsUnit}。把關的病史{condPart}。詳細設定可以在健康設定頁查看。在超市買餸時，我們會為您嚴密把關！',
+    '您好！目前把關的病史{condPart}。詳細設定可以在健康設定頁查看。在超市買餸時，我們會為您嚴密把關！',
 
   /* ── 每日營養建議（結果頁第三層，第三階段）─────────────────── */
   'advice.redSodium.badge': '少吃重鹹・多喝溫水',
@@ -610,7 +517,7 @@ const zhTW = {
   'history.report.tipsHeader': '💡 溫馨健康叮嚀：',
   'history.report.tip1': '  • 請保持每日充足水分攝取（約 1500~2000cc）。',
   'history.report.tip2': '  • 採買時認明綠燈天然原型食材，少吃高鈉加工醬料與高糖零食。',
-  'history.report.tip3': '  • 規律量測血壓與血糖，有助維持長久健康！',
+  'history.report.tip3': '  • 買之前先看一眼標籤，長期下來就是最好的健康投資。',
   'history.report.noConditions': '無特殊慢性病史',
   'history.speech.empty':
     '您好！您過去一週尚未有掃描紀錄，只要點擊底部的拍照按鈕，就可以開始為您的健康飲食把關囉！',
@@ -706,10 +613,8 @@ const en: Record<TranslationKey, string> = {
   'settings.title': 'Health settings',
   'settings.collapseHint': 'Tap to collapse',
   'settings.profile.title': 'Learner profile',
-  'settings.vitals.title': 'Daily health measurements',
   'settings.selectedCount': '{n} selected',
   'settings.notSet': 'Not set',
-  'settings.summary.vitals': 'BP {bp} · Sugar {sugar}',
   'settings.language.title': 'Language',
   'settings.language.zh': '中文',
   'settings.language.en': 'English',
@@ -823,98 +728,6 @@ const en: Record<TranslationKey, string> = {
     'Once chosen, results and lesson content adapt to your needs. You can change it any time.',
   'profile.picker.selected': 'Selected',
   'profile.picker.selectAria': 'Select profile: {name}',
-
-  'vitals.title': 'Daily health measurements',
-  'vitals.subtitle': 'Blood pressure, heart rate and blood sugar (tap + / − to adjust)',
-  'vitals.speak': '🔊 Read them out',
-  'vitals.quickPick': 'Quick pick:',
-
-  'vitals.bp.title': '🩸 Blood pressure (mmHg)',
-  'vitals.bp.systolic': 'Systolic',
-  'vitals.bp.diastolic': 'Diastolic',
-  'vitals.bp.minusSys': 'Lower systolic by 5',
-  'vitals.bp.plusSys': 'Raise systolic by 5',
-  'vitals.bp.minusDia': 'Lower diastolic by 5',
-  'vitals.bp.plusDia': 'Raise diastolic by 5',
-  'vitals.bp.presetNormal': 'Normal (118/78)',
-  'vitals.bp.presetSlight': 'Slightly high (136/86)',
-  'vitals.bp.presetHigh': 'High (152/95)',
-  'vitals.bp.statusHigh': '⚠️ High (watch sodium)',
-  'vitals.bp.statusSlight': '⚡ Slightly high (eat light)',
-  'vitals.bp.statusNormal': '✅ Normal and ideal',
-  'vitals.bp.adviceHigh':
-    'Your blood pressure is high. At the store, look for "low sodium" and avoid salty pickles and high-sodium seasoning packs.',
-  'vitals.bp.adviceSlight':
-    'Your blood pressure is slightly high. Choose natural, unprocessed foods and go easy on instant noodles and processed hotpot items.',
-  'vitals.bp.adviceNormal':
-    'Your blood pressure is in great shape. Keep up the low-oil, low-salt habit.',
-
-  'vitals.hr.title': '💓 Heart rate (bpm)',
-  'vitals.hr.label': 'Resting heart rate',
-  'vitals.hr.unit': 'bpm',
-  'vitals.hr.minus': 'Lower heart rate by 2',
-  'vitals.hr.plus': 'Raise heart rate by 2',
-  'vitals.hr.presetRest': 'Calm at rest (65)',
-  'vitals.hr.presetNormal': 'Typical (75)',
-  'vitals.hr.presetActive': 'Slightly active (88)',
-  'vitals.hr.presetFast': 'Fast (105)',
-  'vitals.hr.statusFast': '⚠️ Fast (avoid stimulants)',
-  'vitals.hr.statusSlow': '⚡ Slow (keep warm)',
-  'vitals.hr.statusNormal': '✅ Steady and normal',
-  'vitals.hr.adviceFast':
-    'Your resting heart rate is a little fast. Avoid high-caffeine drinks, strong tea and energy drinks, and drink more warm water.',
-  'vitals.hr.adviceSlow':
-    'Your heart rate is slightly slow. If you feel dizzy, rest right away and keep your meals balanced.',
-  'vitals.hr.adviceNormal':
-    'Your pulse is very steady (normal range 60–100 bpm). Excellent.',
-
-  'vitals.bs.title': '🍬 Blood sugar',
-  'vitals.bs.fasting': '🌅 Fasting',
-  'vitals.bs.postMeal': '🍱 2 hours after a meal',
-  'vitals.bs.unitMmol': 'mmol/L (HK / international)',
-  'vitals.bs.unitMgdl': 'mg/dL (TW)',
-  'vitals.bs.fastingValue': 'Fasting blood sugar',
-  'vitals.bs.postMealValue': 'Blood sugar after a meal',
-  'vitals.bs.minus': 'Lower blood sugar',
-  'vitals.bs.plus': 'Raise blood sugar',
-  'vitals.bs.presetFasting': 'Normal fasting ({v})',
-  'vitals.bs.presetPostMeal': 'Normal after a meal ({v})',
-  'vitals.bs.presetHigh': 'High ({v})',
-  'vitals.bs.statusHigh': '⚠️ High (strict sugar control)',
-  'vitals.bs.statusSlight': '⚡ Slightly high (less sweet food)',
-  'vitals.bs.statusNormal': '✅ Ideal blood sugar',
-  'vitals.bs.adviceHigh':
-    'Your blood sugar is high. Look for "no added sugar" and "high fibre", and stay away from sweetened drinks and refined pastries.',
-  'vitals.bs.adviceSlight':
-    'Your blood sugar is slightly high. Walk more after meals and go easy on sweet fruit and biscuits.',
-  'vitals.bs.adviceNormal':
-    'Your blood sugar is well controlled. Keep eating at regular times and eating plenty of vegetables.',
-
-  'vitals.extra.title': '🩺 Uric acid and blood lipids',
-  'vitals.extra.uricAcid': 'Gout / uric acid',
-  'vitals.extra.uricNormal': 'Normal',
-  'vitals.extra.uricHigh': 'High / frequent gout',
-  'vitals.extra.cholesterol': 'Blood lipids / cholesterol',
-  'vitals.extra.cholNormal': 'Normal',
-  'vitals.extra.cholHigh': 'Slightly high / high',
-
-  // ── AI in-depth analysis (restored 2026-09-29) ──────────────────
-  'vitals.ai.title': '🤖 Let the AI take a closer look',
-  'vitals.ai.hint':
-    'The assessment above uses fixed thresholds. Tap the button and the AI will read today\u2019s numbers together with the symptoms you ticked, and give you a fuller explanation plus supermarket advice.',
-  'vitals.ai.button': 'Have the AI look at this',
-  'vitals.ai.busy': 'The AI is reading your numbers\u2026',
-  'vitals.ai.readAloud': 'Read this to me',
-  'vitals.ai.resultTitle': 'What the AI sees',
-  'vitals.ai.doNotBuy': '🛒 Do not buy at the supermarket',
-  'vitals.ai.recommended': '✅ Safe to buy',
-  'vitals.ai.tips': '💡 Daily care tips',
-  'vitals.ai.linked': '🔗 Also watched in label scanning',
-  'vitals.ai.linkedNote': 'Next time you scan a food label, these are the things it will watch for you.',
-  'vitals.ai.modeCloud': '☁️ Analysed by cloud AI',
-  'vitals.ai.modeLocal':
-    '📴 Offline analysis (no connection right now, so built-in rules are advising you)',
-  'vitals.ai.error': 'Cannot reach the AI right now. Please try again in a moment.',
 
   // ── Health Q&A (restored 2026-09-29) ──────────────────────────
   'settings.qa.title': 'Ask a health question',
@@ -1035,21 +848,15 @@ const en: Record<TranslationKey, string> = {
     'The following will be permanently deleted from this device and cannot be recovered:',
   'clear.item1': 'Profile and title (Mr / Ms)',
   'clear.item2': 'Chronic conditions and allergens',
-  'clear.item3': 'Body measurements (blood pressure, heart rate, blood sugar)',
-  'clear.item4': 'Diet records and weekly statistics',
-  'clear.item5': 'Food-education learning progress',
-  'clear.item6': 'Cloud-analysis consent setting and interface language',
+  'clear.item3': 'Diet records and weekly statistics',
+  'clear.item4': 'Food-education learning progress',
+  'clear.item5': 'Cloud-analysis consent setting and interface language',
   'clear.step2Title': 'Final confirmation',
   'clear.step2Body':
     'Delete absolutely everything? This cannot be undone, and the app will return to the first-run setup.',
   'clear.continue': 'I understand, continue',
   'clear.confirmDelete': 'Delete everything',
   'clear.cancel': 'Cancel',
-
-  'vitals.speech.unitMmol': 'mmol/L',
-  'vitals.speech.unitMgdl': 'mg/dL',
-  'vitals.speech':
-    'Health measurement report. Your blood pressure is {sys} over {dia}, assessed as {bpStatus}. Your heart rate is {hr} beats per minute, assessed as {hrStatus}. Your blood sugar is {bs} {bsUnit}, assessed as {bsStatus}. The AI has updated your supermarket checks accordingly.',
 
   'conditions.filterAria': 'Filter health items by category',
   'conditions.selectedCount': 'Selected ({n})',
@@ -1081,7 +888,7 @@ const en: Record<TranslationKey, string> = {
   'settings.upgradeKeep': 'Keep my current settings',
   'settings.upgradeReselect': 'Choose again',
   'settings.speech':
-    'Hello. Your health settings are: systolic blood pressure {sys}, diastolic {dia}, heart rate {hr} beats per minute, blood sugar {bs} {bsUnit}. The conditions being checked are {condPart}. You can review everything on the health settings page. At the supermarket we will check carefully for you.',
+    'Hello. The conditions being checked are {condPart}. You can review everything on the health settings page. At the supermarket we will check carefully for you.',
 
   'advice.redSodium.badge': 'Less salt, more water',
   'advice.redSodium.advice':
@@ -1221,7 +1028,7 @@ const en: Record<TranslationKey, string> = {
   'history.report.tip2':
     '  • Choose natural whole foods marked green, and go easy on high-sodium sauces and sugary snacks.',
   'history.report.tip3':
-    '  • Measure your blood pressure and blood sugar regularly — it helps you stay healthy longer!',
+    '  • Glance at the label before you buy — over time that is the best health investment you can make.',
   'history.report.noConditions': 'No specific chronic conditions',
   'history.speech.empty':
     'Hello! You have not scanned anything in the past week. Tap the camera button at the bottom to start checking your food.',

@@ -122,7 +122,12 @@ export const ClearAllDataSection: React.FC = () => {
                   {t('clear.step1Body')}
                 </p>
                 <ul className="text-[16px] font-bold text-slate-700 flex flex-col gap-1 bg-slate-50 rounded-2xl p-3">
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                  {/* ⚠️ 這個數字必須與 `clear.itemN` 的鍵數量一致。
+                      2026-10-02 原本是 6 項，其中「身體指標（血壓、心跳、血糖）」
+                      隨設定頁的生理指標區塊一起移除 → 改成 5 項。
+                      漏改的話 `t('clear.item6')` 會找不到鍵，畫面直接印出
+                      **鍵名本身**（`clear.item6`）—— 不會報錯，但很難看。 */}
+                  {[1, 2, 3, 4, 5].map((n) => (
                     <li key={`ci-${n}`} className="flex gap-2">
                       <span className="text-rose-600 shrink-0">・</span>
                       <span>{t(`clear.item${n}` as 'clear.item1')}</span>
