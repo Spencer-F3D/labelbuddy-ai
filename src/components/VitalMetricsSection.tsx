@@ -15,6 +15,7 @@
  */
 
 import React, { useState } from 'react';
+import { apiUrl } from '../utils/apiBase';
 import {
   HeartPulse,
   Activity,
@@ -78,7 +79,7 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
     setAiBusy(true);
     setAiError(false);
     try {
-      const response = await fetch('/api/analyze-indicators', {
+      const response = await fetch(apiUrl('/api/analyze-indicators'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文結果

@@ -41,3 +41,26 @@ public/tesseract-worker.min.js
 # 用萬用字元而非完整檔名，這樣重新下載成「... (2).pdf」時也會被擋下。
 # 檔案仍留在專案根目錄供查閱，只是不進 git。
 2026全球青少年人工智能未來創新競賽*.pdf
+
+# ── Capacitor / Android（2026-10-01 新增）──────────────────────────────
+# android/ 這個原生專案本身**要進版控**（它是原始碼，不是產物），
+# 但底下的建置產物與機器專屬設定不要。
+android/.gradle/
+android/.idea/
+android/app/.cxx/
+android/app/release/
+android/app/debug/
+# ⚠️ local.properties 是機器專屬的 SDK 路徑，別人的電腦路徑不同。
+#    這是 Android 官方建議忽略的檔案。
+android/local.properties
+# 由 `npx cap sync` 從 dist/ 複製過來的網頁資產 —— 會重新產生，不進版控。
+# （Android Studio 的預設 .gitignore 也是這樣處理）
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+
+# 簽章檔：**絕對不可以進版控**（外洩等於任何人都能冒名發布你的 App）
+*.jks
+*.keystore
+!android/app/debug.keystore
+android/keystore.properties

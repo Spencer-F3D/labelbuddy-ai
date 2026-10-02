@@ -22,6 +22,7 @@
  */
 
 import React, { useState } from 'react';
+import { apiUrl } from '../utils/apiBase';
 import { MessageCircleQuestion, Volume2 } from 'lucide-react';
 import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, HealthQuestionAnswer } from '../types';
 import { speakText, stopSpeech } from '../utils/tts';
@@ -61,7 +62,7 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({
     setBusy(true);
     setError(false);
     try {
-      const response = await fetch('/api/ask-health-question', {
+      const response = await fetch(apiUrl('/api/ask-health-question'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文回答

@@ -25,6 +25,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { apiUrl } from './utils/apiBase';
 import {
   Camera,
   Volume2,
@@ -883,7 +884,7 @@ export default function App() {
   // 【重要】必須以 hasKey 為判斷依據：/api/ai-status 只要伺服器存活就會回 status: 'ok'，
   // 若誤用 status 判斷，會在沒有金鑰、實際走本機備援引擎時仍顯示「已連線」，對長者形成誤導。
   useEffect(() => {
-    fetch('/api/ai-status')
+    fetch(apiUrl('/api/ai-status'))
       .then((res) => res.json())
       .then((data) => {
         // 唯有伺服器確實讀取到 OPENROUTER_API_KEY 時，才算雲端 AI 已就緒
@@ -1089,7 +1090,7 @@ export default function App() {
       ocrText?: string;
       ocrError?: string;
     }): Promise<LabelAnalysisResult> => {
-      const response = await fetch('/api/analyze-label', {
+      const response = await fetch(apiUrl('/api/analyze-label'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

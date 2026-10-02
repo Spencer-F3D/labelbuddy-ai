@@ -26,11 +26,15 @@
     "check:diet": "tsx scripts/check-diet-record-lang.ts",
     "check:mode": "tsx scripts/check-analysis-mode.ts",
     "check:lookup": "tsx scripts/check-lookup-keys.ts",
+    "apk": "node scripts/build-apk.mjs",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
     "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:honorific && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",

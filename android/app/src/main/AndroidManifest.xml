@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <!-- 雲端 AI 分析需要連網（「只在本機」模式不會用到） -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      拍照：本專案用 `<input type="file" capture="environment">`，
+      Android WebView 會用相機意圖處理 —— 需要宣告 CAMERA。
+      ⚠️ 沒宣告的話，按下「拍照」會**靜默失敗**（使用者只看到沒反應）。
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      從相簿選圖：
+        - Android 13+（API 33）：READ_MEDIA_IMAGES
+        - Android 12 以下：READ_EXTERNAL_STORAGE（用 maxSdkVersion 限制範圍）
+      ⚠️ 本專案刻意**兩個 hidden input**（一個有 capture、一個沒有），
+         所以相簿與拍照兩條路都要能用。
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!--
+      ⚠️ 相機設為「非必要」：沒相機的裝置（例如部分模擬器）
+         仍可安裝並使用「從相簿選圖」與食育教材。
+         設成 required 會讓這些裝置完全裝不了。
+    -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+</manifest>
