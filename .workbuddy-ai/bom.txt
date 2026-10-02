@@ -1,3 +1,0 @@
-﻿BOM bytes: 239 187 191  (239 187 191 = OK)
-Contains BOM: True
-Size: 7178 bytes
