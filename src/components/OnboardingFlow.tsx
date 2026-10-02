@@ -30,7 +30,7 @@
  * ★ 本頁的每一段文字都必須雙語（章程要求全英文材料，App 也不能例外）。
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ShieldCheck,
   Camera,
@@ -46,6 +46,8 @@ import {
   GraduationCap,
   MessageCircleQuestion,
   SlidersHorizontal,
+  // 向下捲動提示（2026-10-02）
+  ChevronDown,
 } from 'lucide-react';
 import { AddressGender, AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
@@ -158,6 +160,50 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   /** 使用者按了「開始使用」卻還沒勾同意時，才顯示提醒（不一開始就紅字嚇人） */
   const [showAgreeWarning, setShowAgreeWarning] = useState(false);
 
+  /**
+   * 向下捲動提示（2026-10-02 使用者要求）。
+   *
+   * 【為什麼需要】
+   *   引導頁有 5 頁的內容超出手機畫面（實測第 3 頁超出 859px，
+   *   是螢幕的 1.3 倍高）。而**「下一步」按鈕在捲動容器裡面** ——
+   *   也就是說，內容溢出的頁面，使用者**看不到按鈕**，
+   *   會以為「這一頁卡住了、按不動」。
+   *
+   *   使用者原話：「如果一定要滾動才能展示，可以像一些普通頁面的
+   *   新手教學一樣弄一個半透明的向下箭頭方塊作為輔助引導。」
+   *
+   * 【為什麼是「半透明方塊」而不是一條細線】
+   *   長者對細微的視覺線索不敏感。一個有面積、會微微上下浮動的方塊，
+   *   比一條 2px 的漸層線更容易被注意到。
+   */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+
+  /** 重新判斷「下面還有沒有內容」。捲動、換頁、視窗縮放都要呼叫。 */
+  const updateScrollHint = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // 留 24px 容差：捲到非常接近底部時就收起來，不要讓它閃來閃去
+    const more = el.scrollHeight - el.scrollTop - el.clientHeight > 24;
+    setShowScrollHint(more);
+  }, []);
+
+  /** 換頁之後重新判斷（新的一頁高度不同）。 */
+  useEffect(() => {
+    // 換頁時先回到頂端，否則會沿用上一頁的捲動位置
+    scrollRef.current?.scrollTo({ top: 0 });
+    updateScrollHint();
+    // 內容有圖片／字型載入完成後高度會變，所以延後再量一次
+    const timer = setTimeout(updateScrollHint, 300);
+    return () => clearTimeout(timer);
+  }, [step, languageChosen, updateScrollHint]);
+
+  /** 視窗尺寸改變（例如轉橫向）也要重算。 */
+  useEffect(() => {
+    window.addEventListener('resize', updateScrollHint);
+    return () => window.removeEventListener('resize', updateScrollHint);
+  }, [updateScrollHint]);
+
   const steps = buildSteps(profileId);
   /**
    * ⚠️ 夾取：使用者可能回頭把身分從「長者」改成別的，
@@ -242,6 +288,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
        改用 id 之後，文案怎麼改都不影響偵測。 */
     <div
       id="onboarding-flow"
+      ref={scrollRef}
+      onScroll={updateScrollHint}
       className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
     >
       <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-4 gap-4">
@@ -527,6 +575,32 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             理由：引導頁最前面已經有語言閘門（而且有「之後可以隨時更改」的說明），
             每一頁底部再重複一次只是噪音。 */}
       </div>
+
+      {/* ── 向下捲動提示（2026-10-02）────────────────────────────
+          ★ 只在「下面還有內容」時出現，捲到底就自動收起。
+          ★ 刻意用 `fixed` 定位在畫面底部：因為「下一步」按鈕本身
+            也在捲動容器裡，內容溢出時它會落在畫面之外 ——
+            使用者會以為這一頁壞掉了。這個提示告訴他「下面還有東西」。
+          ⚠️ 它必須放在捲動容器 `#onboarding-flow` **裡面**才蓋得住內容，
+             但用 fixed 定位所以不隨捲動移動。 */}
+      {showScrollHint && (
+        <button
+          type="button"
+          onClick={() => {
+            const el = scrollRef.current;
+            if (!el) return;
+            // 捲「一個畫面高」的 80%，讓使用者看得出有進展但不會跳過內容
+            el.scrollBy({ top: el.clientHeight * 0.8, behavior: 'smooth' });
+          }}
+          aria-label={t('onboard.scrollHint')}
+          className="fixed bottom-[20px] left-1/2 -translate-x-1/2 z-[70] flex flex-col items-center gap-[2px] px-[18px] py-[10px] rounded-[16px] bg-blue-900/85 backdrop-blur-[2px] border-2 border-white/70 shadow-2xl cursor-pointer animate-bounce"
+        >
+          <ChevronDown className="w-[34px] h-[34px] text-white" aria-hidden="true" />
+          <span className="text-[16px] font-black text-white whitespace-nowrap">
+            {t('onboard.scrollHint')}
+          </span>
+        </button>
+      )}
     </div>
   );
 };

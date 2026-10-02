@@ -394,6 +394,9 @@ const zhTW = {
   'onboard.privacy3': '紀錄只存在這台裝置，你可以隨時在設定裡清除。',
   'onboard.next': '下一步',
   'onboard.back': '上一步',
+  // 向下捲動提示（2026-10-02）。只在內容超出手機畫面時出現 ——
+  // 這時「下一步」按鈕會落在畫面之外，使用者會以為頁面卡住。
+  'onboard.scrollHint': '下面還有內容',
   'onboard.start': '開始使用',
 
   /* ── 私隱條款與免責聲明（設定底部 ＋ 引導頁共用）───────────────
@@ -991,6 +994,7 @@ const en: Record<TranslationKey, string> = {
   'onboard.privacy3': 'Records stay on this device and you can clear them any time in Settings.',
   'onboard.next': 'Next',
   'onboard.back': 'Back',
+  'onboard.scrollHint': 'More below',
   'onboard.start': 'Get started',
 
   /* ── Privacy notice & disclaimer (settings bottom + onboarding) ──
