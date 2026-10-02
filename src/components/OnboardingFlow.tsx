@@ -586,6 +586,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       {showScrollHint && (
         <button
           type="button"
+          id="onboarding-scroll-hint"
           onClick={() => {
             const el = scrollRef.current;
             if (!el) return;

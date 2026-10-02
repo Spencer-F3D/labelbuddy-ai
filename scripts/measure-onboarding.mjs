@@ -154,6 +154,15 @@ async function measure() {
         flow,
         // 內容最下緣（相對於畫面頂端）—— 這才是「這一頁需要多少高度」
         contentBottom: Math.round(contentBottom),
+        // 目前套用的字級模式（compact = 非長者、comfortable = 長者）
+        // ⚠️ 由腳本自己回報，不要用「我以為」的假設 ——
+        //    這個腳本先前就因為假設錯字級，在輸出裡寫了相反的警語。
+        density: document.documentElement.getAttribute('data-density') || '(無)',
+        // 實際套用在 16px 上的字級（驗證縮放規則真的生效）
+        bodyFontPx: (() => {
+          const probe = document.querySelector('[class~="text-[16px]"]');
+          return probe ? Math.round(parseFloat(getComputedStyle(probe).fontSize)) : 0;
+        })(),
       };
     })()
   `);
@@ -166,6 +175,8 @@ async function shot(name) {
 
 const dir = mkdtempSync(path.join(tmpdir(), 'lb-measure-'));
 const rows = [];
+/** 向下提示的行為驗證若有任何一頁失敗，最後以非零結束碼回報 */
+let exitHintFail = false;
 
 try {
   chrome = spawn(
@@ -296,6 +307,46 @@ try {
     );
     await shot(`page-${String(step + 1).padStart(2, '0')}`);
 
+    /* ── 驗證向下提示的行為 ──────────────────────────────────
+     * ⚠️ 這是**斷言**不是觀察：只拍截圖看不出「捲到底有沒有收起」。
+     *    引導頁的「下一步」按鈕在捲動容器裡面 ——
+     *    提示若不收起，會一直蓋住按鈕，使用者反而按不到。
+     *    所以「下面還有內容時出現、捲到底就收起」兩件事都要驗。
+     */
+    const hintTop = await evalJs(
+      `(() => !!document.getElementById('onboarding-scroll-hint'))()`
+    );
+    const scrolled = await evalJs(`
+      (() => {
+        const el = document.getElementById('onboarding-flow');
+        if (!el) return null;
+        const canScroll = el.scrollHeight - el.clientHeight > 24;
+        el.scrollTop = el.scrollHeight;   // 捲到最底
+        return canScroll;
+      })()
+    `);
+    await sleep(400);
+    const hintBottom = await evalJs(
+      `(() => !!document.getElementById('onboarding-scroll-hint'))()`
+    );
+
+    // 判定：可捲動的頁面 → 頂端應出現、底部應消失；不可捲動 → 兩者皆無
+    let verdict;
+    if (scrolled) {
+      verdict = hintTop && !hintBottom ? '✅' : '❌';
+    } else {
+      verdict = !hintTop && !hintBottom ? '✅' : '❌';
+    }
+    const detail = scrolled
+      ? `可捲動：頂端${hintTop ? '有' : '無'}提示、底部${hintBottom ? '有' : '無'}提示`
+      : `不需捲動：${hintTop ? '竟出現' : '未出現'}提示`;
+    if (verdict === '❌') exitHintFail = true;
+    console.log(`        ${verdict} 向下提示 ${detail}`);
+
+    // 捲回頂端，讓下一頁從乾淨狀態開始
+    await evalJs(`(() => { const el = document.getElementById('onboarding-flow'); if (el) el.scrollTop = 0; })()`);
+    await sleep(300);
+
     // 按「下一步」；按不到就代表已經是最後一頁
     const clicked = await evalJs(`
       (() => {
@@ -323,8 +374,34 @@ try {
     console.log('\n✅ 所有頁面都塞得下，不需要壓縮。');
   }
   console.log(`\n截圖：${OUT_DIR}`);
-  console.log(`\n⚠️ 注意：這裡量的是「非長者」字級。`);
-  console.log(`   長者字級大 20%，溢出量會更多 —— 請把 profile 切成 senior 再量一次。`);
+
+  if (exitHintFail) {
+    console.log('\n❌ 向下捲動提示的行為驗證失敗（見上方 ❌ 的頁面）。');
+    console.log('   正確行為：可捲動的頁面「頂端出現、捲到底收起」；不可捲動的頁面不出現。');
+    process.exitCode = 1;
+  } else {
+    console.log('\n✅ 向下捲動提示行為正確（每一頁都驗過）。');
+  }
+
+  /**
+   * ⚠️ 回報實際量到的字級模式，不要用假設。
+   *
+   * 這個腳本先前在輸出裡寫「這裡量的是非長者字級」——
+   * 那是**錯的**：引導頁的預設身分是 `DEFAULT_PROFILE_ID = 'senior'`，
+   * 所以量到的其實是**長者（最大字級）**，也就是最壞情況。
+   * 錯誤的警語會讓人以為「還有更壞的情況沒量到」而多做白工。
+   */
+  const d = rows[0]?.density ?? '(未知)';
+  const f = rows[0]?.bodyFontPx ?? 0;
+  const modeName =
+    d === 'comfortable' ? '長者（最大字級）' : d === 'compact' ? '非長者（縮小字級）' : '未知';
+  console.log(`\n📏 實際量到的字級：data-density="${d}" → ${modeName}`);
+  console.log(`   16px 那一級實際渲染成 ${f}px`);
+  if (d === 'comfortable') {
+    console.log('   ✅ 這是最壞情況（字最大）—— 數字可以直接當作驗收標準。');
+  } else {
+    console.log('   ⚠️ 這不是最壞情況。長者字級更大，請把身分切成 senior 再量一次。');
+  }
 } catch (e) {
   console.error('\n❌ 失敗：', e.message);
   process.exitCode = 1;
