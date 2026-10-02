@@ -564,8 +564,25 @@ export default function App() {
         console.warn('讀取個人設定失敗:', e);
       }
     }
-    // 預設勾選四個最常見的慢性病與過敏原
-    return ['hypertension', 'diabetes', 'kidney_disease', 'peanut_allergy'];
+    /**
+     * ⚠️ 2026-10-02 使用者指定：**預設什麼也不勾**。
+     *
+     * 【原本錯在哪】
+     *   這裡寫死四個最常見的慢性病與過敏原
+     *   （高血壓／糖尿病／腎臟病／花生過敏）。
+     *   看起來像「貼心的預設值」，實際上是**替使用者做健康宣告** ——
+     *   而這是錯的，而且很危險：
+     *     - 使用者沒高血壓，卻被預設勾了 → 每次掃描都被用「低鈉」標準判斷，
+     *       得到不屬於他的警告，久了就學會忽略警告（警告疲乏）
+     *     - 使用者真的對花生過敏，卻以為那是「系統示範」而沒去確認
+     *     - 長者可能根本沒注意到自己被勾了什麼
+     *   慢性病與過敏是**必須由本人確認**的資訊，不能猜。
+     *
+     * 【改成空的之後】
+     *   引導頁第 3 頁會是全部未勾選，使用者自己決定。
+     *   掃描時沒有勾選任何項目 → 只做一般的營養判斷，不做個人化把關。
+     */
+    return [];
   });
 
   /**
@@ -2066,7 +2083,16 @@ export default function App() {
                         className={FOOTER_CTA_SECONDARY}
                       >
                         <Camera className="w-[28px] h-[28px] shrink-0" />
-                        <span>📷 {t('footer.retryScan')}</span>
+                        {/* ⚠️ 拍到「不是食物標籤」時不能說「再拍一次」——
+                            那會讓他重拍同一個不是標籤的東西（2026-10-02 使用者實測回報）。
+                            這裡是 `photo_issue` 唯一的消費端。
+                            ⚠️ 本機模式不會有這個欄位 → 走 undefined 分支，維持「再拍一次」。 */}
+                        <span>
+                          📷{' '}
+                          {analysisResult.photo_issue === 'not_food_label'
+                            ? t('footer.retryScanOther')
+                            : t('footer.retryScan')}
+                        </span>
                       </button>
                     </section>
                   </div>
@@ -3140,7 +3166,11 @@ export default function App() {
               </p>
             </div>
           ) : isNetworkDelayed ? (
-            /* 超市弱訊號安撫卡片（醒目大字 22px，消除長者等待焦慮） */
+            /* 保持網路安撫卡片（醒目大字，消除長者等待焦慮）
+               ⚠️ 2026-10-02 使用者要求：原本標題是「超市訊號提示」，
+                  改為「保持網路」；並移除「🔊 語音已為您播報，資料傳輸中」徽章。
+                  理由：原本的標題講的是**系統狀態**（訊號不好），
+                  不是使用者該做的事。「保持網路」是**告訴他怎麼做**。 */
             <div className="w-full max-w-sm mt-[16px] bg-amber-400 text-slate-950 p-[16px] rounded-[16px] border-[3px] border-yellow-200 shadow-2xl flex flex-col items-center gap-[8px]">
               <div className="flex items-center gap-[8px]">
                 <Wifi className="w-[28px] h-[28px] text-slate-950 shrink-0 animate-pulse" />
@@ -3149,9 +3179,6 @@ export default function App() {
               <p className="text-[18px] font-black leading-snug">
                 {t('common.weakSignalSpeech')}
               </p>
-              <span className="text-[16px] font-bold text-slate-900 bg-amber-300 px-[10px] py-[3px] rounded-full">
-                {t('loading.signalBadge')}
-              </span>
             </div>
           ) : (
             <p className="text-[16px] font-bold text-yellow-300 mt-[8px]">

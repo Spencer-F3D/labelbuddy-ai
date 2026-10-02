@@ -55,6 +55,7 @@ import { translateLocalText } from './localEngineEn';
 import {
   SeniorPhysicalIndicators,
   NutrientFact,
+  NutrientBasis,
   LabelAnalysisResult,
   DataHandling,
   LearnerProfile,
@@ -768,7 +769,28 @@ CRITICAL TONE AND COMMUNICATION RULES:
    - 錯誤示範：「這杯豆漿無糖低鈣」← 錯！應該寫「低鈉」。
    - 檢查方法：如果你寫的「鈣」是在講鹹度、鹽分或血壓，那一定是寫錯了，請改成「鈉」。
 3. Avoid dense medical jargon or raw chemical numbers; translate them into everyday vernacular (白話文) that the user can immediately understand.
-4. If image is blurry or cannot be recognized as a food label, set risk_level to "yellow", warning_title to "⚠️ 標籤不夠清楚", and guide them gently to retake the photo with better lighting or closer angle.
+4. 【照片有問題時 —— 兩種情況必須分開，不可以混為一談】
+   ⚠️ 2026-10-02 使用者實測回報：拍了一張「不是標籤」的東西，
+      App 卻說「標籤不夠清楚」，於是他以為是自己手震，
+      **反覆重拍同一個根本不是標籤的東西**。錯誤訊息讓他做出更糟的行為。
+
+   (a) 照片**根本不是食品營養標籤**（拍到風景、人臉、商品正面包裝圖、
+       其他文件、室內環境…）：
+       - photo_issue = "not_food_label"
+       - risk_level = "yellow"
+       - warning_title = "📷 這不是食物標籤"
+       - plain_summary：先用一句話說明你看到什麼（例如「這張照片裡是一面牆」），
+         再告訴他要拍什麼：「請拍包裝背面或側面的營養標示表格。」
+       - ★ 重點是叫他**換東西拍**，不是叫他重拍同一張。
+
+   (b) 照片**是標籤**，但模糊／反光／角度太斜／字太小而讀不出數字：
+       - photo_issue = "blurry"
+       - risk_level = "yellow"
+       - warning_title = "⚠️ 標籤不夠清楚"
+       - plain_summary：溫和地請他**重拍同一張**，並給具體做法
+         （「拿到光線亮一點的地方」「靠近一點，讓數字填滿畫面」）。
+
+   (c) 照片正常可讀時，photo_issue 一律設為 null。
 5. You MUST return ONLY valid JSON. Do NOT wrap it in markdown code fences. Do NOT add any text before or after the JSON.
 6. BE CONCISE. This text is read aloud to the user, so long paragraphs are useless. Respect these limits STRICTLY:
    - plain_summary: at most 80 Chinese characters (1 to 3 short sentences)
@@ -797,6 +819,7 @@ CRITICAL TONE AND COMMUNICATION RULES:
 JSON SCHEMA:
 {
   "risk_level": "red" | "yellow" | "green",
+  "photo_issue": "blurry" | "not_food_label" | null,
   "warning_title": "string (Short, clear, bold warning with emoji, e.g. ⚠️ 高鈉警告！ or ✅ 適合食用)",
   "plain_summary": "string (A warm, large-font plain speech summary explaining the conclusion for the user)",
   "alternative_advice": "string (Practical alternative grocery suggestion or healthy portion advice)",
@@ -809,8 +832,10 @@ JSON SCHEMA:
   "nutrient_facts": [
     {
       "name": "string (成分名，只能用每日參考值清單裡出現的名稱)",
-      "value": number (食品實際含量，純數字，例如 2480),
-      "unit": "string (毫克 or 公克)"
+      "value": number (標籤上實際印出來的數字，純數字，例如 2480),
+      "unit": "string (毫克 or 公克)",
+      "basis": "per_100g" | "per_serving" | "whole_pack" | "unknown",
+      "basis_note": "string (選填：標籤上的份量說明，例如 30 公克。不知道就填空字串)"
     }
   ]
 }
@@ -822,8 +847,21 @@ JSON SCHEMA:
      但長者需要看到「哪些還好、哪些快滿了」的相對關係，才判斷得出輕重。）
 3. name 必須使用該身分每日參考值清單裡的原始名稱（例如「鈉」「添加糖」「飽和脂肪」「蛋白質」「鈣」），
    不要自創名稱、不要寫「鹽分」「糖分」。
-4. value 必須是這包食品「整包」的實際含量，不可自己編造。
-   若標示只寫「每份」的數值，請先換算成整包的數值再填，並在 plain_summary 說明這一點。
+4. value 必須是**標籤上實際印出來的數字，完全不換算**（2026-10-02 使用者指定）。
+   - 標籤寫「每 100 公克：鈉 800 毫克」→ value 填 800，basis 填「每 100 公克」。
+   - 標籤寫「每份（30 公克）：鈉 240 毫克」→ value 填 240，basis 填「每份（30 公克）」。
+   - ★ **不要**乘以份數換算成整包，也**不要**由 100 公克推算整包。
+     你不知道使用者實際會吃多少，換算等於替他做了一個他沒說的假設。
+   - ★ basis 只能填這四個代碼之一，**不要寫中文或英文句子**：
+       "per_100g"    標籤以每 100 公克（或每 100 毫升）為基準
+       "per_serving" 標籤以「每份」為基準
+       "whole_pack"  標籤直接標整包的數值
+       "unknown"     標籤沒有寫清楚基準
+     ★ 為什麼不能用自由文字：前端要依介面語言顯示（中文／英文），
+       若這裡寫「每 100 公克」，英文介面就會露出中文。
+     ⚠️ 本專案已經踩過多次「後端寫死中文 → 英文介面露出中文」的 bug。
+   - basis_note：標籤有寫份量時照抄，例如 "30 公克"。沒有就填空字串。
+   - 使用者需要知道數字「是每 100 公克還是整包」—— 少了基準，數字就沒有意義。
 5. 不需要自己計算百分比，後端會依每日上限換算，你只要把 name / value / unit 填正確即可。`;
 
 /**
@@ -1005,6 +1043,21 @@ export function normalizeNutrientFacts(
       dailyLimit: limit.value,
       percent,
       direction: directions?.[canonical] ?? 'limit',
+      /**
+       * 標籤上的計數基準（2026-10-02）。
+       *
+       * ⚠️ 只接受四個合法代碼，其他一律視為 'unknown'。
+       *    不這樣做的話，模型偶爾回的自由文字（「每 100 公克」）
+       *    會直接流到英文介面 —— 那就是「英文介面露出中文」的 bug。
+       *    ★ 這裡是**白名單**而不是原樣傳遞：寧可顯示「未標示基準」，
+       *      也不要顯示一句不知道什麼語言的句子。
+       */
+      basis: ((): NutrientBasis => {
+        const b = (item as any).basis;
+        return b === 'per_100g' || b === 'per_serving' || b === 'whole_pack' ? b : 'unknown';
+      })(),
+      basisNote:
+        typeof (item as any).basis_note === 'string' ? (item as any).basis_note.trim() : '',
     });
   }
 

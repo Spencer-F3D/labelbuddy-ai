@@ -70,7 +70,36 @@ function factDetail(
    * `unitName()` 一直存在、後端也一直在用，但**前端從來沒呼叫過它**。
    */
   const unit = unitName(fact.unit, language);
-  const amount = t('nutrient.amount', { value: fact.value, unit });
+
+  /**
+   * ⚠️ 基準一定要顯示（2026-10-02 使用者指定「完全不換算」）。
+   *
+   * 數字是標籤上的原始值，所以「800 毫克」本身**沒有意義** ——
+   * 要配上「每 100 公克」還是「整包」才說得通。
+   *
+   * ⚠️ 基準由代碼轉文字，不是直接用後端的字串：
+   *    後端若回中文，英文介面就會露出中文。
+   */
+  const basisText = (() => {
+    const key =
+      fact.basis === 'per_100g'
+        ? 'nutrient.basisPer100g'
+        : fact.basis === 'per_serving'
+          ? 'nutrient.basisPerServing'
+          : fact.basis === 'whole_pack'
+            ? 'nutrient.basisWholePack'
+            : fact.basis === 'unknown'
+              ? 'nutrient.basisUnknown'
+              : // 完全沒有 basis 欄位 = 本機引擎產生的（它不解析基準）
+                // ⚠️ 不能說「標籤未標示基準」—— 那是對標籤的錯誤宣稱，
+                //    我們只是沒去看。要說「基準未確認」。
+                'nutrient.basisNotConfirmed';
+    const base = t(key);
+    // 標籤有寫份量時補上，例如「每份（30 公克）」
+    return fact.basis === 'per_serving' && fact.basisNote ? `${base}（${fact.basisNote}）` : base;
+  })();
+
+  const amount = t('nutrient.amount', { basis: basisText, value: fact.value, unit });
   return fact.direction === 'target'
     ? amount + t('nutrient.dailyMin', { limit: fact.dailyLimit, unit })
     : amount + t('nutrient.dailyMax', { limit: fact.dailyLimit, unit });

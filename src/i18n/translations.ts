@@ -82,6 +82,10 @@ const zhTW = {
   'footer.qaToScan': '拍照為食品把關',
   'footer.historyScan': '拍照為食品把關',
   'footer.retryScan': '再拍一次',
+  // ⚠️ 2026-10-02：拍到「不是食物標籤」的東西時，叫他「再拍一次」是**誤導** ——
+  //    他會以為是自己拍不好，於是重拍同一個不是標籤的東西。
+  //    這種情況要說「換一個東西拍」。
+  'footer.retryScanOther': '換一個東西拍',
 
   /* ── 設定頁 ───────────────────────────────────────────────── */
   'settings.title': '健康設定',
@@ -186,7 +190,19 @@ const zhTW = {
   'settings.mode.title': 'AI 方式',
 
   /* 營養素長條圖 */
-  'nutrient.amount': '這包有 {value} {unit}',
+  // ⚠️ 2026-10-02：原本是「這包有 {value} {unit}」——
+  //    改成「不換算、只呈現標籤原樣」之後，數字已經不是整包了。
+  //    這句話會變成**錯的陳述**（把「每 100 公克 800 毫克」講成「這包有 800 毫克」）。
+  'nutrient.amount': '{basis} {value} {unit}',
+  'nutrient.basisPer100g': '每 100 公克',
+  'nutrient.basisPerServing': '每份',
+  'nutrient.basisWholePack': '整包',
+  'nutrient.basisUnknown': '標籤未標示基準',
+  // ⚠️ 與 basisUnknown 不同：這一種是「App 根本沒去判斷基準」。
+  //    本機規則引擎不解析標籤的計數基準，所以它產生的數字**沒有基準資訊**。
+  //    說「標籤未標示基準」是對標籤的**錯誤宣稱**（我們沒看，不是它沒寫）；
+  //    說「基準未確認」才是誠實描述 App 自己的狀態。
+  'nutrient.basisNotConfirmed': '基準未確認',
   'nutrient.dailyMax': '，每天上限 {limit} {unit}',
   'nutrient.dailyMin': '，每天建議至少 {limit} {unit}',
   'nutrient.reaches': '達到 {n}%',
@@ -517,8 +533,7 @@ const zhTW = {
   'loading.typical': '通常需要 5 到 10 秒',
   'loading.waited': '（已等 {n} 秒）',
   'loading.privacyBadge': '照片不會離開這支手機',
-  'loading.signalTitle': '超市訊號提示',
-  'loading.signalBadge': '🔊 語音已為您播報，資料傳輸中',
+  'loading.signalTitle': '保持網路',
   'loading.signalSpeech': '🔊 語音：「正在為您分析」',
 
   /* ── 飲食紀錄頁（第三階段）─────────────────────────────────── */
@@ -683,6 +698,7 @@ const en: Record<TranslationKey, string> = {
   'footer.qaToScan': 'Check a product',
   'footer.historyScan': 'Check a product',
   'footer.retryScan': 'Take another photo',
+  'footer.retryScanOther': 'Shoot something else',
 
   'settings.title': 'Health settings',
   'settings.collapseHint': 'Tap to collapse',
@@ -774,7 +790,12 @@ const en: Record<TranslationKey, string> = {
   'mode.currentLabel': 'Current mode',
   'settings.mode.title': 'AI analysis mode',
 
-  'nutrient.amount': 'This pack has {value} {unit}',
+  'nutrient.amount': '{basis}: {value} {unit}',
+  'nutrient.basisPer100g': 'Per 100 g',
+  'nutrient.basisPerServing': 'Per serving',
+  'nutrient.basisWholePack': 'Whole pack',
+  'nutrient.basisUnknown': 'Basis not stated',
+  'nutrient.basisNotConfirmed': 'Basis not confirmed',
   'nutrient.dailyMax': ', daily limit {limit} {unit}',
   'nutrient.dailyMin': ', aim for at least {limit} {unit} per day',
   'nutrient.reaches': '{n}% of daily target',
@@ -1119,8 +1140,7 @@ const en: Record<TranslationKey, string> = {
   'loading.typical': 'Usually takes 5 to 10 seconds',
   'loading.waited': '(waited {n}s)',
   'loading.privacyBadge': 'The photo never leaves this phone',
-  'loading.signalTitle': 'Supermarket signal tip',
-  'loading.signalBadge': '🔊 Spoken aloud — sending your data',
+  'loading.signalTitle': 'Stay connected',
   'loading.signalSpeech': '🔊 Voice: "Analysing for you"',
 
   'history.ariaModule': 'My food health history module',

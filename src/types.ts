@@ -96,10 +96,52 @@ export interface NutrientFact {
   percent: number;
   /** limit = 不超過；target = 至少達到 */
   direction: 'limit' | 'target';
+  /**
+   * 標籤上的計數基準（2026-10-02 新增）。
+   *
+   * 【為什麼一定要顯示這個】
+   *   使用者指定「完全不換算、只呈現標籤原樣」，所以 value 是標籤上的原始數字。
+   *   但**同一個數字配上不同的基準，意義完全不同**：
+   *     「鈉 800 毫克／每 100 公克」和「鈉 800 毫克／整包」是兩件不同的事。
+   *   少了基準，畫面上的數字就沒有意義，甚至會誤導。
+   *
+   * ⚠️ 用**代碼**而不是自由文字 —— 前端要依介面語言顯示，
+   *    若後端回「每 100 公克」，英文介面就會露出中文。
+   */
+  basis?: NutrientBasis;
+  /** 標籤上的份量說明（例如 "30 公克"）；標籤沒寫就是空字串 */
+  basisNote?: string;
 }
+
+/**
+ * 標籤的計數基準。
+ *
+ * ⚠️ 由**模型輸出代碼**、後端正規化、前端依語言顯示文字 ——
+ *    三段分工，任何一段自己產生文字都會造成語言不一致。
+ */
+export type NutrientBasis = 'per_100g' | 'per_serving' | 'whole_pack' | 'unknown';
+
+/**
+ * 照片本身的問題（2026-10-02 新增）。
+ *
+ * 【為什麼要區分這三種】
+ *   使用者實測回報：拍了一張「不是標籤」的東西，App 卻說「標籤不夠清楚」，
+ *   於是他以為是自己手震，**反覆重拍同一個根本不是標籤的東西**。
+ *
+ *   兩種失敗需要**不同的指示**：
+ *     - `not_food_label` → 叫他**換東西拍**（拍包裝背面的營養標示）
+ *     - `blurry`         → 叫他**重拍同一張**（光線亮一點、靠近一點）
+ *   混在一起講，使用者就不知道該改什麼。
+ *
+ * ⚠️ 只有雲端 AI 模式會產生這個欄位（本機引擎沒有視覺能力，無法判斷）。
+ *    所以前端**必須處理 `undefined`**（= 本機模式或舊快取）。
+ */
+export type PhotoIssue = 'blurry' | 'not_food_label';
 
 export interface LabelAnalysisResult {
   risk_level: RiskLevel;
+  /** 照片有問題時的原因；照片正常時為 null 或 undefined */
+  photo_issue?: PhotoIssue | null;
   warning_title: string;
   plain_summary: string;
   alternative_advice: string;

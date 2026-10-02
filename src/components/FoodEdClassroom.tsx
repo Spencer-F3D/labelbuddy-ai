@@ -324,7 +324,8 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
   onChangeProfile,
 }) => {
   const { t, language } = useI18n();
-  const [tab, setTab] = useState<ClassroomTab>('cards');
+  // 預設停在「測驗」分頁 —— 見分頁順序的說明（2026-10-02）
+  const [tab, setTab] = useState<ClassroomTab>('quiz');
   const [topicFilter, setTopicFilter] = useState<KnowledgeTopic | null>(null);
   const [progress, setProgress] = useState<LearningProgress>(() => loadProgress());
   const [quizTopic, setQuizTopic] = useState<KnowledgeTopic | null>(null);
@@ -443,20 +444,24 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
       </section>
 
       {/* ---------- 分頁切換 ---------- */}
+      {/* ⚠️ 2026-10-02 使用者要求：**「測驗」放第一個**。
+          原本順序是 教材 → 測驗 → 進度，使用者反映「沒看到測驗分頁」。
+          測驗是唯一有互動、需要思考的分頁 —— 它才是食育的核心，
+          放在第一並設為預設，使用者一進來就直接開始作答。 */}
       <nav aria-label={t('classroom.tabsAria')} className="grid grid-cols-3 gap-1.5">
         {(
           [
-            {
-              id: 'cards',
-              labelKey: 'classroom.tabCards',
-              icon: BookOpen,
-              badge: `${KNOWLEDGE_CARDS.length}`,
-            },
             {
               id: 'quiz',
               labelKey: 'classroom.tabQuiz',
               icon: Target,
               badge: `${QUIZ_QUESTIONS.length}`,
+            },
+            {
+              id: 'cards',
+              labelKey: 'classroom.tabCards',
+              icon: BookOpen,
+              badge: `${KNOWLEDGE_CARDS.length}`,
             },
             {
               id: 'progress',

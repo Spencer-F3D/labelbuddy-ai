@@ -4,6 +4,43 @@
   font-size: 20px;
 }
 
+/* ── 長者身分的字級上調（2026-10-02 使用者要求）─────────────────────
+ *
+ * 【為什麼要這樣做】
+ *   原本長者用的是「原始字級」（16/18/19/20px），非長者才下調。
+ *   使用者實測後要求**長者整體放大，上限到 24px** ——
+ *   他的理由是實際使用者（家中長輩）仍然覺得字不夠大。
+ *
+ * 【為什麼是 1.2 倍】
+ *   20 × 1.2 = 24（使用者指定的上限），其餘按同比例：
+ *     16 → 19.2 ≈ 19
+ *     18 → 21.6 ≈ 22
+ *     19 → 22.8 ≈ 23
+ *   四捨五入到整數 px，與 `compact` 那組一樣保持整數。
+ *
+ * ⚠️ 這裡只改 `index.css`，**不必動 App.tsx** ——
+ *    `App.tsx` 本來就會把長者設成 `data-density='comfortable'`，
+ *    只是先前沒有對應的規則（所以等於「不縮放」）。
+ *
+ * ⚠️⚠️ 放大之後版面會比原本高約 20%，卡片、按鈕、長條圖都可能溢出。
+ *     改動後**必須用瀏覽器逐頁看過**，不能只靠 tsc 通過。
+ *     （`npm run check:ui` 會拍 18 個畫面）
+ *
+ * ⚠️ 若日後新增字級，**兩個模式都要回來補一行**。
+ */
+html[data-density='comfortable'] [class~='text-[16px]'] {
+  font-size: 19px;
+}
+html[data-density='comfortable'] [class~='text-[18px]'] {
+  font-size: 22px;
+}
+html[data-density='comfortable'] [class~='text-[19px]'] {
+  font-size: 23px;
+}
+html[data-density='comfortable'] [class~='text-[20px]'] {
+  font-size: 24px;
+}
+
 /* ── 非長者身分的字級下調（2026-09-29 使用者要求）─────────────────────
  *
  * 【為什麼要這樣做】
@@ -21,6 +58,7 @@
  *   在 Tailwind v4 裡會蓋過 @layer 內的樣式。
  *
  * ⚠️ 若日後新增第五種字級，**必須回來補一行**，否則那個字級不會縮。
+ *    （目前唯一的例外是 `text-[12px]`（LegalNotice），它刻意不受縮放影響。）
  */
 html[data-density='compact'] [class~='text-[16px]'] {
   font-size: 14px;
