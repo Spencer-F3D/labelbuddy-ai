@@ -42,9 +42,30 @@ const die = (m, hint) => {
   process.exit(1);
 };
 
-/** 執行外部指令，即時顯示輸出（不要吞掉錯誤訊息，否則很難除錯） */
+/**
+ * 執行外部指令，即時顯示輸出（不要吞掉錯誤訊息，否則很難除錯）
+ *
+ * ⚠️⚠️ Windows 上**不能直接 spawn `.bat`／`.cmd`**：
+ *     從 Node 18.20.2 / 20.12.2 / 21.7.3 起，為了修 CVE-2024-27980
+ *     （Windows 批次檔的參數注入），`spawnSync('gradlew.bat', …)` 會直接回
+ *     `EINVAL`，連執行都不執行。
+ *
+ *   症狀很容易誤判：錯誤訊息長這樣 ——
+ *     `Error: spawnSync gradlew.bat EINVAL  errno: -4071`
+ *   它**看起來像找不到檔案或權限問題**，其實是 Node 的安全檢查。
+ *   本專案就踩過一次：APK 建置在 gradle 那一步失敗，
+ *   而前面的 vite build 與 cap sync 都成功，所以畫面看起來像「gradle 壞了」。
+ *
+ *   解法：批次檔一律透過 `cmd.exe /d /s /c` 執行。
+ *   ★ 不要改用 `shell: true` —— 那會讓整個指令字串經過 shell 解析，
+ *     路徑含空白或特殊字元時反而更危險（那正是 CVE 的成因）。
+ */
 function run(cmd, args, opts = {}) {
-  return execFileSync(cmd, args, {
+  const isBatch = /\.(bat|cmd)$/i.test(cmd);
+  const realCmd = isBatch ? process.env.ComSpec || 'cmd.exe' : cmd;
+  const realArgs = isBatch ? ['/d', '/s', '/c', cmd, ...args] : args;
+
+  return execFileSync(realCmd, realArgs, {
     cwd: opts.cwd ?? ROOT,
     stdio: 'inherit',
     env: { ...process.env, ...opts.env },
@@ -205,7 +226,17 @@ ok(`app-release.apk（${sizeMb} MB，比網頁新 ✅）`);
 step(4, '複製到桌面');
 const desktop = path.join(homedir(), 'Desktop');
 const outDir = existsSync(desktop) ? desktop : ROOT;
-const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+/**
+ * 檔名上的日期用**本機時區**，不是 UTC。
+ *
+ * ⚠️ 原本用 `new Date().toISOString().slice(0,10)` —— 那是 UTC。
+ *    中國澳門是 UTC+8，所以**每天 16:00 之後**建置出來的檔名會是「昨天」：
+ *    實測 10/03 00:40 建置 → 檔名寫成 20261002。
+ *    使用者要靠檔名判斷新舊，差一天會直接讓人拿錯檔案。
+ */
+const now = new Date();
+const pad = (n) => String(n).padStart(2, '0');
+const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
 // ★ 2026-10-02 使用者指定：APK 檔名用**中文名**。
 //   中文檔名在部分舊工具鏈會出現亂碼，但使用者要依事實找到檔案，
 //   而這只只是**複製出來的副本**（源檔仍是 app-release.apk）。
