@@ -35,6 +35,25 @@ export interface TTSOptions {
 export type TTSLanguage = 'cantonese' | 'mandarin' | 'english';
 
 /**
+ * 依「介面語言」決定該挑哪個語音 —— **全站唯一來源**。
+ *
+ * 【為什麼要有這個函式】
+ *   2026-10-01 使用者要求「語音改廣東話」。當時只在 `App.tsx` 改了 4 處，
+ *   另外三個元件（食育學堂／健康問答／身體指標 AI 朗讀）**仍寫死 `'mandarin'`**
+ *   —— 而且不會報錯，只有實際聽才會發現講的是國語。
+ *   這是本專案第五次「改了 A 沒改 B」。
+ *
+ *   → 把判斷集中在這裡之後，任何新元件只能呼叫這個函式，
+ *     「某一處忘記改」在結構上就不可能發生（而不是靠記得）。
+ *
+ * ⚠️ 使用者的情境是中國澳門 → 中文一律粵語，不是國語。
+ * ⚠️ 英文模式必須換英文語音，否則會用中文腔念英文（決賽 Demo 影片會很難聽）。
+ */
+export function ttsLanguageFor(language: 'zh-TW' | 'en'): TTSLanguage {
+  return language === 'en' ? 'english' : 'cantonese';
+}
+
+/**
  * 取得裝置支援的語音列表，優先選取指定的語言
  */
 export function findBestVoice(preferLang: TTSLanguage = 'cantonese'): SpeechSynthesisVoice | null {

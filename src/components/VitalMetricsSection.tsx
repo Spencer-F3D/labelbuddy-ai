@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, SeniorIndicatorAnalysis } from '../types';
-import { speakText, stopSpeech } from '../utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
 
@@ -106,11 +106,10 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
   const readAiAloud = () => {
     if (!aiResult) return;
     stopSpeech();
-    // ⚠️ TTSLanguage 是 'cantonese' | 'mandarin' | 'english'，
-    //    不是介面語言的 'zh-TW' | 'en' → 必須轉換，否則會唸錯語言。
+    // 語音語言的唯一來源是 ttsLanguageFor()（中文→粵語、英文→英文）。
     speakText(aiResult.voice_summary, {
       rate: 0.9,
-      preferLanguage: language === 'en' ? 'english' : 'mandarin',
+      preferLanguage: ttsLanguageFor(language),
     });
   };
 
@@ -246,7 +245,7 @@ export const VitalMetricsSection: React.FC<VitalMetricsSectionProps> = ({
     });
     speakText(speechText, {
       rate: 0.88,
-      preferLanguage: 'cantonese',
+      preferLanguage: ttsLanguageFor(language),
     });
   };
 

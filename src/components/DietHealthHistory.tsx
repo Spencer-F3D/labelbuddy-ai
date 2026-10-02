@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { DietRecord } from '../types';
 import { PHYSICAL_INDICATORS } from '../data/conditions';
-import { speakText, stopSpeech } from '../utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 // 雙語（2026-09-28 第三階段）：介面文字走 t()，慢性病名稱查共用對照表
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
@@ -60,8 +60,8 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
   selectedConditions = [],
 }) => {
   const { t, language } = useI18n();
-  /** 朗讀語言：中文維持粵語，英文改用英文語音（否則會用中文腔念英文句子） */
-  const ttsLang = language === 'en' ? ('english' as const) : ('cantonese' as const);
+  /** 朗讀語言：中文（澳門情境）用粵語，英文用英文語音。判斷集中在 ttsLanguageFor()。 */
+  const ttsLang = ttsLanguageFor(language);
 
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<GradeFilter>('all');
   const [expandedRecordIds, setExpandedRecordIds] = useState<Record<string, boolean>>({});

@@ -48,7 +48,7 @@ import {
   TOPIC_ORDER,
 } from '../data/learnerProfiles';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
-import { speakText, stopSpeech } from '../utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 // 雙語（2026-09-28 第三階段）：介面文字走 t()，教材內容查 educationContentEn.ts
 // ⚠️ 教材與外框必須一起雙語，否則會變成「英文外殼 + 中文內容」
 import { useI18n } from '../i18n/I18nContext';
@@ -119,8 +119,9 @@ function KnowledgeCardView({
       return;
     }
     speakText(card.voiceScript, {
-      // 英文模式要用英文語音，否則會用中文腔念英文
-      preferLanguage: language === 'en' ? 'english' : 'mandarin',
+      // 中文一律粵語、英文用英文語音。判斷集中在 ttsLanguageFor()，
+      // 避免像 2026-10-01 那樣「只改了部分呼叫端」而靜默講成國語。
+      preferLanguage: ttsLanguageFor(language),
       onEnd: () => setSpeaking(false),
     });
     setSpeaking(true);

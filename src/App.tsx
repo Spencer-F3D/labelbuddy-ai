@@ -103,7 +103,7 @@ import {
   categoryName as localizedCategoryName,
   profileDisplayName as localizedProfileDisplayName,
 } from './data/bilingualContent';
-import { speakText, stopSpeech } from './utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor } from './utils/tts';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { VitalMetricsSection } from './components/VitalMetricsSection';
@@ -487,10 +487,14 @@ export default function App() {
    *    有 4 處誤用了國語 —— 已全部統一，`ttsLangMandarin` 移除。
    *    使用者的情境是澳門，粵語才是他與家人實際聽的語言。
    *
+   * ⚠️ 2026-10-02：判斷本身抽到 `ttsLanguageFor()`（`utils/tts.ts`）。
+   *    原因：上一次只改了這個檔案，另外三個元件仍寫死國語，
+   *    *而且不會報錯* —— 只有真的聽才會發現。集中之後就不可能漏改。
+   *
    * ⚠️ 英文模式要換成英文語音，否則會用中文腔念英文句子 ——
    *    決賽的英文 Demo 影片會很難聽。
    */
-  const ttsLang = language === 'en' ? ('english' as const) : ('cantonese' as const);
+  const ttsLang = ttsLanguageFor(language);
 
   /**
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。

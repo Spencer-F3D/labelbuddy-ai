@@ -202,17 +202,6 @@ export interface LabelAnalysisResult {
   learner_profile_name?: string;
 }
 
-export interface AppSettings {
-  voiceVolume: number; // 0.0 to 1.0 (e.g., 1.0 = 100%)
-  voiceRate: number;   // 0.7 to 1.2 (e.g., 0.88)
-  voiceLang: 'cantonese' | 'mandarin';
-  autoPlaySpeech: boolean;
-  fontSizeLevel: 'standard' | 'large' | 'huge'; // 20px, 24px, 28px
-  contrastTheme: 'standard' | 'high_contrast_yellow'; // standard light or black-yellow high contrast
-  debounceSeconds: number; // 3, 4, or 5
-  customApiKey?: string;   // optional custom Gemini API Key
-}
-
 /**
  * 長者各項自填身體指標（血壓、血糖、尿酸、血脂、症狀）
  */

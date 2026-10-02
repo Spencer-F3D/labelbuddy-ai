@@ -25,7 +25,7 @@ import React, { useState } from 'react';
 import { apiUrl } from '../utils/apiBase';
 import { MessageCircleQuestion, Volume2 } from 'lucide-react';
 import { AddressGender, AnalysisMode, SeniorPhysicalIndicators, HealthQuestionAnswer } from '../types';
-import { speakText, stopSpeech } from '../utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 
 interface HealthQASectionProps {
@@ -89,10 +89,11 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({
   const readAloud = () => {
     if (!answer) return;
     stopSpeech();
-    // TTSLanguage 是 'cantonese' | 'mandarin' | 'english'，不是介面的 'zh-TW' | 'en'
+    // ttsLanguageFor() 是「介面語言 → 語音」的唯一來源：
+    // 中文（含粵語情境）→ 粵語、英文 → 英文語音。
     speakText(answer.voice_script, {
       rate: 0.9,
-      preferLanguage: language === 'en' ? 'english' : 'mandarin',
+      preferLanguage: ttsLanguageFor(language),
     });
   };
 
