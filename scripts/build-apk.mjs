@@ -171,8 +171,35 @@ const apkPath = path.join(ANDROID_DIR, 'app', 'build', 'outputs', 'apk', 'releas
 if (!existsSync(apkPath)) {
   die('gradle 回報成功，但找不到 app-release.apk。');
 }
+
+/**
+ * ⚠️⚠️ **確認 APK 真的比網頁新**（2026-10-02 新增）
+ *
+ * 【為什麼需要這道檢查】
+ *   實際踩過：APK 建好了，但裡面的 JS bundle 是**上一個版本** ——
+ *   gradle 因為「資產沒變」而跳過重新打包，於是你拿到一個
+ *   看起來成功、內容卻是舊的 APK。
+ *   這種錯誤**不會有任何錯誤訊息**，只會在你向評審展示時才發現。
+ *
+ * 【檢查方式】
+ *   APK 的修改時間必須晚於 `dist/index.html`。
+ *   如果 APK 比較舊，代表它沒有包含這次的網頁改動。
+ */
+const distIndex = path.join(ROOT, 'dist', 'index.html');
+const apkMtime = statSync(apkPath).mtimeMs;
+const distMtime = statSync(distIndex).mtimeMs;
+if (apkMtime < distMtime) {
+  die(
+    'APK 比網頁還舊 —— 它沒有包含這次的改動。',
+    `APK 時間：${new Date(apkMtime).toLocaleString()}\n` +
+      `   網頁時間：${new Date(distMtime).toLocaleString()}\n` +
+      '   請先清掉 Android 的建置快取再試：\n' +
+      '     android\\gradlew.bat clean\n' +
+      '   （或直接刪掉 android\\app\\build 目錄）'
+  );
+}
 const sizeMb = (statSync(apkPath).size / 1024 / 1024).toFixed(1);
-ok(`app-release.apk（${sizeMb} MB）`);
+ok(`app-release.apk（${sizeMb} MB，比網頁新 ✅）`);
 
 /* 步驟 4：複製到桌面（好找的地方） */
 step(4, '複製到桌面');
