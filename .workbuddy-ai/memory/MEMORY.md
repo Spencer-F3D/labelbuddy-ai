@@ -21,13 +21,17 @@
 ③ 報告須列明 AI 工具名稱／版本／用途／學生分工，隱瞞**直接取消資格**
 ④ 不得提交學生不能理解的系統（評審可即場提問程式細節）
 
-**四份交付物**：`ProjectIntroduction`（≤2頁）／`ResearchReport`（6–12頁）／
-`Poster`（0.8×1.1m 直向）／`DemoVideo`（≤5分鐘），檔名皆加 `_LabelBuddyAI`。
-⚠️ 這四份是**必交**，不能為了功能而壓縮（章程：未用英文可不予評審）。
+**四份必交交付物**（不能為了功能而壓縮）：`ProjectIntroduction`（≤2頁）／
+`ResearchReport`（6–12頁）／`Poster`（0.8×1.1m 直向）／`DemoVideo`（≤5分鐘）。
 
-⚠️ **APK 打包工具還沒建**（2026-10-01 查證）：`package.json` 裡**沒有 Capacitor／
-Cordova／任何 Android 設定** → 打包是*從零開始的工程任務*（JDK／Android SDK／
-外殼專案／相機權限），不是「執行一個指令」。
+✅ **APK 已完成**（2026-10-02）：`npm run apk` 一鍵建置（`建立APK.bat`）。
+- JDK 21 在 `D://Java//jdk-21.0.12.1+1`（⚠️ Capacitor 8.x 要 **21**，JDK 17 會
+  `invalid source release: 21`；winget 裝 21 需管理員權限 → 用免安裝 ZIP）
+- Android SDK 在 `D://Android//Sdk`（platforms;android-34 + build-tools;34.0.0）
+- 簽章 `android/labelbuddy-release.jks`＋`keystore.properties`（**兩者都不可進版控**）
+- ★ **打包網頁進 APK**（不用 `server.url`）—— 否則「只在本機」的承諾不成立。
+  代價：WebView origin 是 `https://localhost`，所以 API 走 `src/utils/apiBase.ts`
+  的 `apiUrl()`（Capacitor 環境回傳絕對網址）。
 
 **排程**：09-28 雙語 ✅｜09-29 中性化＋稱謂＋條款 ✅｜09-30 三模式＋引導頁 ✅ →
 **10-01~10-02 APK 打包（硬期限）** → 10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**
