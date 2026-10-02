@@ -94,9 +94,14 @@ export function SettingsSection({
           >
             {title}
           </span>
-          {/* 收合時顯示目前狀態；展開時就不重複顯示了（展開後看得到實際內容） */}
+          {/* 收合時顯示目前狀態；展開時就不重複顯示了（展開後看得到實際內容）
+              ⚠️ 2026-10-02：`truncate` 改成可折行。
+                 英文摘要比中文長得多（「👴 Senior · Unspecified」213px 塞不進 166px），
+                 truncate 會把它變成「👴 Senior · Unsp…」——
+                 這個欄位的**唯一用途**就是讓長者不展開也知道自己設了什麼，
+                 被截掉等於這個設計直接失效。寧可讓它折成兩行。 */}
           {summary && !isOpen && (
-            <span className="block text-[16px] font-bold text-slate-600 leading-tight mt-[2px] truncate">
+            <span className="block text-[16px] font-bold text-slate-600 leading-snug mt-[2px]">
               {summary}
             </span>
           )}

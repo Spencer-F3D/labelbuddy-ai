@@ -28,6 +28,7 @@
     "check:lookup": "tsx scripts/check-lookup-keys.ts",
     "apk": "node scripts/build-apk.mjs",
     "measure:onboarding": "node scripts/measure-onboarding.mjs",
+    "check:layout": "node scripts/check-layout-senior.mjs",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
     "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:honorific && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup"

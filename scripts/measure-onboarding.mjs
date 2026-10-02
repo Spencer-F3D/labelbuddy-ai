@@ -173,6 +173,39 @@ async function shot(name) {
   writeFileSync(path.join(OUT_DIR, name + '.png'), Buffer.from(r.data, 'base64'));
 }
 
+/**
+ * 某一頁的「高度組成」——每一個子區塊各佔多少 px。
+ *
+ * 【為什麼需要】
+ *   只知道「這一頁超出 370px」沒辦法決定要改什麼。
+ *   要知道「是 hero 卡太大、還是六條功能清單太長」，才修得準。
+ *   這是修版面時唯一能避免「憑感覺亂壓」的方法。
+ */
+async function breakdown() {
+  return evalJs(`
+    (() => {
+      const flow = document.getElementById('onboarding-flow');
+      if (!flow) return null;
+      const inner = flow.querySelector('.flex-1');
+      if (!inner) return null;
+      const rows = [];
+      const walk = (el, depth) => {
+        for (const c of el.children) {
+          const cs = getComputedStyle(c);
+          if (cs.display === 'none') continue;
+          const r = c.getBoundingClientRect();
+          if (r.height < 4) continue;
+          const label = (c.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 26);
+          rows.push({ depth, h: Math.round(r.height), label });
+          if (depth < 2) walk(c, depth + 1);
+        }
+      };
+      walk(inner, 0);
+      return rows;
+    })()
+  `);
+}
+
 const dir = mkdtempSync(path.join(tmpdir(), 'lb-measure-'));
 const rows = [];
 /** 向下提示的行為驗證若有任何一頁失敗，最後以非零結束碼回報 */
@@ -306,6 +339,18 @@ try {
         `   「${m.title}」`
     );
     await shot(`page-${String(step + 1).padStart(2, '0')}`);
+
+    // 第 1 頁額外輸出高度組成（修版面時要知道是哪一塊在吃高度）
+    if (step === 0) {
+      const bd = await breakdown();
+      if (Array.isArray(bd) && bd.length) {
+        console.log('        ── 高度組成（只列 >20px 的區塊）──');
+        for (const r of bd) {
+          if (r.h < 20) continue;
+          console.log(`        ${'  '.repeat(r.depth)}${String(r.h).padStart(4)}px  ${r.label}`);
+        }
+      }
+    }
 
     /* ── 驗證向下提示的行為 ──────────────────────────────────
      * ⚠️ 這是**斷言**不是觀察：只拍截圖看不出「捲到底有沒有收起」。

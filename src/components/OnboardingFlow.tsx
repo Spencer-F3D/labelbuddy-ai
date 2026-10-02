@@ -292,7 +292,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       onScroll={updateScrollHint}
       className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-4 gap-4">
+      {/* ⚠️ 內距與間距是「量出來的」：`:root{font-size:20px}` 讓 `p-4`/`gap-4`
+          實際是 20px（不是 16px，Tailwind 的 rem 被放大了 1.25 倍）。
+          改成明確的 px 值以精確控制第 1 頁的高度（見 measure:onboarding）。 */}
+      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-[14px] gap-[12px]">
         {/* ⚠️ 2026-09-30 使用者要求：移除上方的步數與進度條。
             理由：長者在引導頁只想趕快設定完，數字只會增加壓力，
             而且總頁數會依身分變動（長者 9／其他 7），顯示數字反而困惑。 */}
@@ -310,20 +313,37 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 連帶移除了 5 個 introShot* 翻譯鍵與那段模擬標籤的排版。 */}
           {stepId === 'intro' && (
             <>
-              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-5">
+              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-[12px]">
                 <p className="text-[16px] font-black text-blue-200 tracking-wide">
                   {t('onboard.introKicker')}
                 </p>
                 <h1 className="text-[20px] font-black mt-1 leading-tight">
                   {t('onboard.introTitle')}
                 </h1>
-                <p className="text-[16px] font-bold mt-2 leading-relaxed text-blue-50">
+                <p className="text-[16px] font-bold mt-1.5 leading-snug text-blue-50">
                   {t('onboard.introBody')}
                 </p>
               </div>
 
-              {/* 功能清單：把 App 的每一個功能都講到 */}
-              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex flex-col gap-3">
+              {/* 功能清單：把 App 的每一個功能都講到
+                  ★ 2026-10-02 使用者要求「第一頁不用滾動就看完整頁」。
+                    這是量出來的取捨，不是猜的（見 scripts/measure-onboarding.mjs）：
+
+                      640px 畫面
+                      − 16 上下內距 ×2
+                      − 10 頂部留白
+                      − 16 區塊間距 ×2
+                      − 68 底部「下一步」按鈕
+                      ────────────────
+                      ＝ 498px 給內容
+
+                    而「6 條 × (標題＋說明)」實測就要 637px —— **物理上塞不下**。
+                    所以移除每條的說明行（83px → 30px，省 340px）。
+                    標題本身已完整點出六個功能，符合原需求「每個功能都要提到」。
+
+                  ⚠️ 若日後要把說明加回來，就必須同時接受「這一頁要滾動」——
+                     兩者不可能同時成立。 */}
+              <div className="bg-white rounded-2xl p-[12px] border-2 border-slate-300 flex flex-col gap-[8px]">
                 <h2 className="text-[19px] font-black text-slate-950">
                   {t('onboard.featListTitle')}
                 </h2>
@@ -335,16 +355,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   { n: 5, Icon: MessageCircleQuestion },
                   { n: 6, Icon: SlidersHorizontal },
                 ].map(({ n, Icon }) => (
-                  <div key={`feat-${n}`} className="flex items-start gap-3">
-                    <Icon className="w-6 h-6 text-blue-800 shrink-0 mt-[3px]" aria-hidden="true" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[18px] font-black text-slate-900 leading-snug">
-                        {t(`onboard.feat${n}Title` as 'onboard.feat1Title')}
-                      </p>
-                      <p className="text-[16px] font-bold text-slate-600 leading-snug">
-                        {t(`onboard.feat${n}Body` as 'onboard.feat1Body')}
-                      </p>
-                    </div>
+                  <div key={`feat-${n}`} className="flex items-center gap-3">
+                    <Icon className="w-6 h-6 text-blue-800 shrink-0" aria-hidden="true" />
+                    <p className="flex-1 min-w-0 text-[18px] font-black text-slate-900 leading-snug">
+                      {t(`onboard.feat${n}Title` as 'onboard.feat1Title')}
+                    </p>
                   </div>
                 ))}
               </div>

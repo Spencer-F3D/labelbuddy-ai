@@ -1501,8 +1501,8 @@ export default function App() {
       {/* ======================================================== */}
       <header className="bg-white border-b-4 border-blue-900 px-[16px] py-[10px] shadow-sm min-[520px]:shrink-0">
         <div className="flex flex-col items-center justify-center gap-1">
-          <div className="flex items-center justify-between w-full gap-[8px]">
-
+          <div className="flex flex-wrap items-center justify-between w-full gap-[8px]">
+          <div className="flex items-center gap-[8px] min-w-0">
             {/* 漢堡選單鈕（左上角）——現在是唯一的頁面切換入口。
                 觸控尺寸 48×48，符合長者的操作需求。
                 aria-expanded 讓螢幕閱讀器知道選單目前是開還是關。 */}
@@ -1522,23 +1522,30 @@ export default function App() {
               )}
             </button>
 
-            {/* ⚠️ 這裡刻意不放 Sparkles 圖示：
-                    360px 寬（16:9 手機）下，漢堡鈕 48px ＋ 標題 ＋ 狀態標籤會超出
-                    可用寬度（328px），導致「LabelBuddy AI」被截成「LabelBuddy A」。
-                    實測拿掉 24px 圖示＋4px 間距後剛好放得下。
-                    App 名稱被截斷比少一個裝飾圖示嚴重得多。 */}
-            <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap min-w-0">
+            {/* ⚠️ 2026-10-02：`min-w-0` 改成 `shrink-0`。
+                原本是 `min-w-0`（允許被壓縮）＋ `whitespace-nowrap`（不准折行）
+                —— 這兩個加起來的結果是：flex 把標題壓到 111px，
+                但文字在長者字級（20px→24px）需要 159px，
+                於是**文字直接溢出框外 48px**，壓到右邊的狀態標籤上。
+                （實測：長者模式下每個畫面都有這一筆，共 24 個畫面。）
+                ★ 通則：`min-w-0` ＋ `nowrap` ＝ 溢出。要嘛讓它折，要嘛別壓縮它。 */}
+            <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap shrink-0">
               LabelBuddy AI
             </h1>
-
-            {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
-                ⚠️ 360px 寬（16:9 手機）下這裡極容易折行，故字級與內距都收斂並強制不換行
-                ⚠️ 字級地板 16px：此處已是全站最小，不可再往下 */}
-            <div className="flex items-center gap-[4px] px-[8px] py-[3px] rounded-full bg-slate-100 border border-slate-300 text-[16px] font-extrabold text-slate-700 whitespace-nowrap shrink-0">
-              <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${geminiConnected ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`} />
-              <span>{geminiConnected ? t('app.statusCloud') : t('app.statusLocal')}</span>
-            </div>
           </div>
+
+          {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
+              ⚠️ 360px 寬（16:9 手機）下這裡極容易折行，故字級與內距都收斂並強制不換行
+              ⚠️ 字級地板 16px：此處已是全站最小，不可再往下
+              ⚠️ 2026-10-02：文案由「雲端 AI 已連線」縮成「雲端 AI」。
+                 長者字級下標題需要 159px，原本的標籤要 147px，
+                 兩者加起來 370px > 可用的 328px → 一定溢出。
+                 縮短標籤後總寬 316px，留 12px 餘裕。 */}
+          <div className="flex items-center gap-[4px] px-[8px] py-[3px] rounded-full bg-slate-100 border border-slate-300 text-[16px] font-extrabold text-slate-700 whitespace-nowrap shrink-0">
+            <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${geminiConnected ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`} />
+            <span>{geminiConnected ? t('app.statusCloud') : t('app.statusLocal')}</span>
+          </div>
+        </div>
           <p className="text-[16px] font-extrabold text-blue-900 flex items-center justify-center gap-1.5 mt-0.5">
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             {t('app.tagline')}
@@ -2457,7 +2464,11 @@ export default function App() {
                         className={`${CARD_BASE} p-[16px] flex flex-col gap-[12px]`}
                         style={{ background: TONES.caution.bg, borderColor: TONES.caution.border }}
                       >
-                        <div className="flex items-center justify-between gap-[8px]">
+                        {/* ⚠️ 2026-10-02：加 `flex-wrap`。
+                            標題 ＋ 徽章並排，英文的徽章（'Less salt, more water'）比中文長，
+                            長者字級下兩者加起來超過卡片寬度 43px → 徽章被推出卡片外。
+                            讓它可以換行才是正確行為（徽章是次要資訊）。 */}
+                        <div className="flex flex-wrap items-center justify-between gap-[8px]">
                           <h3
                             className={`${TYPE.title} ${WEIGHT.strong} flex items-center gap-[8px]`}
                             style={{ color: TONES.caution.text }}
@@ -2831,18 +2842,28 @@ export default function App() {
                                       aria-hidden="true"
                                     />
                                   )}
+                                  {/* ⚠️ 2026-10-02：拿掉 `whitespace-nowrap`。
+                                      英文的病症名比中文長得多（'Cardiovascular disease'
+                                      在長者字級要 262px，而卡片只有 262px）——
+                                      加 nowrap 的結果是**直接溢出並被裁掉**。
+                                      讓它折行才是正確行為。 */}
                                   <span
-                                    className={`text-[20px] font-black leading-tight whitespace-nowrap ${
+                                    className={`text-[20px] font-black leading-tight ${
                                       isAllergen ? 'text-[#501313]' : 'text-slate-900'
                                     }`}
                                   >
                                     {conditionName(cond.id, language)}
                                   </span>
                                 </div>
-                                {/* 後果等級用文字明說，避免長者以為過敏原只是「注意一下」 */}
+                                {/* 後果等級用文字明說，避免長者以為過敏原只是「注意一下」
+                                    ⚠️ 2026-10-02：拿掉 `whitespace-nowrap`。
+                                       英文版是「⚠️ Never eat — can cause breathing difficulty」，
+                                       長者字級下需要 419px —— 卡片只有 262px，
+                                       原本被硬裁掉 170px，**使用者完全看不到後半句**。
+                                       這是最危險的一種：不是排版難看，是安全警語被吃掉。 */}
                                 {isAllergen && (
                                   <span
-                                    className={`text-[16px] font-black whitespace-nowrap ${
+                                    className={`text-[16px] font-black leading-snug ${
                                       severity === 'mild' ? 'text-[#854F0B]' : 'text-[#A32D2D]'
                                     }`}
                                   >
@@ -3128,7 +3149,11 @@ export default function App() {
               className={`${FOOTER_CTA_CLASS} flex-1 min-w-0`}
             >
               <Camera className={FOOTER_CTA_ICON} />
-              <span>📸 {t('footer.homeCamera')}</span>
+              {/* ⚠️ 2026-10-02：拿掉文字前面的 📸 emoji。
+                  左邊已經有一個 28px 的相機圖示了，emoji 是重複的；
+                  而長者字級下它要多佔約 30px —— 那一列只有約 170px 可用，
+                  加上 emoji 就會把「拍照看標籤」擠成 3 行、最後一行只剩 1 個字。 */}
+              <span>{t('footer.homeCamera')}</span>
             </button>
             <button
               type="button"
@@ -3165,7 +3190,7 @@ export default function App() {
                 className={`${FOOTER_CTA_CLASS} flex-1 min-w-0 disabled:opacity-60`}
               >
                 <Camera className={FOOTER_CTA_ICON} />
-                <span>📸 {t('footer.scanCamera')}</span>
+                <span>{t('footer.scanCamera')}</span>
               </button>
               <button
                 type="button"
