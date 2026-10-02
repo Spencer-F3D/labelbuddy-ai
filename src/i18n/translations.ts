@@ -603,7 +603,7 @@ const zhTW = {
 
   'fit.addTitle': '記一組',
   'fit.phExercise': '動作名稱（例如：深蹲）',
-  'fit.phSession': '課表名稱（選填，例如：腿）',
+  'fit.phSession': '鍛鍊部位（選填，例如：胸、腿）',
   'fit.phWeight': '重量（公斤）',
   'fit.phSets': '組數',
   'fit.phReps': '次數',
@@ -1202,7 +1202,7 @@ const en: Record<TranslationKey, string> = {
 
   'fit.addTitle': 'Log a set',
   'fit.phExercise': 'Exercise name (e.g. Squat)',
-  'fit.phSession': 'Session name (optional, e.g. Legs)',
+  'fit.phSession': 'Body part (optional, e.g. Chest, legs)',
   'fit.phWeight': 'Weight (kg)',
   'fit.phSets': 'Sets',
   'fit.phReps': 'Reps',

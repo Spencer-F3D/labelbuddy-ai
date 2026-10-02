@@ -206,7 +206,10 @@ step(4, '複製到桌面');
 const desktop = path.join(homedir(), 'Desktop');
 const outDir = existsSync(desktop) ? desktop : ROOT;
 const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-const outName = `LabelBuddyAI_${stamp}.apk`;
+// ★ 2026-10-02 使用者指定：APK 檔名用**中文名**。
+//   中文檔名在部分舊工具鏈會出現亂碼，但使用者要依事實找到檔案，
+//   而這只只是**複製出來的副本**（源檔仍是 app-release.apk）。
+const outName = `營養放大鏡_${stamp}.apk`;
 const outPath = path.join(outDir, outName);
 try {
   copyFileSync(apkPath, outPath);

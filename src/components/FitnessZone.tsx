@@ -495,35 +495,33 @@ const LogTab: React.FC<{
           value={form.sessionName}
           onChange={(e) => setForm({ ...form, sessionName: e.target.value })}
         />
-        <div className="grid grid-cols-2 gap-[8px]">
-          <input
-            className={inputCls}
-            inputMode="decimal"
-            placeholder={t('fit.phWeight')}
-            value={form.weightKg}
-            onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
-          />
-          <input
-            className={inputCls}
-            inputMode="numeric"
-            placeholder={t('fit.phSets')}
-            value={form.sets}
-            onChange={(e) => setForm({ ...form, sets: e.target.value })}
-          />
-          <input
-            className={inputCls}
-            inputMode="numeric"
-            placeholder={t('fit.phReps')}
-            value={form.reps}
-            onChange={(e) => setForm({ ...form, reps: e.target.value })}
-          />
-          <input
-            className={inputCls}
-            inputMode="numeric"
-            placeholder={t('fit.phRest')}
-            value={form.restSec}
-            onChange={(e) => setForm({ ...form, restSec: e.target.value })}
-          />
+        {/* ★ 2026-10-02 修正：**標籤一定要是看得見的文字，不能只寫在 placeholder。**
+            原本四個數字欄位（重量／組數／次數／休息）的說明**只**寫在 placeholder 裡，
+            而組數、次數、休息有預設值（3／10／90）——
+            有值就不會顯示 placeholder，使用者只看到三個沒有標籤的數字框，
+            根本不知道那是什麼（使用者實際回報了這一點）。
+            ★ 通則：**預設值與 placeholder 不能同時用來表達「這個欄位是什麼」**。 */}
+        <div className="grid grid-cols-2 gap-x-[8px] gap-y-[10px]">
+          {(
+            [
+              { key: 'weightKg', label: 'fit.phWeight', inputMode: 'decimal', ph: '60' },
+              { key: 'sets', label: 'fit.phSets', inputMode: 'numeric', ph: '3' },
+              { key: 'reps', label: 'fit.phReps', inputMode: 'numeric', ph: '10' },
+              { key: 'restSec', label: 'fit.phRest', inputMode: 'numeric', ph: '90' },
+            ] as const
+          ).map(({ key, label, inputMode, ph }) => (
+            <label key={key} className="flex flex-col gap-[4px]">
+              <span className="text-[16px] font-black text-slate-800">{t(label)}</span>
+              <input
+                className={inputCls}
+                inputMode={inputMode}
+                placeholder={ph}
+                aria-label={t(label)}
+                value={form[key]}
+                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+              />
+            </label>
+          ))}
         </div>
         <button
           type="button"

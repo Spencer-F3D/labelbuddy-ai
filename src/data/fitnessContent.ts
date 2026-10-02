@@ -180,35 +180,50 @@ interface SessionTemplate {
 }
 
 export const PLAN_TEMPLATES: Record<number, SessionTemplate[]> = {
+  /**
+   * ★ 2026-10-02 使用者指定：**課表名稱一律寫「鍛鍊部位」**。
+   *
+   * 【為什麼改】
+   *   原本用的是健身圈的專業說法（推／拉／上肢／全身 A）。
+   *   對剛開始健身的人來說，「推」還要想一下是練哪裡；
+   *   而本 App 的使用者是「想知道怎麼開始」的人，不是老手。
+   *   → 直接寫部位（胸、背、腿、肩、手臂、核心），看名字就知道今天練哪裡。
+   *
+   * ⚠️ 因為名稱變成純部位，**不同天可能同名**（例如 4 天的上肢 A／B
+   *    都是「胸、背、肩、手臂」）。這是可接受的 ——
+   *    畫面上每一天都有「第 N 天」在前面，兩者不會混淆。
+   *    ★ 刻意**不加**「A／B」後綴：那會讓名稱變回專業術語，
+   *      而且對使用者沒有額外資訊價值。
+   */
   2: [
-    { name: { zh: '全身 A', en: 'Full body A' }, exercises: ['squat', 'bench', 'row', 'plank'] },
-    { name: { zh: '全身 B', en: 'Full body B' }, exercises: ['deadlift', 'shoulderpress', 'pulldown', 'crunch'] },
+    { name: { zh: '腿、胸、背、核心', en: 'Legs, chest, back, core' }, exercises: ['squat', 'bench', 'row', 'plank'] },
+    { name: { zh: '背、肩、腿、核心', en: 'Back, shoulders, legs, core' }, exercises: ['deadlift', 'shoulderpress', 'pulldown', 'crunch'] },
   ],
   3: [
-    { name: { zh: '推（胸肩三頭）', en: 'Push (chest, shoulders, triceps)' }, exercises: ['bench', 'shoulderpress', 'fly', 'triceps'] },
-    { name: { zh: '拉（背二頭）', en: 'Pull (back, biceps)' }, exercises: ['pulldown', 'row', 'curl', 'plank'] },
-    { name: { zh: '腿與核心', en: 'Legs & core' }, exercises: ['squat', 'lunge', 'calf', 'crunch'], cardio: true },
+    { name: { zh: '胸、肩、手臂', en: 'Chest, shoulders, arms' }, exercises: ['bench', 'shoulderpress', 'fly', 'triceps'] },
+    { name: { zh: '背、手臂、核心', en: 'Back, arms, core' }, exercises: ['pulldown', 'row', 'curl', 'plank'] },
+    { name: { zh: '腿、核心', en: 'Legs, core' }, exercises: ['squat', 'lunge', 'calf', 'crunch'], cardio: true },
   ],
   4: [
-    { name: { zh: '上肢 A', en: 'Upper A' }, exercises: ['bench', 'row', 'shoulderpress', 'curl'] },
-    { name: { zh: '下肢 A', en: 'Lower A' }, exercises: ['squat', 'legpress', 'calf', 'plank'] },
-    { name: { zh: '上肢 B', en: 'Upper B' }, exercises: ['pulldown', 'fly', 'lateralraise', 'triceps'] },
-    { name: { zh: '下肢 B', en: 'Lower B' }, exercises: ['deadlift', 'lunge', 'crunch'], cardio: true },
+    { name: { zh: '胸、背、肩、手臂', en: 'Chest, back, shoulders, arms' }, exercises: ['bench', 'row', 'shoulderpress', 'curl'] },
+    { name: { zh: '腿、核心', en: 'Legs, core' }, exercises: ['squat', 'legpress', 'calf', 'plank'] },
+    { name: { zh: '胸、背、肩、手臂', en: 'Chest, back, shoulders, arms' }, exercises: ['pulldown', 'fly', 'lateralraise', 'triceps'] },
+    { name: { zh: '背、腿、核心', en: 'Back, legs, core' }, exercises: ['deadlift', 'lunge', 'crunch'], cardio: true },
   ],
   5: [
-    { name: { zh: '胸', en: 'Chest' }, exercises: ['bench', 'fly', 'pushup', 'triceps'] },
-    { name: { zh: '背', en: 'Back' }, exercises: ['pulldown', 'row', 'pullup', 'curl'] },
+    { name: { zh: '胸、手臂', en: 'Chest, arms' }, exercises: ['bench', 'fly', 'pushup', 'triceps'] },
+    { name: { zh: '背、手臂', en: 'Back, arms' }, exercises: ['pulldown', 'row', 'pullup', 'curl'] },
     { name: { zh: '腿', en: 'Legs' }, exercises: ['squat', 'legpress', 'lunge', 'calf'] },
-    { name: { zh: '肩與手臂', en: 'Shoulders & arms' }, exercises: ['shoulderpress', 'lateralraise', 'curl', 'triceps'] },
-    { name: { zh: '全身與核心', en: 'Full body & core' }, exercises: ['deadlift', 'pushup', 'plank', 'crunch'], cardio: true },
+    { name: { zh: '肩、手臂', en: 'Shoulders, arms' }, exercises: ['shoulderpress', 'lateralraise', 'curl', 'triceps'] },
+    { name: { zh: '背、腿、胸、核心', en: 'Back, legs, chest, core' }, exercises: ['deadlift', 'pushup', 'plank', 'crunch'], cardio: true },
   ],
   6: [
-    { name: { zh: '推 A', en: 'Push A' }, exercises: ['bench', 'shoulderpress', 'triceps'] },
-    { name: { zh: '拉 A', en: 'Pull A' }, exercises: ['pulldown', 'row', 'curl'] },
-    { name: { zh: '腿 A', en: 'Legs A' }, exercises: ['squat', 'lunge', 'calf'] },
-    { name: { zh: '推 B', en: 'Push B' }, exercises: ['fly', 'pushup', 'lateralraise'] },
-    { name: { zh: '拉 B', en: 'Pull B' }, exercises: ['deadlift', 'pullup', 'curl'] },
-    { name: { zh: '腿 B 與核心', en: 'Legs B & core' }, exercises: ['legpress', 'calf', 'plank', 'crunch'], cardio: true },
+    { name: { zh: '胸、肩、手臂', en: 'Chest, shoulders, arms' }, exercises: ['bench', 'shoulderpress', 'triceps'] },
+    { name: { zh: '背、手臂', en: 'Back, arms' }, exercises: ['pulldown', 'row', 'curl'] },
+    { name: { zh: '腿', en: 'Legs' }, exercises: ['squat', 'lunge', 'calf'] },
+    { name: { zh: '胸、肩', en: 'Chest, shoulders' }, exercises: ['fly', 'pushup', 'lateralraise'] },
+    { name: { zh: '背、手臂', en: 'Back, arms' }, exercises: ['deadlift', 'pullup', 'curl'] },
+    { name: { zh: '腿、核心', en: 'Legs, core' }, exercises: ['legpress', 'calf', 'plank', 'crunch'], cardio: true },
   ],
 };
 
