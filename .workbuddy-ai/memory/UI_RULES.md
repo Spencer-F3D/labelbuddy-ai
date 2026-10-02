@@ -58,10 +58,47 @@
 - 標題（「私隱條款」「免責聲明」）仍維持 16px。
 
 **哪些檔案要改**：`App.tsx`、`theme.ts`、`NutrientFactBars`、`LearnerProfilePicker`、
-`FoodEdClassroom`、`VitalMetricsSection`、`DietHealthHistory`。
-⚠️ **`VitalMetricsSection` 不是死碼**，它真的渲染在「健康設定」頁。
+`FoodEdClassroom`、`DietHealthHistory`。
+（`VitalMetricsSection` 已於 2026-10-02 連同設定頁的生理指標區塊整區移除，不再是可改檔案。）
+
+## 📏 版面溢出與孤行的驗證工具（2026-10-02 新增）
+
+**`npm run check:layout`** → `scripts/check-layout-senior.mjs`
+
+用真實 Chrome 在 **360×640**、**長者字級（`data-density=comfortable`）** 下
+走過 24 個畫面（引導頁 9 頁 ＋ 6 個分頁各掃兩次 ＋ 結果頁），量四件事：
+
+| 類別 | 意思 |
+| --- | --- |
+| ① 文字穿出框框 | 文字的**行框**超出它自己的框，或超出最近一個有背景／邊框的祖先 |
+| ② 文字被裁切 | 祖先 `overflow:hidden` 把文字切掉（＝看不到，比難看更嚴重） |
+| ③ 孤行 | 末行只剩 1～2 個字 |
+| ④ 標籤被擠壓折行 | 按鈕／徽章明明塞得下一行卻折了 |
+
+**一定要加 `--lang=en` 再跑一次。** 中文一字一方塊、英文以詞斷行，
+同一段文案換行位置完全不同 —— **中文乾淨不代表英文乾淨**。
+實測：中文修完是 0 筆，英文第一次跑同一版是 **26 筆**。
+
+★★ **這支腳本自己踩過兩次錯誤量法，務必不要「順手改回去」**：
+1. 用「元素高度 ÷ line-height」估行數 → 回報 **0 筆**（假通過）。
+   文字冒出框外時，**元素框本身還是正常的**，量元素框永遠量不到。
+2. 對容器做 `Range.selectNodeContents(el).getClientRects()` →
+   回傳的是**每個子元素的框**，不是行框。於是「高血壓」被報成 3 行，
+   整份報告幾百筆假警報，等於沒有報告。
+   → 正解：**只取文字節點的 rect，再依 `top` 值分組數行**。
+
+★ 排除清單（每一條都真的產生過假警報）：`position:fixed`、被 translate 推到
+螢幕外的收起選單、`clientHeight<=2` 的收合手風琴、`overflow-x:auto` 的橫向捲動列、
+含 block/flex/grid 子元素的「容器」。
+
+**`npm run measure:onboarding`** 另外會輸出**第 1 頁的高度組成**
+（哪一個區塊吃掉多少 px）—— 修版面時沒有這個就只能憑感覺壓。
+
 
 ## 📐 折行品質：什麼才算「有礙閱讀」
+
+> ⚠️ 2026-10-02 起，本專案請用 `npm run check:layout`（見下方「版面溢出與孤行的驗證工具」）。
+> 本節保留判定標準與根因解法，工具本身以 `check-layout-senior.mjs` 為準。
 
 **不是所有折行都是問題。** 一句 18 字的中文在 360px 上本來就塞不進一行，
 折成 2 行是正確行為，硬不讓它折反而會溢出。真正該修的是這三類：
