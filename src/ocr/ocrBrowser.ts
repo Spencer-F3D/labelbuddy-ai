@@ -54,8 +54,23 @@ export interface BrowserOcrResult {
   ok: boolean;
   /** OCR 讀出的原始文字 */
   text: string;
-  /** 失敗原因（供除錯顯示） */
+  /**
+   * 失敗原因（供除錯顯示）。
+   *
+   * ★ 2026-10-02：這個欄位現在會被**使用者看到**（見 App.tsx 的 OCR 失敗處理）。
+   *   理由：本機的兩個模式（只送文字／只在本機）都必須靠這支 OCR，
+   *   而它不是「照片拍不好」那麼簡單就會失敗的 —— 最常見的失敗是
+   *   **引擎本身載入不了**（要下載約 6.4 MB 的語言模型與 WASM）。
+   *   以前一律顯示「請重拍」，使用者就一張一張重拍，永遠不會好。
+   *   → 現在必須把「引擎問題」與「照片問題」分開講。
+   */
   error?: string;
+  /**
+   * 失敗的種類。
+   *   `engine` —— 引擎載入／初始化失敗（網路問題，重拍照片沒用）
+   *   `image`  —— 圖片本身有問題（空白、格式不支援）
+   */
+  errorKind?: 'engine' | 'image';
 }
 
 let workerPromise: Promise<Worker> | null = null;
@@ -101,7 +116,7 @@ export async function recognizeLabelTextInBrowser(
   imageDataUrl: string
 ): Promise<BrowserOcrResult> {
   if (!imageDataUrl) {
-    return { ok: false, text: '', error: '沒有圖片' };
+    return { ok: false, text: '', error: '沒有圖片', errorKind: 'image' };
   }
 
   try {
@@ -113,12 +128,127 @@ export async function recognizeLabelTextInBrowser(
     });
     return { ok: true, text };
   } catch (err: any) {
+    /**
+     * ★ 2026-10-02：把「引擎失敗」與「圖片失敗」分開。
+     *
+     * 這裡是使用者體驗的關鍵：引擎失敗（要下載 6.4 MB）**重拍照片沒有用**，
+     * 但舊版一律顯示「請重拍」，使用者就一直在原地重拍。
+     * 判斷方式：只要錯誤不是「圖片」相關，就是引擎問題。
+     */
+    const msg = err?.message || String(err);
+    const isImageProblem = /圖片|image|decode|畫布/i.test(msg);
     return {
       ok: false,
       text: '',
-      error: err?.message || String(err),
+      error: msg,
+      errorKind: isImageProblem ? 'image' : 'engine',
     };
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * 前處理與高品質重試（2026-10-02 新增）
+ *
+ * 【為什麼需要】
+ *   本機的兩個模式（只送文字／只在本機）都吃這支 OCR。真實回報是
+ *   「影得多好也不行」—— 但真正的問題往往不是照片，而是**引擎沒載入成功**。
+ *   不過照片端確實也有一個可以便宜改善的地方：
+ *
+ *   App 在 OCR 模式下把照片縮到長邊 1024px、JPEG 品質 0.8。
+ *   對「整包裝入鏡、營養表只佔一小塊」的構圖，小字會變得很吃力。
+ *   而本機模式**不需要上傳照片**，所以提高解析度不吃任何網路成本，
+ *   只多花一點 CPU。因此策略是：
+ *     第一輪：1024px（快，涵蓋大多數情況）
+ *     第二輪（只在第一輪失敗時）：1440px ＋ 灰階對比拉伸
+ *   只在需要時多付 CPU，平常不多花時間。
+ * ------------------------------------------------------------------------- */
+
+/** 前處理用的畫布尺寸上限（第二輪重試用） */
+export const OCR_RETRY_MAX_DIM = 1440;
+
+/**
+ * 灰階 + 對比拉伸。
+ *
+ * 【為什麼是這兩個，不是二值化】
+ *   二值化（黑白切一個門檻）在**打光不均勻**的照片上很危險 ——
+ *   反光那半邊會整片變白、陰影那半邊整片變黑，字直接消失。
+ *   灰階 + 依直方圖拉伸對比則不會有這個問題：它只是把偏灰的影像拉開，
+ *   不會把任何區域「判死」。
+ *
+ * 實作在 canvas 上做（不需要額外 WASM），成本約幾十毫秒。
+ */
+export function preprocessDataUrlForOcr(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          resolve(imageDataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const px = data.data;
+
+        // 1) 灰階（BT.601 亮度）
+        const lum = new Uint8Array(canvas.width * canvas.height);
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+          lum[j] = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000;
+        }
+
+        // 2) 找 2% / 98% 百分位當黑白點（避開反光點與陰影這種極端值）
+        const hist = new Uint32Array(256);
+        for (let i = 0; i < lum.length; i++) hist[lum[i]]++;
+        const total = lum.length;
+        let lo = 0;
+        let hi = 255;
+        let acc = 0;
+        for (let v = 0; v < 256; v++) {
+          acc += hist[v];
+          if (acc >= total * 0.02) {
+            lo = v;
+            break;
+          }
+        }
+        acc = 0;
+        for (let v = 255; v >= 0; v--) {
+          acc += hist[v];
+          if (acc >= total * 0.02) {
+            hi = v;
+            break;
+          }
+        }
+
+        // 沒有足夠的對比 → 原樣回傳（硬拉只會放大雜訊）
+        if (hi - lo < 10) {
+          resolve(imageDataUrl);
+          return;
+        }
+
+        const scale = 255 / (hi - lo);
+        const lut = new Uint8Array(256);
+        for (let v = 0; v < 256; v++) {
+          lut[v] = Math.max(0, Math.min(255, Math.round((v - lo) * scale)));
+        }
+
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+          const v = lut[lum[j]];
+          px[i] = px[i + 1] = px[i + 2] = v;
+        }
+        ctx.putImageData(data, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      } catch {
+        // 前處理失敗不是致命錯誤 —— 用原圖繼續
+        resolve(imageDataUrl);
+      }
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
 }
 
 /**
@@ -126,11 +256,37 @@ export async function recognizeLabelTextInBrowser(
  *
  * 可在使用者還在對準標籤時就先呼叫，讓正式掃描時不必等引擎初始化。
  * 失敗不拋錯 —— 這只是加速，不影響正確性。
+ *
+ * ★★ 2026-10-02：**這支函式存在了很久，但從來沒有被呼叫過**（死匯入）。
+ *
+ * 【為什麼這是一個嚴重的 bug，而不是「少了個加速」】
+ *   引擎要下載：語言模型 2.37 MB ＋ WASM 核心約 4 MB ＋ worker 62 KB
+ *   ＝ **約 6.4 MB**。
+ *   沒有預熱＝這 6.4 MB 會在**使用者按下快門的那一刻**才開始下載。
+ *   在超市（訊號最差的地方）下載一個 6.4 MB 的檔案，失敗機率很高；
+ *   一旦失敗，`createWorker()` 會拋錯 → OCR 失敗 → App 卻顯示
+ *   「看不清楚標籤數字，請重拍」→ **使用者一直重拍，而照片從來不是問題**。
+ *
+ *   這正是「本機的兩個模式 scan 唔到嘢，影得多好也不行」最合理的解釋：
+ *   只有那兩個模式需要這 6.4 MB，而「直接雲端」完全不需要。
+ *
+ * → 現在在 App 進入主頁／掃描頁時就會呼叫（見 App.tsx 的 useEffect）。
  */
 export function warmUpBrowserOcr(): void {
   void getWorker().catch(() => {
     /* 預熱失敗就等正式掃描時再試 */
   });
+}
+
+/**
+ * 引擎是否已經載入完成（給 UI 顯示用）。
+ *
+ * ⚠️ 這裡只回報「有沒有載好」，不做「正在載」的細部狀態 ——
+ *    tesseract 的 logger 進度在不同版本格式不一，拿它做 UI 反而容易誤導。
+ *    使用者只需要知道兩件事：**可以掃了** 或 **還在準備**。
+ */
+export function isBrowserOcrReady(): boolean {
+  return workerPromise !== null;
 }
 
 /**

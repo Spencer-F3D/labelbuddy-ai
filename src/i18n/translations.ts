@@ -108,6 +108,17 @@ const zhTW = {
   'scan.retakeTitle': '這次沒成功',
   'scan.retakeSubtitle': '不是您的問題，不用擔心。',
   'scan.retakeTips': '可以試試這三件事：',
+  /* ── 本機 OCR「引擎載入失敗」專用（2026-10-02）
+     ⚠️ 這幾句**不可以跟「重拍」混用**。
+        「只送文字」與「只在本機」兩個模式都要下載約 6 MB 的辨識引擎；
+        下載失敗時重拍照片完全沒有用，只會讓使用者一直做白工。
+        → 這種情況要講的是「重試」，不是「重拍」。 */
+  'scan.engineTitle': '手機的辨識引擎沒有載入成功',
+  'scan.engineSubtitle': '不是您的問題，也跟照片拍得好不好無關。',
+  'scan.engineHint':
+    '「只送文字」與「只在本機」這兩個模式，需要先下載約 6 MB 的辨識引擎才能讀標籤。剛才沒有下載成功，通常是當下網路不穩。請確認網路順暢後按下面的按鈕重試，或改用「直接雲端」模式。',
+  'scan.engineRetry': '用同一張照片再試一次',
+  'scan.errEngineNotFound': '辨識引擎沒有載入成功（網路問題，不是照片的問題）',
   'scan.tip1': '把手機靠近成分標籤一點，讓字看清楚',
   'scan.tip2': '找光線亮一點的地方，避開反光',
   'scan.tip3': '走到訊號比較好的位置再拍一次',
@@ -283,8 +294,17 @@ const zhTW = {
   'onboard.identityBody':
     '這個答案很重要。同一包食物，對不同的人結論可能完全相反。',
 /* 性別與稱謂相關的鍵已於 2026-10-02 全部移除（使用者指定）。 */
-  'onboard.howTitle': '這個 App 怎麼用',
-  'onboard.how1Title': '第一步：拍照',
+  /* ── 健身專區介紹頁（2026-10-02）：只在身分＝健身人士時出現 ──
+     放在身分頁之後。使用者剛講完自己是健身人士，這時說「所以你多了一個專區」
+     因果最清楚；放到後面隔了慢性病與教學就斷了。 */
+  'onboard.fitnessTitle': '您多了一個「健身專區」',
+  'onboard.fitnessBody': '因為您選擇了健身人士，功能選單裡會多一個專區，專門放健身要用的東西。',
+  'onboard.fitnessPlanBody': '選目標（增肌／減脂／雕塑）與每週天數，直接排出課表。',
+  'onboard.fitnessLogBody': '記下重量、組數、次數與休息，看得到這週練了多少。',
+  'onboard.fitnessNutritionBody': '算出每日熱量與蛋白質目標，並記錄吃了什麼。',
+  'onboard.fitnessPrivacy': '健身紀錄只存在這台手機裡，不會自動上傳。只有您自己按下「用 AI 產生報告」時，才會把統計數字送出去。',
+
+  'onboard.howTitle': '這個 App 怎麼用',  'onboard.how1Title': '第一步：拍照',
   'onboard.how1Body': '對著包裝後面那張表拍一張。光線亮一點、手不要晃。也可以從相簿選已經拍好的照片。',
   'onboard.how2Title': '第二步：看顏色',
   'onboard.how2Body':
@@ -615,6 +635,22 @@ const zhTW = {
   'fit.groupHint': '課表會涵蓋的部位：{list}',
   'fit.notForProfile': '健身專區只提供給「健身人士」這個身分。你目前的設定不是健身人士。',
   'fit.backHome': '回到主頁',
+
+  /* ── AI 健身週報（2026-10-02）
+     ★ 隱私原則：健身紀錄平常完全留在裝置上（專區介紹頁也是這樣寫的），
+       所以按鈕上的說明**必須自己講清楚會送出什麼** ——
+       與標籤辨識的同意閘門是同一條原則：
+       「不可以在使用者不知道的情況下上傳」。 */
+  'fit.reportTitle': '這週的 AI 報告',
+  'fit.reportNote':
+    '按下按鈕會把這週的**統計數字**送到雲端 AI（訓練天數、總訓練量、動作名稱、平均熱量）。逐筆紀錄與日期不會送出。',
+  'fit.reportButton': '用 AI 產生這週的報告',
+  'fit.reportLoading': 'AI 正在看您的紀錄…',
+  'fit.reportError': '暫時拿不到報告。請稍後再試一次——紀錄都還在，不會不見。',
+  'fit.reportSourceAi': 'AI 產生',
+  'fit.reportSourceLocal': '本機規則產生（AI 暫時不可用）',
+  'fit.reportObs': '觀察',
+  'fit.reportSuggest': '建議',
 } as const;
 
 /** 所有可用的翻譯鍵。新增鍵只要加在 zhTW，這裡會自動跟上。 */
@@ -688,6 +724,13 @@ const en: Record<TranslationKey, string> = {
   'scan.retakeTitle': 'That did not work',
   'scan.retakeSubtitle': 'It is not your fault — nothing is broken.',
   'scan.retakeTips': 'Three things you can try:',
+  /* ── On-device OCR engine failed to load (2026-10-02) ── */
+  'scan.engineTitle': 'The on-device reading engine did not load',
+  'scan.engineSubtitle': 'This is not your fault, and it is not about how well you took the photo.',
+  'scan.engineHint':
+    'The "text only" and "on-device only" modes must download about 6 MB of reading engine before they can read a label. That download did not finish, usually because the connection was unstable. Check your connection and tap the button below to try again — or switch to "Direct cloud" mode.',
+  'scan.engineRetry': 'Try again with the same photo',
+  'scan.errEngineNotFound': 'The reading engine could not be loaded (a network problem, not a photo problem)',
   'scan.tip1': 'Move the phone closer to the ingredient list',
   'scan.tip2': 'Find brighter light and avoid glare',
   'scan.tip3': 'Move somewhere with a better signal and try again',
@@ -842,6 +885,14 @@ const en: Record<TranslationKey, string> = {
   'onboard.identityBody':
     'This answer matters. The same food can get opposite verdicts for different people.',
 /* 性別與稱謂相關的鍵已於 2026-10-02 全部移除（使用者指定）。 */
+  /* ── Fitness zone intro page (2026-10-02): only for the Fitness profile ── */
+  'onboard.fitnessTitle': 'You also get a Fitness zone',
+  'onboard.fitnessBody': 'Because you chose the Fitness profile, a new section appears in the menu, built around training.',
+  'onboard.fitnessPlanBody': 'Pick a goal (build muscle / lose fat / tone) and days per week to get a plan.',
+  'onboard.fitnessLogBody': 'Record weight, sets, reps and rest — and see how much you trained this week.',
+  'onboard.fitnessNutritionBody': 'Get daily calorie and protein targets, and log what you ate.',
+  'onboard.fitnessPrivacy': 'Your training records stay on this phone and are never uploaded automatically. Only when you tap "Generate report with AI" are summary numbers sent.',
+
   'onboard.howTitle': 'How this app works',
   'onboard.how1Title': 'Step 1: Take a photo',
   'onboard.how1Body':
@@ -1181,6 +1232,18 @@ const en: Record<TranslationKey, string> = {
   'fit.groupHint': 'Muscle groups covered by the plan: {list}',
   'fit.notForProfile': 'The fitness zone is only for the "Fitness" profile, and your current profile is not that one.',
   'fit.backHome': 'Back to home',
+
+  /* ── AI weekly fitness report (2026-10-02) ── */
+  'fit.reportTitle': 'This week\u2019s AI report',
+  'fit.reportNote':
+    'Tapping the button sends this week\u2019s summary numbers to a cloud AI (training days, total volume, exercise names, average calories). Individual entries and dates are not sent.',
+  'fit.reportButton': 'Generate this week\u2019s report with AI',
+  'fit.reportLoading': 'The AI is reading your log\u2026',
+  'fit.reportError': 'Could not get a report right now. Please try again later \u2014 your records are safe.',
+  'fit.reportSourceAi': 'Generated by AI',
+  'fit.reportSourceLocal': 'Generated on-device (AI unavailable)',
+  'fit.reportObs': 'What the numbers say',
+  'fit.reportSuggest': 'Suggestions',
 };
 
 export const TRANSLATIONS: Record<Language, Record<TranslationKey, string>> = {

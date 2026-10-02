@@ -48,6 +48,9 @@ import {
   SlidersHorizontal,
   // 向下捲動提示（2026-10-02）
   ChevronDown,
+  // 健身專區介紹頁（2026-10-02）：與健身專區的分頁用同一組圖示
+  Dumbbell,
+  Flame,
 } from 'lucide-react';
 import { AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
@@ -95,6 +98,8 @@ interface OnboardingFlowProps {
 type StepId =
   | 'intro'
   | 'profile'
+  /** 健身專區介紹：**只有身分＝健身人士**才會出現（2026-10-02 使用者指定） */
+  | 'fitnessIntro'
   | 'conditions'
   | 'how1'
   | 'how2'
@@ -103,13 +108,28 @@ type StepId =
   | 'mode'
   | 'privacy';
 
-/** 依身分決定步驟序列。長者把教學拆成 3 頁，其他身分合併成 1 頁。 */
+/**
+ * 依身分決定步驟序列。
+ *
+ * 【為什麼健身要單獨多一頁】
+ *   健身專區只在身分＝健身人士時出現在功能選單裡（其他身分完全看不到）。
+ *   如果不在這裡先講，選了健身的人不會知道多了一個專區 ——
+ *   它不在原本那六條功能的清單裡，也不會主動跳出來。
+ *   ★ 放在**身分頁之後**（2026-10-02 使用者指定）：使用者剛講完自己是健身人士，
+ *     這時候講「所以你多了一個專區」因果最清楚。
+ *     放到後面的話，中間隔了慢性病與教學，關聯就斷了。
+ *
+ *   ⚠️ 這個判斷用的是**當下已選的身分**，不是進來時的初始值 ——
+ *      使用者可以在身分頁改來改去，改了就要跟著加／減這一頁。
+ */
 function buildSteps(profileId: LearnerProfileId): StepId[] {
-  const common: StepId[] = ['intro', 'profile', 'conditions'];
+  const head: StepId[] = ['intro', 'profile'];
+  if (profileId === 'fitness') head.push('fitnessIntro');
+  const rest: StepId[] = ['conditions'];
   const tail: StepId[] = ['mode', 'privacy'];
   return profileId === 'senior'
-    ? [...common, 'how1', 'how2', 'how3', ...tail]
-    : [...common, 'howAll', ...tail];
+    ? [...head, ...rest, 'how1', 'how2', 'how3', ...tail]
+    : [...head, ...rest, 'howAll', ...tail];
 }
 
 /** 教學三步（長者逐頁用，年輕版一次過用同一份內容） */
@@ -372,7 +392,52 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             </>
           )}
 
-          {/* ── 3. 慢性病與過敏 ──────────────────────────────────── */}
+          {/* ── 3.（僅健身人士）健身專區介紹 ─────────────────────── */}
+          {stepId === 'fitnessIntro' && (
+            <>
+              <div className="bg-gradient-to-r from-orange-800 to-amber-700 text-white rounded-2xl p-4">
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="w-7 h-7 shrink-0" aria-hidden="true" />
+                  <h1 className="text-[20px] font-black leading-tight">
+                    {t('onboard.fitnessTitle')}
+                  </h1>
+                </div>
+                <p className="text-[16px] font-bold mt-2 leading-relaxed text-amber-50">
+                  {t('onboard.fitnessBody')}
+                </p>
+              </div>
+
+              {/* 三個分頁各一列說明 —— 與健身專區裡的實際分頁一一對應，
+                  用同一組圖示，讓使用者進去之後認得出來。 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-orange-800 flex flex-col gap-3">
+                {[
+                  { Icon: Dumbbell, titleKey: 'fit.tabPlan', bodyKey: 'onboard.fitnessPlanBody' },
+                  { Icon: Calendar, titleKey: 'fit.tabLog', bodyKey: 'onboard.fitnessLogBody' },
+                  { Icon: Flame, titleKey: 'fit.tabNutrition', bodyKey: 'onboard.fitnessNutritionBody' },
+                ].map(({ Icon, titleKey, bodyKey }) => (
+                  <div key={titleKey} className="flex items-start gap-3">
+                    <Icon className="w-6 h-6 text-orange-800 shrink-0 mt-[3px]" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[18px] font-black text-slate-900 leading-snug">
+                        {t(titleKey as 'fit.tabPlan')}
+                      </p>
+                      <p className="text-[16px] font-bold text-slate-600 leading-snug">
+                        {t(bodyKey as 'onboard.fitnessPlanBody')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 隱私：資料留在這台裝置 */}
+              <p className="flex items-start gap-[8px] text-[16px] font-bold text-slate-700 bg-slate-100 border-2 border-slate-300 rounded-2xl px-[14px] py-[12px] leading-snug">
+                <ShieldCheck className="w-[20px] h-[20px] shrink-0 mt-[1px] text-emerald-700" aria-hidden="true" />
+                {t('onboard.fitnessPrivacy')}
+              </p>
+            </>
+          )}
+
+          {/* ── 4. 慢性病與過敏 ──────────────────────────────────── */}
           {stepId === 'conditions' && (
             <>
               <div className="bg-white rounded-2xl p-4 border-2 border-blue-900 flex flex-col gap-2">

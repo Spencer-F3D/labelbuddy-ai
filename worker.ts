@@ -33,6 +33,7 @@ import {
   handleHealth,
   handlePrivacy,
 } from './server/handlers';
+import { handleFitnessReport } from './server/fitnessReport';
 import type { ApiResult, CoreDeps } from './server/core';
 
 /**
@@ -51,6 +52,8 @@ const ROUTES: Record<string, { handler: Handler; method: 'GET' | 'POST' }> = {
   '/api/analyze-label': { handler: handleAnalyzeLabel, method: 'POST' },
   '/api/analyze-indicators': { handler: handleAnalyzeIndicators, method: 'POST' },
   '/api/ask-health-question': { handler: handleAskHealthQuestion, method: 'POST' },
+  // 健身週報（2026-10-02）：走 NVIDIA NIM，AI 失敗時自動回離線規則版
+  '/api/fitness-report': { handler: handleFitnessReport, method: 'POST' },
   '/api/privacy': { handler: handlePrivacy, method: 'GET' },
   '/api/ai-status': { handler: handleAiStatus, method: 'GET' },
   '/api/health': { handler: handleHealth, method: 'GET' },

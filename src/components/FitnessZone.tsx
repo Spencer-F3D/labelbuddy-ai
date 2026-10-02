@@ -39,8 +39,12 @@ import {
   Trash2,
   Info,
   TrendingUp,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
+import type { TranslationKey } from '../i18n/translations';
+import { apiUrl } from '../utils/apiBase';
 import {
   FITNESS_GOALS,
   DAYS_OPTIONS,
@@ -142,6 +146,17 @@ function today(): string {
 
 type ZoneTab = 'plan' | 'log' | 'nutrition';
 
+/** AI 週報的回應形狀（與 server/fitnessReport.ts 的 FitnessReport 對應） */
+interface FitnessReportData {
+  /** ai = 雲端模型產生；local = 後端規則備援（AI 不可用時） */
+  source: 'ai' | 'local';
+  model?: string;
+  headline: string;
+  observations: string[];
+  suggestions: string[];
+  encouragement: string;
+}
+
 /* ---------------------------------------------------------------------------
  * 主元件
  * ------------------------------------------------------------------------- */
@@ -216,7 +231,9 @@ export const FitnessZone: React.FC = () => {
       {tab === 'plan' && (
         <PlanTab state={state} update={update} plan={plan} lang={lang} t={t} />
       )}
-      {tab === 'log' && <LogTab state={state} update={update} lang={lang} t={t} />}
+      {tab === 'log' && (
+        <LogTab state={state} update={update} lang={lang} t={t} macros={macros} />
+      )}
       {tab === 'nutrition' && (
         <NutritionTab state={state} update={update} macros={macros} lang={lang} t={t} />
       )}
@@ -233,7 +250,9 @@ const PlanTab: React.FC<{
   update: (s: FitnessState) => void;
   plan: ReturnType<typeof buildPlan>;
   lang: 'zh-TW' | 'en';
-  t: (k: any, v?: any) => string;
+  /** ⚠️ 用 TranslationKey 而不是 any —— 打錯或漏加翻譯鍵要**編譯失敗**，
+     不能等到使用者看到 undefined 才發現。 */
+  t: (k: TranslationKey, v?: Record<string, string | number>) => string;
 }> = ({ state, update, plan, lang, t }) => (
   <div className="flex flex-col space-y-[16px]">
     {/* 目標選擇 */}
@@ -339,8 +358,12 @@ const LogTab: React.FC<{
   state: FitnessState;
   update: (s: FitnessState) => void;
   lang: 'zh-TW' | 'en';
-  t: (k: any, v?: any) => string;
-}> = ({ state, update, lang, t }) => {
+  /** ⚠️ 用 TranslationKey 而不是 any —— 打錯或漏加翻譯鍵要**編譯失敗**，
+     不能等到使用者看到 undefined 才發現。 */
+  t: (k: TranslationKey, v?: Record<string, string | number>) => string;
+  /** 每日目標（AI 週報要拿來和使用者的實際攝取比較） */
+  macros: ReturnType<typeof calcMacros> | null;
+}> = ({ state, update, lang, t, macros }) => {
   const [form, setForm] = useState({
     sessionName: '',
     exerciseName: '',
@@ -371,6 +394,61 @@ const LogTab: React.FC<{
   };
 
   const remove = (id: string) => update({ ...state, logs: state.logs.filter((l) => l.id !== id) });
+
+  /* ── AI 週報 ──────────────────────────────────────────────
+     ⚠️ 只送「彙總數字」，不送逐筆紀錄（見 server/fitnessReport.ts 的說明）。
+        前端也必須把這件事寫在畫面上 —— 使用者有權在按下按鈕前知道。 */
+  const [report, setReport] = useState<FitnessReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState(false);
+
+  const generateReport = async () => {
+    setReportLoading(true);
+    setReportError(false);
+    setReport(null);
+    try {
+      // 近 7 天（與圖表同一段區間）
+      const since = weekly[0]?.date ?? today();
+      const recent = state.logs.filter((l) => l.date >= since);
+      const days = new Set(recent.map((l) => l.date));
+      const totalVolume = recent.reduce((s, l) => s + l.weightKg * l.sets * l.reps, 0);
+      const exercises = [...new Set(recent.map((l) => l.exerciseName))].slice(0, 8);
+
+      const daysInWindow = 7;
+      const meals = state.meals.filter((m) => m.date >= since);
+      const loggedDays = new Set(meals.map((m) => m.date)).size || 1;
+      const avgKcal = meals.reduce((s, m) => s + m.kcal, 0) / loggedDays;
+      const avgProteinG = meals.reduce((s, m) => s + m.proteinG, 0) / loggedDays;
+
+      const res = await fetch(apiUrl('/api/fitness-report'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: lang,
+          goal: state.goal,
+          daysPerWeek: state.daysPerWeek,
+          trainedDays: days.size,
+          totalVolume,
+          exercises,
+          avgKcal,
+          avgProteinG,
+          targetKcal: macros?.target ?? 0,
+          targetProteinG: macros?.proteinG ?? 0,
+          daysInWindow,
+        }),
+      });
+      const json = await res.json();
+      if (json?.success && json.data) {
+        setReport(json.data as FitnessReportData);
+      } else {
+        setReportError(true);
+      }
+    } catch {
+      setReportError(true);
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   /**
    * 每週訓練量（Σ 重量 × 組數 × 次數）。
@@ -518,6 +596,94 @@ const LogTab: React.FC<{
           </ul>
         )}
       </section>
+
+      {/* ── AI 週報（2026-10-02）──────────────────────────────
+          ⚠️ 隱私：健身紀錄平常完全留在裝置上（專區介紹頁也這樣寫）。
+             所以這顆按鈕**必須自己講清楚**它會送出什麼 ——
+             與標籤辨識的同意閘門是同一條原則：
+             「不可以在使用者不知道的情況下上傳」。 */}
+      <section className="bg-white rounded-2xl p-[16px] border-2 border-indigo-700 flex flex-col gap-[10px]">
+        <h2 className="text-[19px] font-black text-indigo-950 flex items-center gap-[6px]">
+          <Sparkles className="w-[22px] h-[22px] shrink-0 text-indigo-700" aria-hidden="true" />
+          {t('fit.reportTitle')}
+        </h2>
+        <p className="text-[16px] font-bold text-slate-700 leading-snug">{t('fit.reportNote')}</p>
+
+        <button
+          type="button"
+          id="fit-generate-report"
+          onClick={generateReport}
+          disabled={reportLoading || state.logs.length === 0}
+          className="w-full min-h-[60px] rounded-2xl bg-indigo-800 hover:bg-indigo-900 disabled:opacity-50 text-white text-[19px] font-black flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 border-2 border-indigo-950"
+        >
+          {reportLoading ? (
+            <>
+              <Loader2 className="w-[22px] h-[22px] shrink-0 animate-spin" aria-hidden="true" />
+              {t('fit.reportLoading')}
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-[22px] h-[22px] shrink-0" aria-hidden="true" />
+              {t('fit.reportButton')}
+            </>
+          )}
+        </button>
+
+        {reportError && (
+          <p className="text-[16px] font-bold text-rose-800 bg-rose-50 border-2 border-rose-300 rounded-xl px-[12px] py-[10px] leading-snug">
+            {t('fit.reportError')}
+          </p>
+        )}
+
+        {report && (
+          <div className="flex flex-col gap-[8px]" id="fit-report-result">
+            {/* 來源標籤：AI 或本機。使用者有權知道自己拿到的是哪一種。 */}
+            <span
+              className={`self-start text-[16px] font-black px-[10px] py-[2px] rounded-full ${
+                report.source === 'ai'
+                  ? 'bg-indigo-100 text-indigo-900 border border-indigo-300'
+                  : 'bg-slate-100 text-slate-700 border border-slate-300'
+              }`}
+            >
+              {report.source === 'ai' ? t('fit.reportSourceAi') : t('fit.reportSourceLocal')}
+            </span>
+
+            <p className="text-[19px] font-black text-slate-950 leading-snug">{report.headline}</p>
+
+            {report.observations.length > 0 && (
+              <div>
+                <p className="text-[16px] font-black text-slate-800">{t('fit.reportObs')}</p>
+                <ul className="mt-[4px] flex flex-col gap-[4px]">
+                  {report.observations.map((o) => (
+                    <li key={o} className="text-[16px] font-bold text-slate-700 leading-snug">
+                      ・{o}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {report.suggestions.length > 0 && (
+              <div>
+                <p className="text-[16px] font-black text-slate-800">{t('fit.reportSuggest')}</p>
+                <ul className="mt-[4px] flex flex-col gap-[4px]">
+                  {report.suggestions.map((s) => (
+                    <li key={s} className="text-[16px] font-bold text-slate-700 leading-snug">
+                      ・{s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {report.encouragement && (
+              <p className="text-[16px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-xl px-[12px] py-[8px] leading-snug">
+                {report.encouragement}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 };
@@ -531,7 +697,9 @@ const NutritionTab: React.FC<{
   update: (s: FitnessState) => void;
   macros: ReturnType<typeof calcMacros> | null;
   lang: 'zh-TW' | 'en';
-  t: (k: any, v?: any) => string;
+  /** ⚠️ 用 TranslationKey 而不是 any —— 打錯或漏加翻譯鍵要**編譯失敗**，
+     不能等到使用者看到 undefined 才發現。 */
+  t: (k: TranslationKey, v?: Record<string, string | number>) => string;
 }> = ({ state, update, macros, lang, t }) => {
   const [meal, setMeal] = useState({ label: '', kcal: '', proteinG: '', carbG: '', fatG: '' });
 

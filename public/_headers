@@ -1,0 +1,35 @@
+# Cloudflare Workers 靜態資源的額外回應標頭
+#
+# 【為什麼會有這個檔案】
+#   「只送文字」與「只在本機」這兩個模式，都必須先下載本機 OCR 引擎才能讀標籤：
+#
+#     語言模型 chi_tra.traineddata   2.37 MB
+#     WASM 核心（三種變體取一）      約 4 MB
+#     tesseract worker               62 KB
+#     ─────────────────────────────────────
+#     約 6.4 MB
+#
+#   而 Workers Assets 的預設值是：
+#     Cache-Control: public, max-age=0, must-revalidate
+#   —— 也就是**每次開啟 App 都要跟伺服器重新確認一次**這些檔案。
+#
+#   超市是訊號最差的地方，而那正是使用者要掃標籤的地方。
+#   這一步失敗 → createWorker() 拋錯 → OCR 失敗 → App 說「請重拍」，
+#   使用者就一直重拍，而照片從來沒有問題。
+#
+#   這些檔案的內容是**版本固定的**（模型與引擎不會中途改變），
+#   所以可以安全地設一年 immutable：瀏覽器抓過一次之後完全不必再問，
+#   第二次掃描就不需要任何額外的網路往返。
+#
+#   ⚠️ 日後若真的換了模型或引擎版本，**請換檔名**（或改這一段的註解），
+#      不要只是覆蓋同名檔案 —— 已經快取的裝置會繼續用舊的，
+#      而且不會有任何錯誤訊息。
+
+/tessdata/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/tesseract-core/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/tesseract-worker.min.js
+  Cache-Control: public, max-age=31536000, immutable

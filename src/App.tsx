@@ -66,7 +66,12 @@ import {
 import { LabelAnalysisResult, DietRecord, LearnerProfileId, AnalysisMode } from './types';
 import { compressImage } from './utils/imageCompression';
 // OCR 在瀏覽器端執行：照片不會離開使用者的裝置，只有讀出的文字會送到後端。
-import { recognizeLabelTextInBrowser, warmUpBrowserOcr } from './ocr/ocrBrowser';
+import {
+  recognizeLabelTextInBrowser,
+  warmUpBrowserOcr,
+  preprocessDataUrlForOcr,
+  OCR_RETRY_MAX_DIM,
+} from './ocr/ocrBrowser';
 // 雙語介面（2026-09-28）：競賽章程要求「未使用英文」可不予評審。
 import { useI18n } from './i18n/I18nContext';
 import { LanguagePicker } from './i18n/LanguagePicker';
@@ -244,6 +249,15 @@ const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
  *   而且 OCR 的準確度瓶頸在字元辨識而非像素數，所以維持原本的 1024px。
  */
 const IMAGE_MAX_DIM_CLOUD = 1600;
+/**
+ * OCR 模式的縮圖上限（第一輪）。
+ *
+ * ⚠️ 2026-10-02：這裡的取捨是「CPU 時間」而不是「網路流量」——
+ *    本機的兩個模式**不上傳照片**，所以放大完全不花網路，
+ *    但 tesseract 的時間與像素數成正比，手機上會很有感。
+ *    所以維持 1024 當第一輪，失敗時才用 1440 ＋ 前處理重試一次
+ *    （見 OCR_RETRY_MAX_DIM 與 ocrBrowser.ts 的說明）。
+ */
 const IMAGE_MAX_DIM_OCR = 1024;
 
 /**
@@ -800,6 +814,16 @@ export default function App() {
    *    不講的話，他會以為自己一直在用最準的模式。
    */
   const [autoDowngraded, setAutoDowngraded] = useState<boolean>(false);
+
+  /**
+   * 本機 OCR **引擎**載入失敗（2026-10-02）。
+   *
+   * ⚠️ 這跟「照片拍不好」是完全不同的兩件事，必須分開處理：
+   *    引擎要下載約 6.4 MB（語言模型＋WASM），超市弱訊號下會失敗。
+   *    舊版把這種情況也說成「請重拍」，使用者就一直重拍。
+   *    → 這個旗標讓畫面上出現「重試」而不是「重拍」。
+   */
+  const [ocrEngineFailed, setOcrEngineFailed] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<LabelAnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -870,6 +894,34 @@ export default function App() {
   }, [learnerProfileId]);
   const latencyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTickRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * ★★ 2026-10-02：**預熱本機 OCR 引擎。**
+   *
+   * 【為什麼這一行是修好「本機兩個模式掃不到」的關鍵之一】
+   *   `warmUpBrowserOcr()` 存在很久了，但**從來沒有任何地方呼叫它**
+   *   （是死匯入）。後果是：引擎要下載的 6.4 MB
+   *   （中文語言模型 2.37 MB ＋ WASM 核心約 4 MB ＋ worker）
+   *   **在使用者按下快門的那一刻才開始下載**。
+   *
+   *   超市是訊號最差的地方 —— 那正是使用者要掃標籤的地方。
+   *   下載失敗 → `createWorker()` 拋錯 → OCR 失敗 → App 說「請重拍」，
+   *   於是使用者一直重拍，而照片從來沒問題。
+   *
+   * 【為什麼挑「完成引導頁之後」才預熱】
+   *   引導頁是第一次使用、還不知道要不要用這個 App 的階段，
+   *   那時就抓 6.4 MB 對行動網路不禮貌。
+   *   走完引導頁＝已經決定要用 → 這時候預熱最合理，
+   *   而且使用者在看首頁、走向貨架的時間就下載完了。
+   *
+   * 【為什麼只用 `hasKey` 這種條件不寫在這裡】
+   *   三個模式裡有兩個需要它（只送文字／只在本機）；「直接雲端」不需要，
+   *   但使用者在流程中隨時可能改模式 —— 所以一律預熱。
+   */
+  useEffect(() => {
+    if (!onboarded) return;
+    warmUpBrowserOcr();
+  }, [onboarded]);
 
   // 檢查雲端 AI 服務狀態
   // 【重要】必須以 hasKey 為判斷依據：/api/ai-status 只要伺服器存活就會回 status: 'ok'，
@@ -953,6 +1005,60 @@ export default function App() {
     }
   };
 
+  /**
+   * 最近一次選取／拍攝的原始檔。
+   *
+   * ★ 2026-10-02：本機 OCR 失敗時要「用更高解析度重試一次」，
+   *   而重試必須從**原檔**重新編碼（把已縮圖的結果放大只會放大模糊）。
+   */
+  const lastPhotoFileRef = useRef<File | null>(null);
+
+  /**
+   * 本機 OCR 兩階段執行。
+   *
+   * 第一輪：1024px（快）
+   * 第二輪：只在第一輪「讀到的內容明顯不足」時才跑 ——
+   *         1440px ＋ 灰階對比拉伸。
+   *
+   * 【為什麼是「不足才跑」而不是一律高解析度】
+   *   tesseract 的時間與像素數成正比，手機上很有感。
+   *   常態路徑不該為少數難例付出兩倍時間。
+   */
+  const runBrowserOcr = async (attempt: 1 | 2) => {
+    const file = lastPhotoFileRef.current;
+    if (!file) return null;
+    const maxDim = attempt === 1 ? IMAGE_MAX_DIM_OCR : OCR_RETRY_MAX_DIM;
+    const compressed = await compressImage(file, maxDim, attempt === 1 ? 0.8 : 0.9);
+    const input = attempt === 1 ? compressed.base64 : await preprocessDataUrlForOcr(compressed.base64);
+    return recognizeLabelTextInBrowser(input);
+  };
+
+  /**
+   * 重新分析同一張照片（2026-10-02）。
+   *
+   * 【為什麼需要這顆按鈕】
+   *   本機 OCR 引擎載入失敗時，**正確的動作是「重試」而不是「重拍」**。
+   *   引擎要下載 6.4 MB，第一次失敗很可能是當下網路不穩 ——
+   *   同一張照片再試一次就有機會成功。
+   *   舊版只給「重拍」的建議，等於叫使用者做一件沒有用的事。
+   */
+  const handleRetryAnalysis = async () => {
+    const file = lastPhotoFileRef.current;
+    if (!file) return;
+    // 其餘的狀態重置（isLoading／秒數計時／errorMessage…）都在
+    // sendImageForAnalysis 的開頭統一處理，這裡不重複。
+    setOcrEngineFailed(false);
+    // 引擎可能剛剛才失敗，這裡順便再預熱一次
+    warmUpBrowserOcr();
+    const compressed = await compressImage(
+      file,
+      analysisMode === 'cloud_image' ? IMAGE_MAX_DIM_CLOUD : IMAGE_MAX_DIM_OCR,
+      0.8
+    );
+    setPreviewImage(compressed.base64);
+    await sendImageForAnalysis(compressed.base64);
+  };
+
   // 處理相機拍攝或選取的相片
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -962,6 +1068,15 @@ export default function App() {
     event.target.value = '';
 
     try {
+      /**
+       * ★ 2026-10-02：把原始檔留下來。
+       *
+       * 【為什麼需要】本機 OCR 失敗時要用**更高解析度 ＋ 前處理**重試一次，
+       *   而重試必須從原檔重新編碼 —— 拿已經縮到 1024px 的結果再放大，
+       *   只會把模糊一起放大，沒有任何資訊上的好處。
+       */
+      lastPhotoFileRef.current = file;
+
       // 拍照成功，觸發震動回饋 (200ms)
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         try {
@@ -1167,7 +1282,29 @@ export default function App() {
           preferLanguage: ttsLang,
         });
 
-        ocr = await recognizeLabelTextInBrowser(base64Data);
+        ocr = await runBrowserOcr(1);
+
+        /**
+         * ★★ 2026-10-02：**引擎失敗與照片失敗要分開講。**
+         *
+         * 【為什麼這是本次最重要的修正】
+         *   「只送文字」與「只在本機」兩個模式都必須靠瀏覽器 OCR。
+         *   而它最常見的失敗原因**不是照片**，是引擎載入不了 ——
+         *   語言模型 2.37 MB ＋ WASM 約 4 MB 要在當下載完。
+         *   舊版遇到這種情況照樣送去後端，後端只能回
+         *   「看不清楚標籤數字，請重拍」，於是使用者**一直重拍而照片從來沒問題**。
+         *   這正是使用者回報的「影得多好也不行」。
+         *
+         *   → 引擎失敗時：**不送後端**、不叫使用者重拍，
+         *     直接說「辨識引擎沒有載入成功」並給一顆重試鈕。
+         */
+        if (ocr && !ocr.ok && ocr.errorKind === 'engine') {
+          setOcrEngineFailed(true);
+          setErrorMessage(t('scan.errEngineNotFound'));
+          speakText(t('scan.errEngineNotFound'), { rate: 0.88, preferLanguage: ttsLang });
+          setAnalysisResult(null);
+          return;
+        }
 
         setLoadingPhase('analyzing');
         // AI 分析狀態語音提示：「正在為您分析」
@@ -1178,10 +1315,33 @@ export default function App() {
         // 【只送文字，不送照片】`ocrText` 是空的代表沒讀到字，
         // 後端會回「請重拍」，我們不在前端自行捏造結果。
         data = await postAnalyzeLabel({
-          ocrText: ocr.ok ? ocr.text : '',
+          ocrText: ocr?.ok ? ocr.text : '',
           // OCR 失敗的原因只在瀏覽器 console 留紀錄，不打擾使用者
-          ocrError: ocr.ok ? undefined : ocr.error,
+          ocrError: ocr?.ok ? undefined : ocr?.error,
         });
+
+        /**
+         * ★ 兩階段重試：後端說「讀到的數字不夠」時，用
+         *   1440px ＋ 灰階對比拉伸再讀一次。
+         *
+         * 【為什麼不是一開始就用高解析度】
+         *   本機模式不上傳照片，放大不吃網路，但 tesseract 的時間與像素數
+         *   成正比 —— 手機上很有感。常態路徑不該為少數難例付兩倍時間。
+         *
+         * ⚠️ 只在「文字模式」重試。`cloud_image` 的結果是視覺模型給的，
+         *    跟本機 OCR 無關，重試沒有意義。
+         */
+        if (data?.ocr_failed) {
+          const second = await runBrowserOcr(2);
+          if (second?.ok && second.text.trim().length > (ocr?.text.trim().length ?? 0)) {
+            const retried = await postAnalyzeLabel({ ocrText: second.text });
+            // 只有真的變好才採用（避免重試反而把結果弄差）
+            if (retried && !retried.ocr_failed) {
+              data = retried;
+              ocr = second;
+            }
+          }
+        }
       }
 
       if (!data) throw new Error(t('scan.errNoResult'));
@@ -1803,10 +1963,10 @@ export default function App() {
                     <AlertCircle className="w-[40px] h-[40px] text-white" />
                   </span>
                   <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight`}>
-                    {t('scan.retakeTitle')}
+                    {ocrEngineFailed ? t('scan.engineTitle') : t('scan.retakeTitle')}
                   </h3>
                   <p className={`${TYPE.body} ${WEIGHT.normal} text-[#791F1F] leading-snug`}>
-                    {t('scan.retakeSubtitle')}
+                    {ocrEngineFailed ? t('scan.engineSubtitle') : t('scan.retakeSubtitle')}
                   </p>
                 </div>
 
@@ -1815,6 +1975,26 @@ export default function App() {
                   {errorMessage}
                 </p>
 
+                {/* ★ 2026-10-02：引擎失敗時，給的是「重試」而不是「重拍」。
+                    理由見掃描流程的註解 —— 照片從來不是問題，
+                    叫使用者重拍只會讓他一直做沒有用的事。 */}
+                {ocrEngineFailed ? (
+                  <div className="flex flex-col gap-[10px]">
+                    <p className={`${TYPE.secondary} ${WEIGHT.normal} text-[#501313] bg-white/70 rounded-[12px] p-[12px] leading-snug border border-[#F09595]`}>
+                      {t('scan.engineHint')}
+                    </p>
+                    <button
+                      type="button"
+                      id="btn-retry-analysis"
+                      onClick={handleRetryAnalysis}
+                      className="w-full min-h-[64px] rounded-2xl bg-[#A32D2D] hover:bg-[#7F1D1D] text-white font-black text-[19px] flex items-center justify-center gap-[10px] cursor-pointer active:scale-95 border-3 border-[#501313]"
+                    >
+                      <RefreshCw className="w-[24px] h-[24px] shrink-0" aria-hidden="true" />
+                      {t('scan.engineRetry')}
+                    </button>
+                  </div>
+                ) : (
+                  <>
                 {/* 三個具體可做的事 */}
                 <div className="flex flex-col gap-[8px]">
                   <span className={`${TYPE.secondary} font-black text-[#501313]`}>
@@ -1838,6 +2018,8 @@ export default function App() {
                     ))}
                   </ul>
                 </div>
+                  </>
+                )}
 
                 <button
                   type="button"

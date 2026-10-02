@@ -38,6 +38,7 @@ import {
   handleHealth,
   handlePrivacy,
 } from './server/handlers';
+import { handleFitnessReport } from './server/fitnessReport';
 import type { ApiResult, CoreDeps, PlatformRequest } from './server/core';
 
 const app = express();
@@ -91,6 +92,7 @@ function route(handler: (body: any, headers: Headers, deps: CoreDeps) => Promise
 app.post('/api/analyze-label', route(handleAnalyzeLabel));
 app.post('/api/analyze-indicators', route(handleAnalyzeIndicators));
 app.post('/api/ask-health-question', route(handleAskHealthQuestion));
+app.post('/api/fitness-report', route(handleFitnessReport));
 app.get('/api/privacy', route(handlePrivacy));
 app.get('/api/ai-status', route(handleAiStatus));
 app.get('/api/health', route(handleHealth));

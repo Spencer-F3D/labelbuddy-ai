@@ -674,6 +674,141 @@ async function callOpenRouter(key: string, options: AiCallOptions): Promise<Prov
   return { ok: false, permanent: false, error: lastError || '全部嘗試失敗' };
 }
 
+/* ===========================================================================
+ * NVIDIA NIM（2026-10-02 新增）
+ * ===========================================================================
+ * 【為什麼要加第三家】
+ *   OpenRouter 免費層只有約 50 次/日，Gemini 在中國澳門被區域封鎖。
+ *   NIM 是目前找到**唯一沒有每日請求上限**的免費供應商，
+ *   對「每晚自動跑一次健身週報」這種用途特別合適。
+ *
+ * 【為什麼不接進 callAiModel 的輪替鏈】
+ *   那條鏈服務的是**標籤辨識與健康問答**，有兩個特性：
+ *     ① 需要視覺（圖片）能力
+ *     ② 使用者正在貨架前等，時間預算很緊
+ *   NIM 已驗證可用的模型都是**文字**模型，而且冷啟動可能長達 86～156 秒。
+ *   把它接進那條鏈，等於拿標籤辨識的穩定性去換一個不需要它的地方。
+ *   → 所以做成獨立函式，只給**健身報告**（純文字、可以等）使用。
+ *
+ * 【實測到的三個坑（來自 nvidia-nim-free-api 技能）】
+ *   ① `/v1/models` 會列出帳號其實**不能呼叫**的模型（回 404 Not found for account）
+ *      → 404 是永久性的，不可以重試，直接換下一個候選。
+ *   ② 冷啟動極慢（最慢實測 156 秒），在 75 秒逾時下看起來像壞掉。
+ *      → 每個模型給獨立的短逾時，慢的就快速換人，不要卡住整體。
+ *   ③ 推理模型的 `message.content` 可能是 **null**，答案在 `reasoning_content`。
+ *      → 兩個都要讀，否則會誤判成「模型沒有回答」。
+ */
+const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
+
+/**
+ * NIM 的模型候選鏈。
+ *
+ * ★ 2026-10-02 用**這把金鑰實測**（非引用技能的一般結論）：
+ *
+ *   openai/gpt-oss-20b                        → HTTP 200，0.76 秒   ← 主力
+ *   z-ai/glm-5.3-flash                        → HTTP 200，13.5 秒
+ *                                               ⚠️ content 是 null，答案在 reasoning_content
+ *   nvidia/nemotron-3.5-lightning-30b-a3b     → 40 秒逾時（冷啟動太慢，不列入）
+ *
+ * 【為什麼只留兩個】
+ *   每個失敗的候選要吃掉一次逾時預算（25 秒）。鏈裡放一個「通常會逾時」的模型
+ *   等於每次都先白等 25 秒才輪到能用的 —— 那比沒有備援更糟。
+ *   → 只放實測可用的；日後要加，**先用同樣的方法量一次**再加入。
+ */
+const NVIDIA_MODEL_CHAIN = ['openai/gpt-oss-20b', 'z-ai/glm-5.3-flash'];
+
+/** 單一 NIM 模型的逾時。刻意短 —— 冷啟動慢的模型要快速讓位。 */
+const NVIDIA_ATTEMPT_TIMEOUT_MS = Number(process.env.NVIDIA_ATTEMPT_TIMEOUT_MS) || 25000;
+
+export function nvidiaKey(): string {
+  return (process.env.NVIDIA_API_KEY || '').trim();
+}
+
+/**
+ * 呼叫 NVIDIA NIM。
+ *
+ * @returns 成功時回傳解析後的 JSON 與實際使用的模型；失敗回傳 null。
+ */
+export async function callNvidiaNim(options: {
+  systemInstruction: string;
+  userPrompt: string;
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<{ data: any; model: string } | null> {
+  const key = nvidiaKey();
+  if (!isValidKey(key)) {
+    console.log('[LabelBuddy AI] NVIDIA NIM：未設定金鑰，略過');
+    return null;
+  }
+
+  for (const model of NVIDIA_MODEL_CHAIN) {
+    const started = Date.now();
+    try {
+      const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: options.systemInstruction },
+            { role: 'user', content: options.userPrompt },
+          ],
+          temperature: options.temperature ?? 0.4,
+          max_tokens: options.maxTokens ?? 1200,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(NVIDIA_ATTEMPT_TIMEOUT_MS),
+      });
+
+      const elapsed = Date.now() - started;
+
+      if (response.status === 404) {
+        // 永久性：這個帳號不能呼叫這個模型。**不要重試**，直接下一個候選。
+        console.log(`[LabelBuddy AI] NVIDIA ${model}：404（此帳號不可用），換下一個`);
+        continue;
+      }
+      if (response.status === 503 || response.status === 500) {
+        // 上游 worker 飽和，屬暫時性 —— 但也不要在同一個模型上耗太久
+        console.log(`[LabelBuddy AI] NVIDIA ${model}：HTTP ${response.status}（暫時性，換下一個）`);
+        continue;
+      }
+      if (!response.ok) {
+        const t = await response.text();
+        console.log(`[LabelBuddy AI] NVIDIA ${model}：HTTP ${response.status} ${t.slice(0, 120)}`);
+        continue;
+      }
+
+      const json: any = await response.json();
+      const msg = json?.choices?.[0]?.message;
+      /**
+       * ⚠️ 推理模型的 content 可能是 null，答案在 reasoning_content。
+       *    只讀 content 會得到空字串，看起來像「模型沒有回答」。
+       */
+      const text: string = (msg?.content ?? msg?.reasoning_content ?? '') || '';
+      const parsed = parseJsonLoose(text);
+
+      console.log(
+        `[LabelBuddy AI] NVIDIA ${model}：${parsed ? '成功' : 'JSON 解析失敗'}（${elapsed}ms）` +
+          ` 輸出=${json?.usage?.completion_tokens ?? '?'} tokens`
+      );
+
+      if (parsed) return { data: parsed, model: json?.model || model };
+    } catch (error: any) {
+      // 逾時／連線失敗多為冷啟動，換下一個候選即可，不標記為永久失敗
+      console.log(
+        `[LabelBuddy AI] NVIDIA ${model}：例外（${Date.now() - started}ms）` +
+          ` ${String(error?.message).slice(0, 120)}`
+      );
+    }
+  }
+
+  console.log('[LabelBuddy AI] NVIDIA NIM：所有候選都失敗');
+  return null;
+}
+
 /**
  * 依使用率輪替呼叫供應商。
  *
