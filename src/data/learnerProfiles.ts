@@ -92,7 +92,8 @@ const TEEN_SUGAR: NutritionTarget = {
 };
 
 /* ---------------------------------------------------------------------------
- * 六種身分
+ * 七種身分
+ *   長者 senior／兒童 child／青少年 teen／健身人士 fitness／青年 young／中年 middle／學生 student
  * ------------------------------------------------------------------------- */
 
 const PROFILES: LearnerProfile[] = [
@@ -216,10 +217,10 @@ const PROFILES: LearnerProfile[] = [
     preferredTopics: ['basics', 'dangers', 'shopping', 'profiles'],
   },
 
-  /* ======================= 4. 健身增肌 ======================= */
+  /* ======================= 4. 健身人士 ======================= */
   {
     id: 'fitness',
-    name: '健身增肌',
+    name: '健身人士',
     emoji: '💪',
     accent: 'orange',
     focusSummary: '想知道這個產品蛋白質夠不夠、糖和熱量會不會拖累體態',
@@ -256,10 +257,18 @@ const PROFILES: LearnerProfile[] = [
     preferredTopics: ['basics', 'profiles', 'dangers', 'shopping'],
   },
 
-  /* ======================= 5. 年輕人 ======================= */
+  /* ======================= 5. 青年 ======================= */
   {
-    id: 'takeout',
-    name: '年輕人',
+    /**
+     * ★ 2026-10-02：id 由 `takeout` 改為 `young`（顯示名稱也由「年輕人」改為「青年」）。
+     *
+     * 為什麼要改 id 而不只改名稱：這個 id 會**存進使用者的裝置**
+     * （`labelbuddy_learner_profile_v1`）。留著 `takeout` 這個名字，
+     * 半年後接手的人看到「青年」身分的 id 叫 `takeout` 只會更困惑。
+     * 舊值由 `App.tsx` 的 `migrateProfileId()` 對應過來（不會靜默退回長者）。
+     */
+    id: 'young',
+    name: '青年',
     emoji: '🍱',
     accent: 'emerald',
     focusSummary: '想知道便利商店與外送餐點裡，哪一個負擔比較小、怎麼搭配才均衡',
@@ -334,6 +343,53 @@ const PROFILES: LearnerProfile[] = [
       '在有限預算下做出比較好的零食選擇',
     ],
     recommendKeywords: ['無糖', '低糖', '高鈣', '原味', '天然'],
+    preferredTopics: ['basics', 'dangers', 'shopping', 'profiles'],
+  },
+
+  /* ======================= 7. 中年 ======================= */
+  {
+    /**
+     * ★ 2026-10-02 新增（使用者指定身分清單：長者／兒童／青少年／健身人士／青年／中年／學生）。
+     *
+     * 【為什麼「中年」需要獨立一個身分，而不是併進長者或青年】
+     *   這個族群的特徵是「**數值還在正常範圍，但已經開始在意**」——
+     *   40～60 歲、健檢報告出現紅字邊緣、想趁還沒吃藥之前調整。
+     *   若併進「長者」，會拿到長者的嚴格鈉上限（1200～1500 毫克），
+     *   那是給已經確診的人看的，對他只是過度緊張；
+     *   若併進「青年」，又少了「預防三高」這個最重要的判讀角度。
+     *   所以採用**一般成人上限**，但把重點放在飽和脂肪與鈉的長期累積。
+     */
+    id: 'middle',
+    name: '中年',
+    emoji: '🧑‍💼',
+    accent: 'sky',
+    focusSummary: '想趁健檢數字還在邊緣時調整飲食，避免三高找上門',
+    aiPersona: '像一位看重長期健康的家庭醫師，講求實證但不嚇人，強調「現在改還來得及」',
+    aiFocus: '鈉、飽和脂肪、添加糖的長期累積、膳食纖維',
+    targets: [
+      SODIUM_STANDARD,
+      SAT_FAT_STANDARD,
+      SUGAR_STANDARD,
+      {
+        nutrient: '膳食纖維',
+        target: '25 公克',
+        direction: 'target',
+        note: '纖維能延緩血糖上升、帶走多餘膽固醇，是三高預防最實惠的一項',
+      },
+    ],
+    numericLimits: {
+      鈉: { value: 2000, unit: '毫克' },
+      飽和脂肪: { value: 20, unit: '公克' },
+      添加糖: { value: 50, unit: '公克' },
+      膳食纖維: { value: 25, unit: '公克' },
+    },
+    learningObjectives: [
+      '看懂「飽和脂肪」那一列，知道它和膽固醇的關係',
+      '分辨「含糖」與「添加糖」，避開不知不覺喝進去的糖',
+      '學會用「加一份蔬菜」取代一份加工食品',
+      '知道哪些宣稱（低脂、高纖）值得相信、哪些只是行銷詞',
+    ],
+    recommendKeywords: ['低鈉', '高纖', '少油', '無糖', '原型食物'],
     preferredTopics: ['basics', 'dangers', 'shopping', 'profiles'],
   },
 ];

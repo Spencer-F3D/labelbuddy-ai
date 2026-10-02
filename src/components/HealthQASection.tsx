@@ -22,17 +22,11 @@
 import React, { useState } from 'react';
 import { apiUrl } from '../utils/apiBase';
 import { MessageCircleQuestion, Volume2 } from 'lucide-react';
-import { AddressGender, AnalysisMode, HealthQuestionAnswer } from '../types';
+import { AnalysisMode, HealthQuestionAnswer } from '../types';
 import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
 
 interface HealthQASectionProps {
-  /**
-   * 稱謂用的性別（2026-09-29）。
-   * 只影響 AI 回答與語音怎麼稱呼使用者（先生／小姐／您好），
-   * 不影響任何營養或風險判斷。未指定時後端一律用中性的「您好」。
-   */
-  gender?: AddressGender;
   /**
    * 分析模式（2026-09-30）。
    * ⚠️ 這是**同意閘門**：`local_only` 時後端不會呼叫雲端。
@@ -42,10 +36,7 @@ interface HealthQASectionProps {
   analysisMode?: AnalysisMode;
 }
 
-export const HealthQASection: React.FC<HealthQASectionProps> = ({
-  gender,
-  analysisMode,
-}) => {
+export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }) => {
   const { t, language } = useI18n();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<HealthQuestionAnswer | null>(null);
@@ -62,13 +53,12 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文回答
-        // gender 只影響稱謂（先生／小姐／您好），不影響判斷
         // localOnly 是同意閘門：只在本機時後端不呼叫雲端
         // ⚠️ 不再送 indicators（血壓／心跳／血糖）—— 見檔頭說明。
+        // ⚠️ 不再送 gender（性別與稱謂機制已於 2026-10-02 移除）。
         body: JSON.stringify({
           question: q,
           language,
-          gender,
           localOnly: analysisMode === 'local_only',
         }),
       });

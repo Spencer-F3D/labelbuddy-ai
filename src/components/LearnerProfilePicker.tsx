@@ -72,11 +72,17 @@ const ACCENT_STYLES: Record<
     text: 'text-orange-900',
     badge: 'bg-orange-700',
   },
-  takeout: {
+  young: {
     ring: 'ring-emerald-500 border-emerald-600',
     bg: 'bg-emerald-50',
     text: 'text-emerald-900',
     badge: 'bg-emerald-700',
+  },
+  middle: {
+    ring: 'ring-sky-500 border-sky-600',
+    bg: 'bg-sky-50',
+    text: 'text-sky-900',
+    badge: 'bg-sky-700',
   },
   student: {
     ring: 'ring-purple-500 border-purple-600',

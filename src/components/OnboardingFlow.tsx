@@ -49,10 +49,9 @@ import {
   // 向下捲動提示（2026-10-02）
   ChevronDown,
 } from 'lucide-react';
-import { AddressGender, AnalysisMode, LearnerProfileId } from '../types';
+import { AnalysisMode, LearnerProfileId } from '../types';
 import { useI18n } from '../i18n/I18nContext';
 import { LearnerProfilePicker } from './LearnerProfilePicker';
-import { GenderPicker } from './GenderPicker';
 import { LegalNotice } from './LegalNotice';
 import { AnalysisModePicker } from './AnalysisModePicker';
 // 語言閘門（2026-09-30）：全流程的第一頁，獨立於編號步驟之外。
@@ -61,19 +60,17 @@ import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { conditionName } from '../data/bilingual';
 
 /**
- * 性別。
+ * ★ 2026-10-02 使用者指定：**刪除有關稱呼、性別的東西**。
  *
- * 【為什麼要問，以及為什麼一定要有「不指定」】
- *   中文的稱謂分性別（先生／小姐），AI 回饋與語音都要用對才不失禮。
- *   但這題**不該強迫作答** —— 使用者可能不想講、也可能覺得沒必要。
- *   所以第三個選項不是裝飾，是為了讓「不想說」也能走下去。
- *   `unspecified` 時一律用中性的「您好」，不要猜。
+ * 原本引導頁第 4 步是「要怎麼稱呼您？」（先生／小姐／不指定），
+ * 連帶 `Gender` 型別、`OnboardingResult.gender`、
+ * 以及後端的 `buildAddressRule`／`applyHonorific*` 全部移除。
+ * 現在流程是：語言閘門 → 介紹 → 身分 → 慢性病與過敏 → 教學 → AI 方式 → 私隱。
+ * （長者 8 頁、其他 6 頁 —— 比原本各少 1 頁。）
  */
-export type Gender = AddressGender;
 
 export interface OnboardingResult {
   profileId: LearnerProfileId;
-  gender: Gender;
   /** 使用者選的分析模式（2026-09-30 起為三選一）。 */
   analysisMode: AnalysisMode;
   /** 第 3 頁勾選的慢性病與過敏原（與設定頁共用同一個儲存鍵）。 */
@@ -99,7 +96,6 @@ type StepId =
   | 'intro'
   | 'profile'
   | 'conditions'
-  | 'gender'
   | 'how1'
   | 'how2'
   | 'how3'
@@ -109,7 +105,7 @@ type StepId =
 
 /** 依身分決定步驟序列。長者把教學拆成 3 頁，其他身分合併成 1 頁。 */
 function buildSteps(profileId: LearnerProfileId): StepId[] {
-  const common: StepId[] = ['intro', 'profile', 'conditions', 'gender'];
+  const common: StepId[] = ['intro', 'profile', 'conditions'];
   const tail: StepId[] = ['mode', 'privacy'];
   return profileId === 'senior'
     ? [...common, 'how1', 'how2', 'how3', ...tail]
@@ -138,7 +134,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
    */
   const [languageChosen, setLanguageChosen] = useState(false);
   const [profileId, setProfileId] = useState<LearnerProfileId>(initialProfileId);
-  const [gender, setGender] = useState<Gender>('unspecified');
   /** 第 3 頁的勾選（與設定頁共用同一個儲存鍵，由 App 負責存） */
   const [conditions, setConditions] = useState<string[]>(initialConditions);
   /**
@@ -214,7 +209,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const stepId = steps[current];
   const isLast = current === steps.length - 1;
 
-  const finish = () => onComplete({ profileId, gender, analysisMode, conditions });
+  const finish = () => onComplete({ profileId, analysisMode, conditions });
 
   const toggleCondition = (id: string) =>
     setConditions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -292,10 +287,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       onScroll={updateScrollHint}
       className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
     >
-      {/* ⚠️ 內距與間距是「量出來的」：`:root{font-size:20px}` 讓 `p-4`/`gap-4`
-          實際是 20px（不是 16px，Tailwind 的 rem 被放大了 1.25 倍）。
-          改成明確的 px 值以精確控制第 1 頁的高度（見 measure:onboarding）。 */}
-      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-[14px] gap-[12px]">
+      {/* ⚠️ 內距與間距用明確 px：`:root{font-size:20px}` 讓 `p-4`/`gap-4`
+          實際是 20px（不是 16px，Tailwind 的 rem 被放大了 1.25 倍）。 */}
+      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col p-[16px] gap-[16px]">
         {/* ⚠️ 2026-09-30 使用者要求：移除上方的步數與進度條。
             理由：長者在引導頁只想趕快設定完，數字只會增加壓力，
             而且總頁數會依身分變動（長者 9／其他 7），顯示數字反而困惑。 */}
@@ -313,37 +307,24 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 連帶移除了 5 個 introShot* 翻譯鍵與那段模擬標籤的排版。 */}
           {stepId === 'intro' && (
             <>
-              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-[12px]">
+              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white rounded-2xl p-5">
                 <p className="text-[16px] font-black text-blue-200 tracking-wide">
                   {t('onboard.introKicker')}
                 </p>
                 <h1 className="text-[20px] font-black mt-1 leading-tight">
                   {t('onboard.introTitle')}
                 </h1>
-                <p className="text-[16px] font-bold mt-1.5 leading-snug text-blue-50">
+                <p className="text-[16px] font-bold mt-2 leading-relaxed text-blue-50">
                   {t('onboard.introBody')}
                 </p>
               </div>
 
-              {/* 功能清單：把 App 的每一個功能都講到
-                  ★ 2026-10-02 使用者要求「第一頁不用滾動就看完整頁」。
-                    這是量出來的取捨，不是猜的（見 scripts/measure-onboarding.mjs）：
-
-                      640px 畫面
-                      − 16 上下內距 ×2
-                      − 10 頂部留白
-                      − 16 區塊間距 ×2
-                      − 68 底部「下一步」按鈕
-                      ────────────────
-                      ＝ 498px 給內容
-
-                    而「6 條 × (標題＋說明)」實測就要 637px —— **物理上塞不下**。
-                    所以移除每條的說明行（83px → 30px，省 340px）。
-                    標題本身已完整點出六個功能，符合原需求「每個功能都要提到」。
-
-                  ⚠️ 若日後要把說明加回來，就必須同時接受「這一頁要滾動」——
-                     兩者不可能同時成立。 */}
-              <div className="bg-white rounded-2xl p-[12px] border-2 border-slate-300 flex flex-col gap-[8px]">
+              {/* 功能清單：把 App 的每一個功能都講到（標題 ＋ 說明）
+                  ★ 2026-10-02 使用者明確指示：**這一頁保留說明、接受滾動。**
+                    「不用滾動」的要求是給**語言選擇頁**（見 OnboardingLanguageStep），
+                    不是這一頁 —— 我先前把這裡的說明砍掉是修錯地方，已還原。
+                    本頁高度約 1010px（畫面 640px），會出現向下捲動提示。 */}
+              <div className="bg-white rounded-2xl p-4 border-2 border-slate-300 flex flex-col gap-3">
                 <h2 className="text-[19px] font-black text-slate-950">
                   {t('onboard.featListTitle')}
                 </h2>
@@ -355,11 +336,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   { n: 5, Icon: MessageCircleQuestion },
                   { n: 6, Icon: SlidersHorizontal },
                 ].map(({ n, Icon }) => (
-                  <div key={`feat-${n}`} className="flex items-center gap-3">
-                    <Icon className="w-6 h-6 text-blue-800 shrink-0" aria-hidden="true" />
-                    <p className="flex-1 min-w-0 text-[18px] font-black text-slate-900 leading-snug">
-                      {t(`onboard.feat${n}Title` as 'onboard.feat1Title')}
-                    </p>
+                  <div key={`feat-${n}`} className="flex items-start gap-3">
+                    <Icon className="w-6 h-6 text-blue-800 shrink-0 mt-[3px]" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[18px] font-black text-slate-900 leading-snug">
+                        {t(`onboard.feat${n}Title` as 'onboard.feat1Title')}
+                      </p>
+                      <p className="text-[16px] font-bold text-slate-600 leading-snug">
+                        {t(`onboard.feat${n}Body` as 'onboard.feat1Body')}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -408,7 +394,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 </div>
               </div>
 
-              {/* 過敏原用紅色：後果等級與慢性病完全不同（絕對不能吃 vs 少吃一點） */}
+              {/* 過敏原用紅色：與慢性病在視覺上區隔開（這是最容易誤食的一類） */}
               <div className="bg-white rounded-2xl p-4 border-2 border-[#A32D2D] flex flex-col gap-3">
                 <h2 className="text-[19px] font-black text-[#501313] flex items-center gap-2">
                   <AlertTriangle className="w-6 h-6 shrink-0" aria-hidden="true" />
@@ -422,13 +408,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 </div>
               </div>
             </>
-          )}
-
-          {/* ── 4. 性別 ─────────────────────────────────────────── */}
-          {stepId === 'gender' && (
-            <div className="bg-white rounded-2xl p-4 border-2 border-blue-900">
-              <GenderPicker value={gender} onChange={setGender} />
-            </div>
           )}
 
           {/* ── 5~7（長者）／5（其他）：使用教學 ──────────────────── */}

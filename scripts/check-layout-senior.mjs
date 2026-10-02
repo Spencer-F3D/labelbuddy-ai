@@ -54,6 +54,18 @@ const VERBOSE = process.argv.includes('--verbose');
  *   所以英文版面的正確性是**門檻**，不是加分項。
  */
 const LANG = (process.argv.find((a) => a.startsWith('--lang=')) || '--lang=zh-TW').split('=')[1];
+/**
+ * 引導頁要選哪一個身分。預設用預設值（senior）。
+ *
+ * 【為什麼需要這個參數】
+ *   「健身專區」只在身分＝健身人士時出現。用預設身分跑，那三個分頁
+ *   **根本不會被渲染**，也就完全沒有被驗證到 —— 那正是本專案最怕的
+ *   「假通過」：報告全綠，但那塊從來沒被看過。
+ *   用法：`--profile=fitness`（值會用來比對身分卡上的文字）。
+ */
+const PROFILE = (process.argv.find((a) => a.startsWith('--profile=')) || '').split('=')[1] || '';
+/** 各語言下「健身人士」卡片上的文字（找不到就換一種寫法再找一次） */
+const PROFILE_TEXT = { 'zh-TW': '健身人士', en: 'Fitness' };
 
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -570,6 +582,23 @@ try {
     const stillFlow = await evalJs('(() => !!document.getElementById("onboarding-flow"))()');
     if (!stillFlow) break;
     await sweep('引導頁第 ' + (step + 1) + ' 頁');
+
+    // 身分頁（第 2 頁）：若指定了 --profile，先選那個身分再往下
+    if (PROFILE && step === 1) {
+      const want = PROFILE_TEXT[LANG] || PROFILE;
+      const picked = await evalJs(`
+        (() => {
+          const b = [...document.querySelectorAll('button')].find((e) =>
+            (e.textContent || '').includes(${JSON.stringify(want)}));
+          if (!b) return false;
+          b.click();
+          return true;
+        })()
+      `);
+      console.log('   ' + (picked ? '✅ 已選身分：' : '⚠️  找不到身分卡片：') + want);
+      await sleep(600);
+    }
+
     const next = await evalJs(
       '(() => { const b = [...document.querySelectorAll("button")].find(e => /下一步|Next/.test((e.textContent || "").trim())); if (!b) return false; b.click(); return true; })()'
     );
@@ -594,7 +623,10 @@ try {
     ['history', '飲食紀錄'],
     ['classroom', '食育學堂'],
     ['qa', '健康問答'],
+    // ⚠️ 設定頁的 tab 識別碼是 'conditions'，不是 'settings'
     ['conditions', '健康設定'],
+    // 健身專區只在身分＝健身人士時存在。其他身分下找不到按鈕（會印警告，屬預期）。
+    ['fitness', '健身專區'],
   ];
 
   const openTab = async (tab) => {

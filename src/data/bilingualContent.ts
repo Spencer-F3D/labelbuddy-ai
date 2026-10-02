@@ -41,14 +41,17 @@ import type { DietRecord, KnowledgeTopic, LearnerProfileId } from '../types';
  *
  * ⚠️ 名稱措辭是**使用者明確要求**的，不要自行「補回」：
  *    - `senior` 不得寫成「Senior (3 highs)」—— 把長者貼上「三高」標籤不禮貌。
- *    - `takeout` 是「年輕人」，不是「外食族」（原文 Frequent takeout 已改）。
+ *    - `young`（青年）原本的 id 是 `takeout`，畫面名稱是「年輕人」，
+ *      已於 2026-10-02 依使用者指定的身分清單改為「青年」／id `young`。
+ *      （`takeout` 這個字本身帶著「外食族」的評價，換掉也順便對齊。）
  */
 export const PROFILE_UI_EN: Record<string, { name: string }> = {
   senior: { name: 'Senior' },
   child: { name: 'Child' },
   teen: { name: 'Teenager' },
-  fitness: { name: 'Muscle building' },
-  takeout: { name: 'Young adult' },
+  fitness: { name: 'Fitness' },
+  young: { name: 'Young adult' },
+  middle: { name: 'Middle-aged' },
   student: { name: 'Student' },
 };
 

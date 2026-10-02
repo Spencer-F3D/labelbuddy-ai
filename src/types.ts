@@ -29,15 +29,6 @@ export type RiskLevel = 'red' | 'yellow' | 'green';
 export type DataHandling = 'cloud' | 'local_only';
 
 /**
- * 稱謂用的性別。
- *
- * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
- *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
- * ⚠️ 必須與後端 `server/core.ts` 的 `AddressGender` 保持一致。
- */
-export type AddressGender = 'male' | 'female' | 'unspecified';
-
-/**
  * 分析模式（三選一，2026-09-30 起）。
  *
  * 【為什麼從「同意／不同意」變成三選一】
@@ -291,7 +282,14 @@ export interface DietRecord {
  * 設計原則：所有內容皆為內建靜態資料，完全不需網路即可學習。
  * ==========================================================================*/
 
-export type LearnerProfileId = 'senior' | 'child' | 'teen' | 'student' | 'fitness' | 'takeout';
+export type LearnerProfileId =
+  | 'senior'
+  | 'child'
+  | 'teen'
+  | 'fitness'
+  | 'young'
+  | 'middle'
+  | 'student';
 
 /** 學習者身分定義（供 AI 提示詞組裝與教學內容篩選） */
 export interface LearnerProfile {

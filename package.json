@@ -21,7 +21,6 @@
     "ocr:smoke": "esbuild scripts/ocr-smoke.ts --bundle --platform=node --format=esm --packages=external --outfile=.ocr-smoke.mjs --log-level=error && node .ocr-smoke.mjs",
     "verify:conditions": "esbuild scripts/verify-condition-keywords.ts --bundle --platform=node --format=esm --packages=external --outfile=.verify-conditions.mjs --log-level=error && node .verify-conditions.mjs",
     "check:i18n": "tsx scripts/check-i18n-leaks.ts",
-    "check:honorific": "tsx scripts/check-honorific.ts",
     "check:cache": "tsx scripts/check-cache-key.ts",
     "check:diet": "tsx scripts/check-diet-record-lang.ts",
     "check:mode": "tsx scripts/check-analysis-mode.ts",
@@ -31,7 +30,7 @@
     "check:layout": "node scripts/check-layout-senior.mjs",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
-    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:honorific && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup"
+    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

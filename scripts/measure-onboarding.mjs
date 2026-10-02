@@ -185,8 +185,10 @@ async function breakdown() {
   return evalJs(`
     (() => {
       const flow = document.getElementById('onboarding-flow');
-      if (!flow) return null;
-      const inner = flow.querySelector('.flex-1');
+      const gate = document.getElementById('onboarding-language-gate');
+      if (!flow && !gate) return null;
+      // 引導頁的內容在 .flex-1 裡；語言閘門沒有那一層，直接量它的內層容器
+      const inner = flow ? flow.querySelector('.flex-1') : gate.firstElementChild;
       if (!inner) return null;
       const rows = [];
       const walk = (el, depth) => {
@@ -281,6 +283,30 @@ try {
     await sleep(2500);
   }
   if (!ready) throw new Error('App 載入失敗');
+
+  /**
+   * ★ 語言閘門也要量（2026-10-02 使用者要求：「不用滾動的是**選語言**那一頁」）。
+   *
+   * 原本這支腳本直接把它按掉才開始量，所以它從來沒被量過 ——
+   * 而它偏偏是使用者唯一明確要求「必須一頁看完」的畫面。
+   * measure() 本來就同時認 `onboarding-language-gate`，直接呼叫即可。
+   */
+  const gateRow = await measure();
+  if (gateRow && !gateRow.__error && gateRow.flow && gateRow.title !== '(無標題)') {
+    const over = gateRow.contentBottom - gateRow.innerH;
+    console.log(
+      `  【語言閘門】${over > 0 ? '❌ 溢出' : '✅ 塞得下'}  內容到 ${gateRow.contentBottom}px / 畫面 ${gateRow.innerH}px` +
+        (over > 0 ? `  → 超出 ${over}px` : `  （剩 ${-over}px）`)
+    );
+    const bd = await breakdown();
+    if (Array.isArray(bd) && bd.length) {
+      console.log('        ── 高度組成 ──');
+      for (const r of bd) {
+        if (r.h < 12) continue;
+        console.log(`        ${'  '.repeat(r.depth)}${String(r.h).padStart(4)}px  ${r.label}`);
+      }
+    }
+  }
 
   /**
    * 語言閘門（全流程第一頁，2026-09-30 新增）。

@@ -89,26 +89,42 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
       id="onboarding-language-gate"
       className="fixed inset-0 z-[60] bg-slate-100 overflow-y-auto"
     >
-      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col justify-center p-4 gap-5">
+      {/* ★★ 2026-10-02 使用者明確指定：**這一頁不用向下滾動就看完整頁。**
+          （原本「不用滾動」的要求被誤解成介紹頁 —— 介紹頁改成保留說明、接受滾動。）
+
+          量出來的預算：`:root{font-size:20px}` 讓 Tailwind 的 rem 間距放大 1.25 倍，
+          而且這一頁在**長者字級**下渲染（`text-[20px]` 實際是 24px）。
+          原始版本實測約 691px > 640px。以下每一項都是為了把那 51px 收回來：
+
+            `gap-5`(25px×4) → `gap-[12px]`      −52
+            品牌圓標 72 → 56                     −16
+            題目卡 `p-5`(25px) → `p-[14px]`      −22
+            選項 `min-h-[88px]` → `min-h-[76px]` −24
+            ────────────────────────────────────────
+            約 577px，留 60px 餘裕
+
+          ⚠️ 選項仍是 76px 高（一般規範 48px），長者手指較難精準點擊。
+              這是**刻意的**：這一頁只有兩顆按鈕，寧可高一點也不要誤按。 */}
+      <div className="mx-auto w-full max-w-[560px] min-h-screen flex flex-col justify-center p-[14px] gap-[12px]">
         {/* 品牌區：用中性內容，不偏任何一種語言 */}
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           <span
-            className="w-[72px] h-[72px] rounded-full bg-blue-900 flex items-center justify-center shrink-0"
+            className="w-[56px] h-[56px] rounded-full bg-blue-900 flex items-center justify-center shrink-0"
             aria-hidden="true"
           >
-            <Languages className="w-[40px] h-[40px] text-white" />
+            <Languages className="w-[32px] h-[32px] text-white" />
           </span>
           <p className="text-[20px] font-black text-blue-950 tracking-wide">LabelBuddy AI</p>
         </div>
 
         {/* 題目：兩種語言同時寫，確保任一方都看得懂 */}
-        <div className="bg-white rounded-2xl p-5 border-2 border-blue-900 flex flex-col items-center gap-1">
+        <div className="bg-white rounded-2xl p-[14px] border-2 border-blue-900 flex flex-col items-center">
           <p className="text-[20px] font-black text-slate-950">{QUESTION.zh}</p>
           <p className="text-[20px] font-black text-slate-950">{QUESTION.en}</p>
         </div>
 
-        {/* 兩個選項：高度 88px（比一般按鈕更大，這是唯一能做的事） */}
-        <div className="flex flex-col gap-3">
+        {/* 兩個選項：高度 76px（比一般按鈕更大，這是唯一能做的事） */}
+        <div className="flex flex-col gap-[10px]">
           {LANGUAGE_OPTIONS.map((opt) => {
             const isActive = pending === opt.id;
             const nativeLabel = NATIVE_NAME[opt.id] ?? opt.short;
@@ -119,7 +135,7 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
                 id={`onboarding-language-${opt.id}`}
                 onClick={() => setPending(opt.id)}
                 aria-pressed={isActive}
-                className={`w-full min-h-[88px] px-5 py-4 rounded-2xl border-2 flex items-center gap-4 text-left transition-all active:scale-[0.98] cursor-pointer ${
+                className={`w-full min-h-[76px] px-4 py-3 rounded-2xl border-2 flex items-center gap-4 text-left transition-all active:scale-[0.98] cursor-pointer ${
                   isActive
                     ? 'bg-blue-900 text-white border-blue-950 shadow-md'
                     : 'bg-white text-slate-900 border-slate-300'
@@ -127,7 +143,7 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
               >
                 {/* 圓形徽章：讓不識字的視覺線索也能分辨兩個選項 */}
                 <span
-                  className={`w-[52px] h-[52px] shrink-0 rounded-full flex items-center justify-center text-[18px] font-black ${
+                  className={`w-[46px] h-[46px] shrink-0 rounded-full flex items-center justify-center text-[18px] font-black ${
                     isActive ? 'bg-blue-800 text-white' : 'bg-slate-100 text-slate-700 border border-slate-300'
                   }`}
                   aria-hidden="true"
@@ -154,7 +170,7 @@ export const OnboardingLanguageStep: React.FC<OnboardingLanguageStepProps> = ({
         </button>
 
         {/* 提示：同樣兩種語言都寫 */}
-        <div className="flex flex-col items-center gap-0.5">
+        <div className="flex flex-col items-center">
           <p className="text-[16px] font-bold text-slate-600">{HINT.zh}</p>
           <p className="text-[16px] font-bold text-slate-600">{HINT.en}</p>
         </div>

@@ -60,29 +60,45 @@ export const AnalysisModePicker: React.FC<AnalysisModePickerProps> = ({
               type="button"
               onClick={() => onChange(m)}
               aria-pressed={on}
-              className={`min-h-[48px] rounded-xl px-4 py-3 text-left border-2 flex items-start gap-3 transition-all active:scale-[0.99] cursor-pointer ${
+              /**
+               * ★ 2026-10-02：由 `flex items-start` 改為 `flex flex-col`。
+               *
+               * 【為什麼】
+               *   「上傳：…」那一行原本是右側欄位的一部分 ——
+               *   要跟圖示（24px）、間距（15px）、**選中時的勾勾（24px＋間距）**
+               *   一起分那 360px 的寬度。實測剩下只有 **128px**
+               *   （長者字級 19px → 一行只放得下 6 個字），
+               *   於是「上傳：照片與病史」被折成 2 行、末行只剩 1 個字（孤行）。
+               *
+               *   但這一行是**整張卡片最重要的一句**（它決定使用者按不按得下去），
+               *   卻分到最少的寬度 —— 順序完全錯了。
+               *   改成獨立一列之後它拿到全寬（約 238px），英文版也放得下。
+               */
+              className={`min-h-[48px] rounded-xl px-4 py-3 text-left border-2 flex flex-col gap-2 transition-all active:scale-[0.99] cursor-pointer ${
                 on ? 'bg-blue-800 text-white border-blue-800' : 'bg-white text-slate-800 border-slate-300'
               }`}
             >
-              <Icon className="w-6 h-6 shrink-0 mt-[2px]" aria-hidden="true" />
-              <span className="flex flex-col gap-[2px] flex-1 min-w-0">
-                <span className="text-[18px] font-black">{t(MODE_LABEL_KEY[m])}</span>
-                <span
-                  className={`text-[16px] font-bold leading-snug ${
-                    on ? 'text-blue-100' : 'text-slate-600'
-                  }`}
-                >
-                  {t(MODE_NOTE_KEY[m])}
+              <span className="flex items-start gap-3 w-full">
+                <Icon className="w-6 h-6 shrink-0 mt-[2px]" aria-hidden="true" />
+                <span className="flex flex-col gap-[2px] flex-1 min-w-0">
+                  <span className="text-[18px] font-black">{t(MODE_LABEL_KEY[m])}</span>
+                  <span
+                    className={`text-[16px] font-bold leading-snug ${
+                      on ? 'text-blue-100' : 'text-slate-600'
+                    }`}
+                  >
+                    {t(MODE_NOTE_KEY[m])}
+                  </span>
                 </span>
-                <span
-                  className={`text-[16px] font-black leading-snug ${
-                    on ? 'text-yellow-300' : 'text-amber-700'
-                  }`}
-                >
-                  {t(MODE_DATA_KEY[m])}
-                </span>
+                {on && <Check className="w-6 h-6 shrink-0 mt-[2px]" aria-hidden="true" />}
               </span>
-              {on && <Check className="w-6 h-6 shrink-0 mt-[2px]" aria-hidden="true" />}
+              <span
+                className={`block w-full text-[16px] font-black leading-snug ${
+                  on ? 'text-yellow-300' : 'text-amber-700'
+                }`}
+              >
+                {t(MODE_DATA_KEY[m])}
+              </span>
             </button>
           );
         })}

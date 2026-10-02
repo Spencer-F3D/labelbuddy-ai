@@ -22,11 +22,9 @@
 import {
   analysisCache,
   analysisCacheContent,
-  applyHonorific,
-  applyHonorificToFields,
+  ADDRESS_RULE,
   NUTRIENT_WORDING_FIELDS,
-  applyHonorificToIndicators,
-  buildAddressRule,
+  applyIndicatorPostprocessing,
   buildOcrFailedResult,
   buildSystemInstruction,
   callAiModel,
@@ -34,9 +32,7 @@ import {
   ensureEducationFields,
   getModelChain,
   getOpenRouterQuota,
-  honorificPrefix,
   isValidKey,
-  LABEL_TEXT_FIELDS,
   makeCacheKey,
   normalizeNutrientFacts,
   providerKeys,
@@ -49,7 +45,6 @@ import {
   ENGLISH_OUTPUT_OVERRIDE_INDICATORS,
   ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA,
   writeCache,
-  type AddressGender,
   type ApiResult,
   type CoreDeps,
   type ProviderName,
@@ -106,11 +101,6 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
       profileId,
       localOnly = true,
       /**
-       * 稱謂用的性別（2026-09-29 新增）。只影響「怎麼稱呼使用者」，
-       * 不影響任何營養判斷。舊客戶端不帶 → 一律當 unspecified（中性「您好」）。
-       */
-      gender,
-      /**
        * 介面語言（2026-09-28 新增）。
        *
        * 【為什麼後端要知道語言】
@@ -125,19 +115,13 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     } = req.body;
     // 只有明確等於 'en' 才走英文，其餘（含 undefined、亂填）一律當繁體中文
     const isEnglish = language === 'en';
+    /** 中文才附加稱呼規則；英文沒有「Mr + Hello」這種慣例（見 core.ts 的 ADDRESS_RULE）。 */
+    const addressRule = isEnglish ? '' : ADDRESS_RULE;
     /**
-     * 稱謂前綴（'先生' / '小姐' / ''）。
-     *
-     * ⚠️ 這裡**刻意不把 gender 寫進快取鍵**。
-     *    快取裡存的是「中性」文字（模型不知道性別，開頭一律是「您好」），
-     *    稱謂是在**讀出結果的最後一步**才插上去的。
-     *    所以同一張圖的快取可以同時服務三種性別，不必存三份。
-     *    若日後有人改成「把稱謂寫進快取內容」，那就**必須**把 gender 加進鍵，
-     *    否則會發生「先生拿到小姐的稱謂」這種不會報錯的災難。
+     * ★ 2026-10-02：性別與稱謂機制已移除（使用者指定）。
+     *   舊客戶端仍可能帶 `gender`，這裡**直接忽略**即可 ——
+     *   不需要報錯，也不影響任何判斷（稱謂本來就不進快取鍵）。
      */
-    const addressGender: AddressGender =
-      gender === 'male' || gender === 'female' ? gender : 'unspecified';
-    const honorific = honorificPrefix(addressGender, isEnglish ? 'en' : 'zh-TW');
     console.log(`[LabelBuddy AI] 收到辨識請求（body 解析完成，耗時 ${Date.now() - handlerStart}ms）`);
 
     // ══════════════════════════════════════════════════════════════════
@@ -345,8 +329,6 @@ ${promptContext}`;
         };
         // 舊快取可能沒有食育欄位，這裡一併補齊
         ensureEducationFields(cachedData, cachedFacts, language);
-        // 稱謂是最後一步才插上去（快取內容維持中性）
-        applyHonorificToFields(cachedData, honorific, LABEL_TEXT_FIELDS);
         simplifyNutrientWordingInFields(cachedData, NUTRIENT_WORDING_FIELDS);
         return res.json({ success: true, data: attachReminders(cachedData) });
       }
@@ -362,7 +344,7 @@ ${promptContext}`;
           buildSystemInstruction(
             learnerProfile.id,
             isEnglish ? 'en' : 'zh-TW'
-          ) + buildAddressRule(addressGender, language),
+          ) + addressRule,
         userPrompt: userPromptText,
         // ⚠️ 文字模式下**絕對不傳圖片** —— 這是隱私承諾的核心：
         //    照片從來沒有離開使用者的裝置，雲端只看得到文字。
@@ -388,10 +370,7 @@ ${promptContext}`;
         aiResult.data.learner_profile_name = profileName(learnerProfile.id, learnerProfile.name, language);
         // 模型漏給食育欄位時用確定性內容補上（由真實 nutrient_facts 推導）
         ensureEducationFields(aiResult.data, cloudFacts, language);
-        // ⚠️ 順序：先寫快取（存**中性**文字），再插稱謂。
-        //    反過來的話，快取裡就會帶著第一位使用者的性別稱謂。
         writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
-        applyHonorificToFields(aiResult.data, honorific, LABEL_TEXT_FIELDS);
         simplifyNutrientWordingInFields(aiResult.data, NUTRIENT_WORDING_FIELDS);
         console.log(`[LabelBuddy AI] 雲端辨識完成（${aiResult.provider}），處理器總耗時 ${Date.now() - handlerStart}ms`);
         return res.json({
@@ -439,7 +418,6 @@ ${promptContext}`;
 
     if (!ocr.ok || !ocr.profile) {
       const failed = buildOcrFailedResult(learnerProfile, ocr, language);
-      applyHonorificToFields(failed, honorific, LABEL_TEXT_FIELDS);
       simplifyNutrientWordingInFields(failed, NUTRIENT_WORDING_FIELDS);
       return res.json({
         success: true,
@@ -461,8 +439,6 @@ ${promptContext}`;
     );
     // 引擎內部的比對關鍵字維持中文，這裡只把**輸出欄位**轉成英文。
     const localizedResult = translateLocalResult(smartResult, language);
-    // 稱謂最後才插（在翻譯之後，所以不會影響 localEngineEn 的對照表鍵）
-    applyHonorificToFields(localizedResult, honorific, LABEL_TEXT_FIELDS);
     simplifyNutrientWordingInFields(localizedResult, NUTRIENT_WORDING_FIELDS);
 
     return res.json({
@@ -507,11 +483,9 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     // 介面語言（與標籤分析同一套規則：只有明確 'en' 才走英文）
     const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
     const isEnglish = language === 'en';
+    /** 中文才附加稱呼規則；英文沒有「Mr + Hello」這種慣例（見 core.ts 的 ADDRESS_RULE）。 */
+    const addressRule = isEnglish ? '' : ADDRESS_RULE;
     // 稱謂（只影響怎麼稱呼；舊客戶端不帶 → 中性）
-    const genderRaw = req.body.gender;
-    const addressGender: AddressGender =
-      genderRaw === 'male' || genderRaw === 'female' ? genderRaw : 'unspecified';
-    const honorific = honorificPrefix(addressGender, language);
 
     const sugarDisplay = indicators.bloodSugarUnit === 'mg/dL'
       ? `${indicators.bloodSugar} mg/dL`
@@ -545,7 +519,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
           systemInstruction:
             (isEnglish
               ? SYSTEM_INSTRUCTION_INDICATORS + ENGLISH_OUTPUT_OVERRIDE_INDICATORS
-              : SYSTEM_INSTRUCTION_INDICATORS) + buildAddressRule(addressGender, language),
+              : SYSTEM_INSTRUCTION_INDICATORS) + addressRule,
           userPrompt: promptText,
           temperature: 0.3,
           maxTokens: 1200,
@@ -573,7 +547,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
 
       return res.json({
         success: true,
-        data: applyHonorificToIndicators(aiResult.data, honorific),
+        data: applyIndicatorPostprocessing(aiResult.data),
       });
     }
 
@@ -582,7 +556,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     const smartAnalysis = analyzeSeniorPhysicalIndicators(indicators, language);
     return res.json({
       success: true,
-      data: applyHonorificToIndicators(smartAnalysis, honorific),
+      data: applyIndicatorPostprocessing(smartAnalysis),
     });
   } catch (error: any) {
     console.error('身體指標處理異常:', error);
@@ -603,10 +577,7 @@ export async function handleAnalyzeIndicators(body: any, headers: Headers, deps:
     }, fallbackLanguage);
     return res.json({
       success: true,
-      data: applyHonorificToIndicators(fallback, honorificPrefix(
-        req.body?.gender === 'male' || req.body?.gender === 'female' ? req.body.gender : 'unspecified',
-        fallbackLanguage
-      )),
+      data: applyIndicatorPostprocessing(fallback),
     });
   }
   // 走到這裡代表 handler 沒有提早 return（例如 GET 端點直接 res.json）
@@ -632,11 +603,9 @@ export async function handleAskHealthQuestion(body: any, headers: Headers, deps:
     // 介面語言（與標籤／指標同一套規則：只有明確 'en' 才走英文）
     const language: 'zh-TW' | 'en' = req.body.language === 'en' ? 'en' : 'zh-TW';
     const isEnglish = language === 'en';
+    /** 中文才附加稱呼規則；英文沒有「Mr + Hello」這種慣例（見 core.ts 的 ADDRESS_RULE）。 */
+    const addressRule = isEnglish ? '' : ADDRESS_RULE;
     // 稱謂（只影響怎麼稱呼；舊客戶端不帶 → 中性）
-    const genderRaw = req.body.gender;
-    const addressGender: AddressGender =
-      genderRaw === 'male' || genderRaw === 'female' ? genderRaw : 'unspecified';
-    const honorific = honorificPrefix(addressGender, language);
 
     let contextInfo = '';
     if (indicators) {
@@ -675,7 +644,7 @@ ${contextInfo
           systemInstruction:
             (isEnglish
               ? SYSTEM_INSTRUCTION_HEALTH_QA + ENGLISH_OUTPUT_OVERRIDE_HEALTH_QA
-              : SYSTEM_INSTRUCTION_HEALTH_QA) + buildAddressRule(addressGender, language),
+              : SYSTEM_INSTRUCTION_HEALTH_QA) + addressRule,
           userPrompt: promptText,
           temperature: 0.3,
           maxTokens: 1000,
@@ -691,8 +660,6 @@ ${contextInfo
         voice_script: parsed.voice_script || parsed.answer,
         source: 'cloud_ai',
       };
-      // ⚠️ QA_TEXT_FIELDS 不含 `question` —— 那是**使用者自己的話**，不能改。
-      applyHonorificToFields(qaData, honorific, QA_TEXT_FIELDS);
       simplifyNutrientWordingInFields(qaData, QA_TEXT_FIELDS);
       return res.json({
         success: true,
@@ -703,7 +670,6 @@ ${contextInfo
     // 降級：備用大白話長者問答引擎
     console.log('[LabelBuddy AI] 健康問答啟動本機守護引擎');
     const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators, language);
-    applyHonorificToFields(fallbackAnswer as any, honorific, QA_TEXT_FIELDS);
     simplifyNutrientWordingInFields(fallbackAnswer as any, QA_TEXT_FIELDS);
     return res.json({
       success: true,
@@ -717,14 +683,6 @@ ${contextInfo
       req.body?.question || '常見健康保養',
       req.body?.indicators,
       qaFallbackLanguage
-    );
-    applyHonorificToFields(
-      fallbackAnswer as any,
-      honorificPrefix(
-        req.body?.gender === 'male' || req.body?.gender === 'female' ? req.body.gender : 'unspecified',
-        qaFallbackLanguage
-      ),
-      QA_TEXT_FIELDS
     );
     return res.json({
       success: true,

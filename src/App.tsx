@@ -46,6 +46,7 @@ import {
   Calendar,
   ArrowRight,
   SlidersHorizontal,
+  Dumbbell,
   GraduationCap,
   XCircle,
   ChevronDown,
@@ -107,10 +108,10 @@ import { speakText, stopSpeech, ttsLanguageFor } from './utils/tts';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { HealthQASection } from './components/HealthQASection';
-import { OnboardingFlow, type OnboardingResult, type Gender } from './components/OnboardingFlow';
+import { OnboardingFlow, type OnboardingResult } from './components/OnboardingFlow';
 import { FoodEdClassroom } from './components/FoodEdClassroom';
+import { FitnessZone } from './components/FitnessZone';
 import { LearnerProfilePicker } from './components/LearnerProfilePicker';
-import { GenderPicker } from './components/GenderPicker';
 import { LegalNotice } from './components/LegalNotice';
 import { ClearAllDataSection } from './components/ClearAllDataSection';
 import { AnalysisModePicker } from './components/AnalysisModePicker';
@@ -134,7 +135,15 @@ import {
 } from './theme';
 
 // 導航 Bar 頁面定義：拍照辨識、健康設定、飲食紀錄、食育學堂
-export type NavigationTab = 'home' | 'scan' | 'conditions' | 'history' | 'classroom' | 'qa';
+export type NavigationTab =
+  | 'home'
+  | 'scan'
+  | 'conditions'
+  | 'history'
+  | 'classroom'
+  | 'qa'
+  /** 健身專區（2026-10-02）。只有在身分＝健身人士時才會出現在選單。 */
+  | 'fitness';
 
 /**
  * 側邊選單的項目。
@@ -175,6 +184,22 @@ const MENU_ITEMS: Array<{
     labelKey: 'menu.conditions',
     hintKey: 'menu.conditions.hint',
     Icon: HeartPulse,
+  },
+  {
+    /**
+     * 健身專區（2026-10-02 使用者指定）。
+     *
+     * ⚠️ **只有身分＝健身人士時才顯示**（見下方 MENU_ITEMS 的過濾）。
+     *    理由：對其他 6 種身分來說，「組數／次數／休息」是純噪音 ——
+     *    本專案的原則之一是「不要在頁面上有不用給用戶看的字」。
+     *
+     * 放在最後（設定之前）是因為它與其他功能是**並列的功能**，
+     * 但使用頻率低於拍照與紀錄。
+     */
+    tab: 'fitness',
+    labelKey: 'menu.fitness',
+    hintKey: 'menu.fitness.hint',
+    Icon: Dumbbell,
   },
 ];
 
@@ -263,13 +288,22 @@ function loadAnalysisMode(): AnalysisMode {
 const STORAGE_ONBOARDED_KEY = 'labelbuddy_onboarded_v1';
 
 /**
- * 稱謂用的性別。
+ * ★ 2026-10-02 使用者指定：**刪除性別與稱謂機制**。
  *
- * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
- *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
- *    沒存過或存了無效值 → `unspecified`，一律用中性的「您好」。
+ * 原本這裡有一個儲存鍵 `labelbuddy_gender_v1`（先生／小姐／不指定），
+ * 以及一整套對應的後處理（`applyHonorific*`、`buildAddressRule`）。
+ * 全部移除，理由與代價：
+ *   ① App 的核心是「這包能不能買」，問性別對這個判斷沒有任何貢獻。
+ *   ② 「先生／小姐」在中文是二元假設，對不想回答的人是一種為難。
+ *   ③ **代價**：AI 回饋不再有稱謂。但 neutral 的「您好」本來就是預設 ——
+ *      舊使用者的體驗不會變差，只是不再出現「先生您好」。
+ *   ④ 「不可用長輩稱呼」「你一律寫成您」這兩條規則**保留**
+ *      （見 server/core.ts 的 ADDRESS_RULE）—— 那是安全與禮貌規則，與性別無關。
+ *
+ * ⚠️ 舊的 `labelbuddy_gender_v1` 不需要特別刪除 ——
+ *    「清除所有資料」是前綴掃描（`startsWith('labelbuddy')`），它會被一起清掉；
+ *    而程式碼已不再讀取它，留著也不會影響任何行為。
  */
-const STORAGE_GENDER_KEY = 'labelbuddy_gender_v1';
 
 /** 全部可勾選的慢性病與過敏原（12 項，來源為共用資料檔） */
 const ALL_CONDITIONS = PHYSICAL_INDICATORS;
@@ -322,15 +356,6 @@ const formatScanTime = (lang: Language, d: Date): string => {
     .replace('{d}', String(d.getDate()))
     .replace('{ampm}', hours < 12 ? dict['history.am'] : dict['history.pm']);
   return dict['history.justNow'].replace('{time}', `${datePart} ${clock}`);
-};
-
-/** 過敏原是「絕對不能吃」，慢性病是「少吃一點」——後果等級不同，所以徽章文字要分開。 */
-const ALLERGEN_SEVERITY: Record<string, 'critical' | 'mild'> = {
-  peanut_allergy: 'critical',
-  seafood_allergy: 'critical',
-  gluten_sensitivity: 'critical',
-  // 乳糖「不耐」是生理性不適（脹氣腹瀉），不是致命過敏，所以降一級
-  lactose_intolerance: 'mild',
 };
 
 /**
@@ -498,10 +523,26 @@ export default function App() {
    * 0. 學習者身分：決定 AI 的判斷基準（每日參考值）與學堂內容排序。
    *    未選擇或儲存值損毀時，安全退回「長者」，與舊版行為一致。
    */
+  /**
+   * ★ 2026-10-02：**舊身分 id 的遷移**。
+   *
+   * 【為什麼一定要有這一段】
+   *   身分 id 會存進使用者的裝置。2026-10-02 把 `takeout`（年輕人）
+   *   改名為 `young`（青年）—— 若不做遷移，舊使用者裝置裡的 `'takeout'`
+   *   會被 `isValidProfileId()` 判為無效，然後**靜默退回「長者」**：
+   *   鈉上限從 2000 變成 1500、字級突然放大、教材排序也變了，
+   *   而畫面上只會顯示「長者」—— 使用者不會知道為什麼。
+   *   ★ 通則：**改儲存值的時候，一定要同時寫遷移。**
+   */
+  const LEGACY_PROFILE_IDS: Record<string, LearnerProfileId> = {
+    takeout: 'young',
+  };
+
   const [learnerProfileId, setLearnerProfileId] = useState<LearnerProfileId>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(STORAGE_PROFILE_KEY);
+        if (saved && LEGACY_PROFILE_IDS[saved]) return LEGACY_PROFILE_IDS[saved];
         if (isValidProfileId(saved)) return saved;
       } catch (e) {
         console.warn('讀取學習者身分失敗:', e);
@@ -531,23 +572,10 @@ export default function App() {
   };
 
   /**
-   * 切換稱謂性別（設定頁與引導頁共用同一份 localStorage 鍵）。
-   *
-   * ⚠️ 只影響「怎麼稱呼」，**不影響任何營養或風險判斷**。
-   *    所以這裡不需要重算分析結果，也不需要清快取 ——
-   *    快取存的是中性文字，稱謂是在輸出最後一步才插上去的。
+   * ★ 2026-10-02：`handleChangeGender` 已隨性別機制一併移除。
+   *   （舊的 `labelbuddy_gender_v1` 仍可能留在使用者裝置上，
+   *     但程式已不再讀寫它；「清除所有資料」的前綴掃描會一併清掉。）
    */
-  const handleChangeGender = (next: Gender) => {
-    setGender(next);
-    try {
-      localStorage.setItem(STORAGE_GENDER_KEY, next);
-    } catch {}
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(60);
-      } catch {}
-    }
-  };
 
   // 1. 個人慢性病設定：預設全選或讀取本地儲存
   //
@@ -596,19 +624,16 @@ export default function App() {
    */
   const handleOnboardingComplete = ({
     profileId,
-    gender: chosenGender,
     analysisMode: chosenMode,
     conditions: chosenConditions,
   }: OnboardingResult) => {
     setLearnerProfileId(profileId);
-    setGender(chosenGender);
     setAnalysisMode(chosenMode);
     setSelectedConditions(chosenConditions);
     setOnboarded(true);
 
     try {
       localStorage.setItem(STORAGE_PROFILE_KEY, profileId);
-      localStorage.setItem(STORAGE_GENDER_KEY, chosenGender);
       localStorage.setItem(STORAGE_ANALYSIS_MODE_KEY, chosenMode);
       // 引導頁第 3 頁的慢性病與過敏（與設定頁共用同一個鍵）
       localStorage.setItem(STORAGE_CONDITIONS_KEY, JSON.stringify(chosenConditions));
@@ -828,17 +853,6 @@ export default function App() {
       return false;
     }
   });
-  /** 稱謂用性別（只影響怎麼稱呼，不影響營養判斷） */
-  const [gender, setGender] = useState<Gender>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_GENDER_KEY);
-      if (stored === 'male' || stored === 'female') return stored;
-      return 'unspecified';
-    } catch {
-      return 'unspecified';
-    }
-  });
-
   /**
    * 非長者身分 → 整體字級下調 2px。
    *
@@ -1080,10 +1094,7 @@ export default function App() {
           // 介面語言（2026-09-28）：分析結果的文字由後端產生，
           // 不傳的話切到英文後會看到「英文介面 + 中文結論」。
           language,
-          // 稱謂（2026-09-29）：只影響後端要怎麼稱呼使用者（先生／小姐／您好），
-          // 不影響任何營養判斷，也不會改變快取（快取存的是中性文字）。
-          gender,
-          // 只有「只在本機」模式才禁止呼叫雲端。
+          // ★ 2026-10-02：不再傳 `gender`（性別與稱謂機制已移除）。
           localOnly: analysisMode === 'local_only',
           // ⚠️ 2026-10-02：不再附帶 `vitals`（血壓／心跳／血糖）。
           //    設定頁的生理指標區塊已移除，App 不再收集醫療數值 ——
@@ -1593,7 +1604,18 @@ export default function App() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
-            {MENU_ITEMS.map(({ tab, labelKey, hintKey, Icon }) => {
+            {MENU_ITEMS.filter(
+              /**
+               * ★ 2026-10-02：健身專區只在身分＝健身人士時出現。
+               *
+               * 【為什麼不把條件寫進 MENU_ITEMS 常數】
+               *   MENU_ITEMS 是**模組層常數**，在模組載入時算一次 ——
+               *   它看不到 `learnerProfileId` 這個 state。若寫在那裡，
+               *   使用者切換身分後選單不會更新（而且**不會報錯**）。
+               *   放在 render 裡過濾才會跟著 state 即時重算。
+               */
+              (item) => item.tab !== 'fitness' || learnerProfileId === 'fitness'
+            ).map(({ tab, labelKey, hintKey, Icon }) => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -2570,18 +2592,13 @@ export default function App() {
               id="settings-profile"
               icon={<UsersIcon className="w-[26px] h-[26px]" />}
               title={t('settings.profile.title')}
-              /* ⚠️ 收合時顯示目前身分與稱謂 —— 這裡也要本地化，
-                 否則英文介面的摺疊標題會直接露出中文身分名稱。 */
+              /* ⚠️ 收合時顯示目前身分 —— 這裡也要本地化，
+                 否則英文介面的摺疊標題會直接露出中文身分名稱。
+                 ★ 2026-10-02：不再附帶稱謂（性別機制已移除）。 */
               summary={`${learnerProfile.emoji} ${localizedProfileDisplayName(
                 learnerProfile.id,
                 learnerProfile.name,
                 language
-              )} · ${t(
-                gender === 'male'
-                  ? 'gender.shortMale'
-                  : gender === 'female'
-                  ? 'gender.shortFemale'
-                  : 'gender.shortNone'
               )}`}
             >
               <div className="flex flex-col gap-5">
@@ -2589,12 +2606,6 @@ export default function App() {
                   selectedId={learnerProfileId}
                   onSelect={handleChangeProfile}
                 />
-
-                {/* 稱謂性別：放在身分區塊內（2026-09-29 使用者要求「在身分的地方改性別」），
-                    與引導頁共用同一個元件與同一份 localStorage 鍵。 */}
-                <div className="pt-4 border-t-2 border-slate-200">
-                  <GenderPicker value={gender} onChange={handleChangeGender} />
-                </div>
               </div>
             </SettingsSection>
 
@@ -2810,7 +2821,6 @@ export default function App() {
                     {unselectedConditions.map((cond) => {
                       const isAllergen = cond.category === 'allergen';
                       const isExpanded = expandedConditionId === cond.id;
-                      const severity = ALLERGEN_SEVERITY[cond.id];
                       return (
                         <div key={cond.id} className="flex flex-col">
                           <div
@@ -2855,23 +2865,15 @@ export default function App() {
                                     {conditionName(cond.id, language)}
                                   </span>
                                 </div>
-                                {/* 後果等級用文字明說，避免長者以為過敏原只是「注意一下」
-                                    ⚠️ 2026-10-02：拿掉 `whitespace-nowrap`。
-                                       英文版是「⚠️ Never eat — can cause breathing difficulty」，
-                                       長者字級下需要 419px —— 卡片只有 262px，
-                                       原本被硬裁掉 170px，**使用者完全看不到後半句**。
-                                       這是最危險的一種：不是排版難看，是安全警語被吃掉。 */}
-                                {isAllergen && (
-                                  <span
-                                    className={`text-[16px] font-black leading-snug ${
-                                      severity === 'mild' ? 'text-[#854F0B]' : 'text-[#A32D2D]'
-                                    }`}
-                                  >
-                                    {severity === 'mild'
-                                      ? t('conditions.mildReaction')
-                                      : t('conditions.severeReaction')}
-                                  </span>
-                                )}
+                                {/* ★ 2026-10-02 使用者指定：**不要在過敏選項寫「絕對不能吃」等後果字樣。**
+                                    原本這裡有一行「⚠️ 絕對不能吃，會呼吸困難」／「⚠️ 吃了會腹瀉」。
+                                    移除的理由（使用者判斷）：
+                                      ① 那是醫療後果的斷言，而本 App 是飲食教育工具，
+                                         不是診斷工具 —— 寫得越肯定，責任越大。
+                                      ② 後果因人而異（有人接觸就休克、有人只是皮膚癢），
+                                         統一的說法反而可能誤導。
+                                    過敏原仍然靠**顏色（紅）＋ 圖示（三角警示）**識別 ——
+                                    三重編碼少了文字這一重，顏色與圖示仍在（見上方 isAllergen 分支）。 */}
                               </div>
                               <div
                                 aria-hidden="true"
@@ -3017,10 +3019,37 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === 'qa' && (
           <div className="flex flex-col space-y-5">
-            <HealthQASection
-              gender={gender}
-              analysisMode={analysisMode}
-            />
+            <HealthQASection analysisMode={analysisMode} />
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 頁面 6：健身專區（FITNESS TAB）                           */}
+        {/* 2026-10-02 新增。只有身分＝健身人士才進得來（選單已過濾）。 */}
+        {/* ⚠️ 這裡再檢查一次身分：使用者可能停在這一頁之後才把身分切走， */}
+        {/*    那時 activeTab 仍是 'fitness'，不擋的話會看到一個不該存在的頁面。 */}
+        {/* ======================================================== */}
+        {activeTab === 'fitness' && learnerProfileId === 'fitness' && (
+          <div className="flex flex-col space-y-5">
+            <FitnessZone />
+          </div>
+        )}
+
+        {/* 身分被改成非健身人士時，若人還停在健身分頁 → 自動回主頁。
+            ★ 這種「狀態與頁面不一致」的問題不會報錯，只會留下一頁空白，
+              所以寧可多寫這幾行。 */}
+        {activeTab === 'fitness' && learnerProfileId !== 'fitness' && (
+          <div className="flex flex-col space-y-5">
+            <p className="text-[16px] font-bold text-slate-700 bg-slate-100 border-2 border-slate-300 rounded-2xl px-[14px] py-[12px]">
+              {t('fit.notForProfile')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="min-h-[60px] rounded-2xl bg-blue-900 text-white text-[18px] font-black cursor-pointer active:scale-95"
+            >
+              {t('fit.backHome')}
+            </button>
           </div>
         )}
       </main>

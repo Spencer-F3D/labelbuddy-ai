@@ -110,7 +110,7 @@ export const KNOWLEDGE_CARDS: KnowledgeCard[] = [
       '其他高鈉陷阱還有：火鍋湯底、滷味醬汁、加工肉品（香腸、火腿）、以及各種沾醬。',
     ],
     tip: '吃麵不喝湯，是最快減少鈉攝取的方法。',
-    forProfiles: ['senior', 'takeout'],
+    forProfiles: ['senior', 'young'],
     voiceScript:
       '鈉是藏在湯裡的隱形殺手。一包泡麵的鈉常常就是一天的建議上限，而且大部分都在調味粉和湯裡。所以吃麵不喝湯，可以少掉一半以上的鈉。火鍋湯、滷味醬汁、香腸火腿也都是高鈉陷阱。',
   },
@@ -140,7 +140,7 @@ export const KNOWLEDGE_CARDS: KnowledgeCard[] = [
       '兩者在標示上都要看：飽和脂肪看數字，反式脂肪看成分表有沒有「氫化」。',
     ],
     tip: '同樣是油脂，來源不同，對身體的影響差很多。',
-    forProfiles: ['senior', 'takeout'],
+    forProfiles: ['senior', 'young'],
     voiceScript:
       '飽和脂肪主要來自動物油和棕櫚油椰子油，吃多會讓壞膽固醇上升。反式脂肪是人造反式的，對心血管危害更大，多來自氫化植物油和油炸食品。飽和脂肪看數字，反式脂肪要看成分表有沒有氫化。',
   },
@@ -170,7 +170,7 @@ export const KNOWLEDGE_CARDS: KnowledgeCard[] = [
       '補充纖維不難：把白飯換成糙米或五穀飯、每餐加一份青菜、水果連皮吃。',
     ],
     tip: '每一餐問自己：這餐有沒有吃到一個拳頭大的蔬菜？',
-    forProfiles: ['takeout', 'senior'],
+    forProfiles: ['young', 'senior'],
     voiceScript:
       '膳食纖維建議每天二十五到三十五公克，但大多數人只吃一半。外食蔬菜少、白飯白麵多，纖維自然不夠。補充不難：白飯換糙米、每餐加一份青菜、水果連皮吃。每餐問自己有沒有吃到一個拳頭大的蔬菜。',
   },
@@ -232,7 +232,7 @@ export const KNOWLEDGE_CARDS: KnowledgeCard[] = [
       '湯品是陷阱：一碗湯的鈉常比主食還高，能少喝就少喝。',
     ],
     tip: '先拿蔬菜和蛋白質，最後才決定主食，比較不容易亂買。',
-    forProfiles: ['takeout'],
+    forProfiles: ['young'],
     voiceScript:
       '在便利商店吃得均衡，記住一主一副一菜。主食選全穀或飯糰，蛋白質選茶葉蛋雞胸或無糖豆漿，蔬菜選沙拉或關東煮蔬菜。湯是陷阱，一碗湯的鈉常比主食還高。先拿蔬菜和蛋白質，最後再決定主食。',
   },
@@ -340,7 +340,7 @@ export const KNOWLEDGE_CARDS: KnowledgeCard[] = [
       '判斷方法：問自己「這包我會分幾次吃完？」如果答案是「一次」，就選小包裝。',
     ],
     tip: '先買小包裝，確認自己真的吃得完再換大包。',
-    forProfiles: ['student', 'takeout'],
+    forProfiles: ['student', 'young'],
     voiceScript:
       '買大包裝不見得划算。單價通常比較低，但如果因此吃得多，總攝取反而增加。零食特別明顯，大包裝常常一次就吃完。問自己這包會分幾次吃完，如果答案是一次，就選小包裝。',
   },

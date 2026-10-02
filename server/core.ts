@@ -1108,115 +1108,21 @@ export function ensureEducationFields(
 }
 
 /**
- * 稱謂用的性別。
+ * 「怎麼稱呼使用者」的提示詞片段（雲端路徑用）。
  *
- * ⚠️ 這**不是**營養判斷的依據 —— 每日參考值不因性別改變（本 App 未分性別）。
- *    它只決定 AI 回饋與語音要怎麼稱呼使用者。
+ * ★ 2026-10-02 使用者指定：**刪除性別與稱謂機制**（App 不再問先生／小姐）。
+ *   所以這裡只剩「中性稱呼」一種版本。
+ *
+ * ⚠️ **但規則本身不能一起刪** —— 下面兩條與性別無關，是安全與禮貌規則：
+ *     ① 絕對不可以使用「阿公、阿伯、爺爺、奶奶、阿婆、阿姨」等長輩稱呼 ——
+ *        本 App 有 7 種身分（含兒童與青少年），叫一個 13 歲的人「阿公」是侮辱。
+ *     ② 「你」一律寫成「您」—— 對長者與陌生人保持敬語。
+ *   原本這兩條綁在 `buildAddressRule(gender)` 裡面。刪性別時若整段刪掉，
+ *   模型就會開始用長輩稱呼稱呼小孩，而且**要等到實際輸出才會發現**。
+ *
+ * 英文不附加此規則（英文沒有「Mr + Hello」這種稱謂慣例）。
  */
-export type AddressGender = 'male' | 'female' | 'unspecified';
-
-/**
- * 依性別與語言決定「招呼語前綴」。
- *
- * 【為什麼英文一律回空字串 —— 這不是漏做】
- *   中文的「先生您好」是自然的招呼；英文把 "Mr" 接在 "Hello" 前面
- *   （"Mr Hello!"）是錯的。英文的禮貌招呼本來就只有 "Hello"，
- *   沒有對應的稱謂慣例。所以這裡**刻意**只讓中文生效。
- */
-export function honorificPrefix(
-  gender: AddressGender | undefined | null,
-  language: 'zh-TW' | 'en'
-): string {
-  if (language === 'en') return '';
-  if (gender === 'male') return '先生';
-  if (gender === 'female') return '小姐';
-  // unspecified → 不加稱謂，維持中性的「您好」
-  return '';
-}
-
-/**
- * 產生「怎麼稱呼使用者」的提示詞片段（雲端路徑用）。
- *
- * 【為什麼要寫進提示詞，不能只靠後處理】
- *   後處理只能改「以『您好』開頭」的字串。實測發現免費模型有時
- *   直接從結論開始寫（例如「咖啡因會讓心跳加快…」），整段沒有招呼語 ——
- *   那樣後處理就無從插入稱謂，同一個使用者每次拿到的稱呼會**時有時無**。
- *   寫進提示詞讓模型自然產出招呼語；`applyHonorific` 則當作最後保證。
- *   兩者不會重複加：模型若已寫「先生您好」，後處理的 `^\s*您好` 就不會命中。
- *
- * 英文一律回空字串 —— 英文沒有「Mr + Hello」這種稱謂慣例（見 honorificPrefix）。
- */
-export function buildAddressRule(
-  gender: AddressGender | undefined | null,
-  language: 'zh-TW' | 'en'
-): string {
-  if (language === 'en') return '';
-  if (gender === 'male') {
-    return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n使用者的稱謂是「先生」。你的**第一句話必須以「先生您好」開頭**。\n絕對不可以使用 阿公、阿伯、爺爺、奶奶 等任何長輩稱呼。\n「你」一律寫成「您」。`;
-  }
-  if (gender === 'female') {
-    return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n使用者的稱謂是「小姐」。你的**第一句話必須以「小姐您好」開頭**。\n絕對不可以使用 阿婆、阿嬤、奶奶、阿姨 等任何長輩稱呼。\n「你」一律寫成「您」。`;
-  }
-  return `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n你不知道使用者的性別與稱謂，請用中性的「您好」，**不要加任何稱謂**（不要寫先生、小姐、阿公、阿婆）。\n「你」一律寫成「您」。`;
-}
-
-/**
- * 把稱謂插進「開頭的第一個『您好』」。
- *
- * 【為什麼用字串後處理，而不是叫模型自己寫】
- *   同一段文字有三條產生路徑（雲端 AI／快取命中／本機規則引擎），
- *   格式各不相同。要求每一條都記得帶稱謂，遲早會漏一條 —— 而且**不會報錯**，
- *   只會偶爾少一個稱謂，根本測不出來。
- *   集中在結果輸出的最後一步做，三條路徑一次涵蓋。
- *
- * 【為什麼只認「開頭」的『您好』】
- *   內文也可能出現「您好」（例如引述、例句）。
- *   只改開頭那一個，才不會動到內文。
- *
- * 【不以「您好」開頭的字串一律不動】
- *   例如「請注意！有在吃降血壓藥的話…」或「不好意思，這張照片看不清楚…」。
- *   這正是使用者要的「不寫稱呼也可以」—— 硬塞稱謂反而突兀。
- */
-export function applyHonorific(text: unknown, prefix: string): unknown {
-  if (!prefix || typeof text !== 'string') return text;
-  if (!/^\s*您好/.test(text)) return text;
-  return text.replace('您好', `${prefix}您好`);
-}
-
-/**
- * 對結果物件的指定欄位套用稱謂（支援字串與字串陣列）。
- *
- * 【為什麼要明列欄位，而不是遞迴走訪整個物件】
- *   遞迴會連**使用者自己的輸入**一起改（例如他的提問「您好，我想問…」
- *   會變成「先生您好，我想問…」）—— 那是改到使用者的話，不能接受。
- *   所以只動我們自己產生的欄位。
- */
-export function applyHonorificToFields(
-  obj: Record<string, any> | null | undefined,
-  prefix: string,
-  fields: readonly string[]
-): void {
-  if (!prefix || !obj) return;
-  for (const f of fields) {
-    const v = obj[f];
-    if (typeof v === 'string') {
-      obj[f] = applyHonorific(v, prefix);
-    } else if (Array.isArray(v)) {
-      obj[f] = v.map((x) => applyHonorific(x, prefix));
-    }
-  }
-}
-
-/** 標籤分析結果中「後端產生、會被朗讀或顯示」的文字欄位 */export const LABEL_TEXT_FIELDS = [
-  'warning_title',
-  'plain_summary',
-  'alternative_advice',
-  'knowledge_point',
-  'label_reading_tip',
-  'daily_limit_context',
-  'nutrition_concerns',
-  'ingredients_detected',
-] as const;
+export const ADDRESS_RULE = `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n你不知道使用者的性別與稱謂，請用中性的「您好」，**不要加任何稱謂**（不要寫先生、小姐、阿公、阿婆）。\n絕對不可以使用 阿公、阿伯、爺爺、奶奶、阿婆、阿姨 等任何長輩稱呼。\n「你」一律寫成「您」。`;
 
 /**
  * 難字簡化要處理的欄位（2026-09-30）。
@@ -1224,7 +1130,6 @@ export function applyHonorificToFields(
  * ⚠️ **刻意不含 `ingredients_detected`** —— 那是「標籤上的原文」，
  *    使用者要拿去和包裝對照，改了就不是原文了。
  *    而且它還被用來判斷標籤語言與取出食品品名，改動會連帶影響紀錄。
- *    （`LABEL_TEXT_FIELDS` 可以含它，因為稱謂的 `^\s*您好` 守衛在那裡不會命中。）
  */
 export const NUTRIENT_WORDING_FIELDS = [
   'warning_title',
@@ -1244,27 +1149,28 @@ export const INDICATOR_TEXT_FIELDS = [
   'daily_care_tips',
 ] as const;
 
-/** 健康問答結果的文字欄位 */
+/**
+ * 健康問答結果的文字欄位（難字簡化用）。
+ *
+ * ⚠️ **刻意不含 `question`** —— 那是**使用者自己打的話**，不能改寫。
+ *    （原本這份清單是給「稱謂後處理」用的，2026-10-02 稱謂機制移除後
+ *      只剩難字簡化在用，但這條排除規則依然成立：使用者的話一個字都不動。）
+ */
 export const QA_TEXT_FIELDS = ['key_takeaway', 'answer', 'safe_tips', 'voice_script'] as const;
 
 /**
- * 生理指標結果的完整套用（含 supermarket_rules 的兩個陣列）。
+ * 生理指標結果的後處理（含 supermarket_rules 的兩個陣列）。
+ *
+ * ★ 2026-10-02：原本叫 `applyHonorificToIndicators`，名稱與一半的內容都繞著
+ *   「稱謂」轉。性別與稱謂機制移除後，這裡**只剩下難字簡化**，所以改名。
  *
  * 獨立成一支是因為 supermarket_rules 是**巢狀物件**，
- * 上面的通用函式只處理頂層欄位，不拆巢狀。
+ * `simplifyNutrientWordingInFields` 只處理頂層欄位，不拆巢狀。
  */
-export function applyHonorificToIndicators(data: Record<string, any>, prefix: string): Record<string, any> {
-  applyHonorificToFields(data, prefix, INDICATOR_TEXT_FIELDS);
+export function applyIndicatorPostprocessing(
+  data: Record<string, any>
+): Record<string, any> {
   const rules = data?.supermarket_rules;
-  if (prefix && rules && typeof rules === 'object') {
-    if (Array.isArray(rules.do_not_buy)) {
-      rules.do_not_buy = rules.do_not_buy.map((x: unknown) => applyHonorific(x, prefix));
-    }
-    if (Array.isArray(rules.recommended_to_buy)) {
-      rules.recommended_to_buy = rules.recommended_to_buy.map((x: unknown) => applyHonorific(x, prefix));
-    }
-  }
-
   // 難字簡化（2026-09-30）：生理指標的說明也常提到「鈉」——
   // 例如血壓偏高的買菜指南。同樣換成「鹽分」。
   simplifyNutrientWordingInFields(data, INDICATOR_TEXT_FIELDS);

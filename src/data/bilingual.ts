@@ -57,11 +57,19 @@ export const UNIT_EN: Record<string, string> = {
  * 用在提示詞的「本次辨識的對象身分」與使用者提示詞的「判斷是否適合…購買」。
  */
 export const PROFILE_NAME_EN: Record<string, string> = {
-  senior: 'Senior with hypertension, high blood sugar and high cholesterol',
+  /**
+   * ⚠️ 2026-10-02：原本寫成 'Senior with hypertension, high blood sugar and high
+   *    cholesterol' —— 那等於把「三高」貼在長者身上。`bilingualContent.ts`
+   *    的同名原則已經註明「不得寫成 Senior (3 highs)」，但這一份漏改了，
+   *    而且是**英文介面才會看到**，中文模式永遠測不出來。
+   *    → 改成中性描述。同理，`fitness`／`young` 也只描述情境，不作評價。
+   */
+  senior: 'Older adult',
   child: 'Child aged 6 to 12',
   teen: 'Teenager aged 13 to 18',
   fitness: 'Adult training for muscle gain',
-  takeout: 'Office worker who mostly eats takeout and convenience-store food',
+  young: 'Young adult who mostly eats out or buys convenience-store food',
+  middle: 'Middle-aged adult focused on preventing metabolic syndrome',
   student: 'Student on a limited budget',
 };
 
