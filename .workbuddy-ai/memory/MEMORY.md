@@ -92,6 +92,31 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 ★ 額度四層：雙供應商輪替｜健康冷卻｜**回應快取**（最有效）｜額度預檢。
 ⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。詳見 `ARCHITECTURE.md`。
 
+### NVIDIA NIM（2026-10-02 新增，**只給健身週報**）
+金鑰 = Worker secret `NVIDIA_API_KEY`（`wrangler secret put`，**不進版控**；
+本機測試放 `.dev.vars`）。Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。
+★ **刻意不接進 `callAiModel` 的輪替鏈** —— 那條鏈服務標籤辨識（需要視覺、
+  時間預算緊），而 NIM 可用的都是文字模型、冷啟動可達 156 秒。
+  用獨立 `callNvidiaNim()`（`server/core.ts`）。
+★ 模型鏈以**這把金鑰實測**決定（不要照抄技能結論）：
+  `openai/gpt-oss-20b` **0.76s ✅ 主力**｜`z-ai/glm-5.3-flash` 13.5s
+  （**`content` 是 `null`，答案在 `reasoning_content`**）｜
+  `nvidia/nemotron-3.5-lightning-30b-a3b` **40 秒逾時，不列入**
+  （每個失敗要吃掉 25 秒逾時預算 → 放一個會逾時的模型比沒有備援更糟）。
+★ `/api/fitness-report` 只送**彙總數字**，不送逐筆紀錄；AI 失敗回**離線規則版**。
+
+## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
+引擎 = 瀏覽器端 tesseract.js，要下載 **約 6.4 MB**
+（`chi_tra.traineddata` 2.37 MB ＋ WASM 約 4 MB ＋ worker）。
+★★ **`warmUpBrowserOcr()` 曾長期是死匯入**（存在但沒人呼叫）→ 6.4 MB 在按下快門
+  那一刻才開始下載 → 超市弱訊號下失敗 → App 卻說「請重拍」→
+  **使用者一直重拍而照片從來沒問題**。現已在完成引導頁後呼叫。
+★ 資產快取標頭在 `public/_headers`（Workers Assets 預設 `max-age=0` → 每次重驗）。
+★ 失敗要分「引擎」與「照片」：`errorKind`，引擎失敗**不要叫使用者重拍**。
+★ 診斷工具：`scripts/check-local-ocr.mjs`（**唯一會走瀏覽器 OCR 的檢查**）、
+  `scripts/make-ocr-test-photos.py`（逐步劣化測試圖）。
+  ⚠️ 兩支都記錄了我自己量錯的方式，**先讀檔頭再用**。
+
 ## 🎓 7 身分（`LearnerProfileId`，2026-10-02 起）
 `senior` 長者／`child` 兒童／`teen` 青少年／`fitness` 健身人士／
 `young` 青年／`middle` 中年／`student` 學生。
