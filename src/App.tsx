@@ -1700,9 +1700,22 @@ export default function App() {
                 於是**文字直接溢出框外 48px**，壓到右邊的狀態標籤上。
                 （實測：長者模式下每個畫面都有這一筆，共 24 個畫面。）
                 ★ 通則：`min-w-0` ＋ `nowrap` ＝ 溢出。要嘛讓它折，要嘛別壓縮它。 */}
-            <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap shrink-0">
-              LabelBuddy AI
-            </h1>
+            {/* ★ 2026-10-02：加上中文副標「營養放大鏡」。
+                ⚠️ 用 flex-col「疊」在標題下方，**不是並排** ——
+                   並排會把標題列寬度撐爆（那正是先前溢出 48px 的原因）。
+                   疊起來的話，欄寬仍由 'LabelBuddy AI' 決定（長者字級 159px），
+                   副標只有 5 個字（約 95px），不會改變任何寬度。
+                ⚠️ 英文模式副標是空字串，用守衛避免渲染空元素。 */}
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap shrink-0 leading-tight">
+                LabelBuddy AI
+              </h1>
+              {t('app.nameZh') && (
+                <span className="text-[16px] font-black text-blue-700 leading-tight">
+                  {t('app.nameZh')}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
@@ -1760,8 +1773,7 @@ export default function App() {
               <p className="text-[16px] font-bold text-blue-200 leading-tight">
                 {t('app.menuTitle')}
               </p>
-            </div>
-          </div>
+            </div>          </div>
 
           <div className="flex-1 overflow-y-auto p-[10px] flex flex-col gap-[8px]">
             {MENU_ITEMS.filter(

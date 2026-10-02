@@ -33,8 +33,19 @@ export type Language = 'zh-TW' | 'en';
 const zhTW = {
   /* ── App 外框 ─────────────────────────────────────────────── */
   'app.name': 'LabelBuddy AI',
+  /**
+   * 中文副標（2026-10-02 使用者指定）。
+   *
+   * 【為什麼英文是空字串 —— 這不是漏翻】
+   *   使用者明確指定「英文維持 LabelBuddy AI」。
+   *   在英文介面另外取一個英文名字（例如 Nutrition Magnifier）
+   *   會變成「一個 App 兩個英文名」，評審與使用者都會混淆。
+   *   → 所以英文刻意留空，畫面用 `{t('app.nameZh') && ...}` 守衛，
+   *     不會渲染出一個空的元素。
+   */
+  'app.nameZh': '營養放大鏡',
   // 瀏覽器分頁／書籤的標題（由 I18nProvider 寫進 document.title）
-  'app.documentTitle': 'LabelBuddy AI - 您的超市健康小幫手',
+  'app.documentTitle': 'LabelBuddy AI（營養放大鏡）- 您的超市健康小幫手',
   // ⚠️ 不要在這裡寫「專為長者設計」。
   //    本 App 有 6 種身分（長者／兒童／青少年／健身／年輕人／學生），
   //    預設使用者不是長者。標語若預設對方是老人，等於一開始就稱呼錯。
@@ -664,6 +675,8 @@ export type TranslationKey = keyof typeof zhTW;
  */
 const en: Record<TranslationKey, string> = {
   'app.name': 'LabelBuddy AI',
+  /* 中文副標。英文刻意留空 —— 見 zhTW 版本的說明（英文維持 LabelBuddy AI）。 */
+  'app.nameZh': '',
   'app.documentTitle': 'LabelBuddy AI - Your supermarket health helper',
   'app.tagline': 'A health magnifier for supermarket food labels',
   'app.taglineEn': 'A health magnifier for supermarket food labels',
