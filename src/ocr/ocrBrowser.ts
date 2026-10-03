@@ -163,8 +163,9 @@ export async function recognizeLabelTextInBrowser(
  *   只在需要時多付 CPU，平常不多花時間。
  * ------------------------------------------------------------------------- */
 
-/** 前處理用的畫布尺寸上限（第二輪重試用） */
-export const OCR_RETRY_MAX_DIM = 1440;
+/* 註：原本有一個 OCR_RETRY_MAX_DIM 常數（第二輪放大用），
+   2026-10-03 已移除 —— 第二輪改成「換一種前處理」而不是「放大更多」。
+   理由見 App.tsx 的 runBrowserOcr 說明。 */
 
 /**
  * 灰階 + 對比拉伸。

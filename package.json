@@ -33,6 +33,7 @@
     "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",

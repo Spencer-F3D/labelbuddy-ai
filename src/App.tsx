@@ -70,7 +70,6 @@ import {
   recognizeLabelTextInBrowser,
   warmUpBrowserOcr,
   preprocessDataUrlForOcr,
-  OCR_RETRY_MAX_DIM,
 } from './ocr/ocrBrowser';
 // 雙語介面（2026-09-28）：競賽章程要求「未使用英文」可不予評審。
 import { useI18n } from './i18n/I18nContext';
@@ -110,6 +109,7 @@ import {
   profileDisplayName as localizedProfileDisplayName,
 } from './data/bilingualContent';
 import { speakText, stopSpeech, ttsLanguageFor } from './utils/tts';
+import { getTtsSettings } from './utils/ttsSettings';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { HealthQASection } from './components/HealthQASection';
@@ -120,6 +120,8 @@ import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { LegalNotice } from './components/LegalNotice';
 import { ClearAllDataSection } from './components/ClearAllDataSection';
 import { AnalysisModePicker } from './components/AnalysisModePicker';
+import { TtsSettingsSection } from './components/TtsSettingsSection';
+import { DeveloperPanel } from './components/DeveloperPanel';
 import { NutrientFactBars } from './components/NutrientFactBars';
 import {
   DEFAULT_PROFILE_ID,
@@ -250,15 +252,19 @@ const STORAGE_CLOUD_CONSENT_KEY = 'labelbuddy_cloud_consent_v1';
  */
 const IMAGE_MAX_DIM_CLOUD = 1600;
 /**
- * OCR 模式的縮圖上限（第一輪）。
+ * OCR 模式的縮圖上限（2026-10-03 由 1024 提高到 1600）
  *
- * ⚠️ 2026-10-02：這裡的取捨是「CPU 時間」而不是「網路流量」——
- *    本機的兩個模式**不上傳照片**，所以放大完全不花網路，
- *    但 tesseract 的時間與像素數成正比，手機上會很有感。
- *    所以維持 1024 當第一輪，失敗時才用 1440 ＋ 前處理重試一次
- *    （見 OCR_RETRY_MAX_DIM 與 ocrBrowser.ts 的說明）。
+ * ★【為什麼提高】使用者回報「本機 OCR 識別完全不行」。
+ *   實測比對後確認：**表格在畫面裡佔多大，比引擎參數更能決定成敗**。
+ *   真實情境是「拍整個包裝」，營養表可能只佔畫面 1/4；
+ *   縮到 1024px 之後，表格裡的小字只剩幾像素高 —— 那不是引擎的問題，是解析度不夠。
+ *   提高之後，同樣的構圖會多出 2.4 倍像素，字才有機會被讀出來。
+ *
+ * ⚠️ 代價：tesseract 的時間與像素數成正比，手機上會明顯變慢。
+ *    但「讀得到但慢」遠勝「快但讀不到」——
+ *    更何況本機的兩個模式不上傳照片，慢不會吃任何網路費用。
  */
-const IMAGE_MAX_DIM_OCR = 1024;
+const IMAGE_MAX_DIM_OCR = 1600;
 
 /**
  * 三個分析模式的翻譯鍵與順序，定義在 `src/data/analysisModes.ts`
@@ -571,6 +577,14 @@ export default function App() {
   // 切換身分並儲存；同時以語音回饋，讓不識字的長者也知道切換成功
   const handleChangeProfile = (id: LearnerProfileId) => {
     setLearnerProfileId(id);
+    /**
+     * ★ 身分變了，語音的**預設值**要跟著重算（2026-10-03）。
+     *
+     * 例：使用者本來是「青年」（預設關閉），改成「長者」之後應該自動開啟 ——
+     * 否則長者會遇到「設定裡明明有語音，卻沒有聲音」。
+     * ⚠️ 但**手動改過開關的人不受影響**（touched 旗標，見 ttsSettings.ts）。
+     */
+    setTtsSettingsState(getTtsSettings(id));
     try {
       localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(id));
     } catch {}
@@ -816,6 +830,45 @@ export default function App() {
   const [autoDowngraded, setAutoDowngraded] = useState<boolean>(false);
 
   /**
+   * 語音朗讀設定（2026-10-03）。
+   *
+   * ⚠️ 這個 state 必須存在 —— 設定頁的收合摘要要顯示「開／關 ＋ 音量」，
+   *    而語音有沒有聲音是使用者最需要一眼確認的事。
+   */
+  const [ttsSettings, setTtsSettingsState] = useState(() => getTtsSettings());
+
+  /* ── 開發者面板的隱藏入口（2026-10-03）──────────────────────────
+     連點「LabelBuddy AI」主標 7 下。
+     ⚠️ 點擊計數一定要有**時間窗**（這裡 2 秒）——
+        沒有時間窗的話，使用者分三天各點幾下也會打開。
+     ⚠️ 用 ref 而不是 state 存計數：state 會讓每次點擊都重新渲染整個 App，
+        點 7 下就是 7 次全樹重繪（畫面會閃）。 */
+  const [devPanelOpen, setDevPanelOpen] = useState(false);
+  const [devTapRemaining, setDevTapRemaining] = useState(0);
+  const devTapRef = useRef(0);
+  const devTapTimerRef = useRef<any>(null);
+
+  const handleTitleTap = () => {
+    devTapRef.current += 1;
+    if (devTapTimerRef.current) clearTimeout(devTapTimerRef.current);
+    // 2 秒內沒有下一點就重新算
+    devTapTimerRef.current = setTimeout(() => {
+      devTapRef.current = 0;
+      setDevTapRemaining(0);
+    }, 2000);
+
+    const left = 7 - devTapRef.current;
+    if (left <= 0) {
+      devTapRef.current = 0;
+      setDevTapRemaining(0);
+      setDevPanelOpen(true);
+      return;
+    }
+    // 只在剩下 3 下以內才顯示提示（避免隨手點幾下就洩漏入口）
+    setDevTapRemaining(left <= 3 ? left : 0);
+  };
+
+  /**
    * 本機 OCR **引擎**載入失敗（2026-10-02）。
    *
    * ⚠️ 這跟「照片拍不好」是完全不同的兩件事，必須分開處理：
@@ -1024,12 +1077,24 @@ export default function App() {
    *   tesseract 的時間與像素數成正比，手機上很有感。
    *   常態路徑不該為少數難例付出兩倍時間。
    */
+  /**
+   * 本機 OCR 兩階段執行（2026-10-03 改版）。
+   *
+   * 第一輪：1600px ＋ 灰階對比拉伸
+   * 第二輪：1600px，**不**做前處理
+   *
+   * ★【為什麼第二輪是「換一種處理」而不是「放大更多」】
+   *   重試的價值在於「換一個會失敗的地方」。
+   *   同一個解析度再放大，是拿同一條路再走一次，成功機率提升有限；
+   *   而前處理對**大多數**真實照片有幫助，但對「本來對比就很夠」的照片
+   *   反而可能把雜訊一起拉大 —— 所以第二輪改跑未處理的版本，
+   *   讓兩輪各自涵蓋一種情況。
+   */
   const runBrowserOcr = async (attempt: 1 | 2) => {
     const file = lastPhotoFileRef.current;
     if (!file) return null;
-    const maxDim = attempt === 1 ? IMAGE_MAX_DIM_OCR : OCR_RETRY_MAX_DIM;
-    const compressed = await compressImage(file, maxDim, attempt === 1 ? 0.8 : 0.9);
-    const input = attempt === 1 ? compressed.base64 : await preprocessDataUrlForOcr(compressed.base64);
+    const compressed = await compressImage(file, IMAGE_MAX_DIM_OCR, 0.9);
+    const input = attempt === 1 ? await preprocessDataUrlForOcr(compressed.base64) : compressed.base64;
     return recognizeLabelTextInBrowser(input);
   };
 
@@ -1058,6 +1123,23 @@ export default function App() {
     setPreviewImage(compressed.base64);
     await sendImageForAnalysis(compressed.base64);
   };
+
+  /**
+   * 成份表範例圖（2026-10-03）。
+   *
+   * ⚠️ 用 useMemo 而不是每次渲染都畫 —— canvas 繪圖是同步的，
+   *    放在 render 裡會讓每次 state 變動都重畫一次（打字、計時器都會觸發）。
+   * ⚠️ 語言是依賴項：切換介面語言時必須重畫，否則會出現
+   *    「介面英文、範例圖中文」的不一致。
+   */
+  const exampleLabelImage = React.useMemo(() => {
+    const demo = DEMO_LABELS[language === 'en' ? 'en' : 'zh-TW'];
+    return generateSampleLabelDataUrl(
+      demo.ramen.title,
+      demo.ramen.details,
+      language === 'en' ? 'en' : 'zh-TW'
+    );
+  }, [language]);
 
   // 處理相機拍攝或選取的相片
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1706,8 +1788,17 @@ export default function App() {
                    疊起來的話，欄寬仍由 'LabelBuddy AI' 決定（長者字級 159px），
                    副標只有 5 個字（約 95px），不會改變任何寬度。
                 ⚠️ 英文模式副標是空字串，用守衛避免渲染空元素。 */}
+            {/* ★ 2026-10-03：主標連點 7 下進入開發者面板（使用者指定）。
+                ⚠️ 用 <h1 onClick> 而不是包一個 <button>：
+                   包成按鈕會讓它變成可見的互動元素（focus ring、hover 效果、
+                   讀屏軟體會念成按鈕），那就不是隱藏手勢了。
+                   鍵盤使用者仍可用下面抽屜裡的入口（見 devHint）。 */}
             <div className="flex flex-col min-w-0">
-              <h1 className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap shrink-0 leading-tight">
+              <h1
+                id="app-title"
+                onClick={handleTitleTap}
+                className="text-[20px] font-black text-blue-950 tracking-tight whitespace-nowrap shrink-0 leading-tight select-none"
+              >
                 LabelBuddy AI
               </h1>
               {t('app.nameZh') && (
@@ -1717,6 +1808,14 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* 連點提示：只在已經按了 4 下之後才出現。
+              這樣「不小心按到幾下」不會洩漏入口，但真的在按的人不會數錯。 */}
+          {devTapRemaining > 0 && (
+            <p className="text-[15px] font-bold text-blue-800 bg-blue-50 border border-blue-300 rounded-lg px-[8px] py-[2px]">
+              {t('dev.tapMore', { n: devTapRemaining })}
+            </p>
+          )}
 
           {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
               ⚠️ 360px 寬（16:9 手機）下這裡極容易折行，故字級與內距都收斂並強制不換行
@@ -2122,6 +2221,66 @@ export default function App() {
                       </strong>
                     </span>
                     <SlidersHorizontal className="w-[18px] h-[18px] text-slate-500 shrink-0 ml-auto" />
+                  </button>
+                </section>
+
+                {/* ══════════════════════════════════════════════════════
+                    區塊 2.5：食物成份表範例（2026-10-03 使用者指定）
+
+                    【為什麼要放這一塊，而不是只留文字提示】
+                      使用者回報「本機 OCR 識別完全不行」。實測下來，
+                      最大的變數不是引擎，而是**表格在畫面裡佔多大**：
+                      拍整個包裝時，營養表可能只佔畫面 1/4，
+                      縮到 1024px 之後那些小字就只剩下幾像素高，誰都讀不出來。
+
+                      → 與其一直改引擎參數，不如**讓使用者知道要拍哪一塊**。
+                        一張圖勝過三行說明，而且這對三種分析模式都有幫助。
+                    ══════════════════════════════════════════════════════ */}
+                <section className="bg-white rounded-[16px] border-[2px] border-[#3B6D11] p-[16px] flex flex-col gap-[12px]">
+                  <h3 className="text-[19px] font-black text-slate-900 leading-snug">
+                    {t('scan.exampleTitle')}
+                  </h3>
+                  <p className="text-[16px] font-bold text-slate-700 leading-snug">
+                    {t('scan.exampleBody')}
+                  </p>
+
+                  <div className="flex items-start gap-[12px]">
+                    {/* 範例圖：用與示範標籤同一套繪圖程式產生，
+                        所以「範例長什麼樣」與「按下去會分析什麼」永遠一致 ——
+                        不會出現「範例是 A 圖、跑出來是 B 結果」這種矛盾。 */}
+                    {exampleLabelImage && (
+                      <img
+                        src={exampleLabelImage}
+                        alt={t('scan.exampleAlt')}
+                        className="w-[112px] h-[112px] shrink-0 object-cover rounded-xl border-2 border-slate-300 bg-white"
+                      />
+                    )}
+                    <ol className="flex-1 min-w-0 flex flex-col gap-[6px]">
+                      {[t('scan.exampleTip1'), t('scan.exampleTip2'), t('scan.exampleTip3')].map(
+                        (tip, i) => (
+                          <li
+                            key={tip}
+                            className="text-[16px] font-bold text-slate-700 flex items-start gap-[6px] leading-snug"
+                          >
+                            <span className="shrink-0 w-[22px] h-[22px] rounded-full bg-[#3B6D11] text-white text-[15px] font-black flex items-center justify-center mt-[1px]">
+                              {i + 1}
+                            </span>
+                            <span className="min-w-0">{tip}</span>
+                          </li>
+                        )
+                      )}
+                    </ol>
+                  </div>
+
+                  <button
+                    type="button"
+                    id="btn-example-label"
+                    onClick={() => handleLoadSample('ramen')}
+                    disabled={isLoading}
+                    className="w-full min-h-[56px] rounded-[12px] bg-[#EAF3DE] border-[2px] border-[#3B6D11] text-[#173404] text-[18px] font-black flex items-center justify-center gap-[8px] cursor-pointer active:scale-[0.98] disabled:opacity-60"
+                  >
+                    <FileImage className="w-[22px] h-[22px] shrink-0" aria-hidden="true" />
+                    {t('scan.exampleTry')}
                   </button>
                 </section>
 
@@ -2815,6 +2974,23 @@ export default function App() {
               <AnalysisModePicker value={analysisMode} onChange={handleChangeAnalysisMode} />
             </SettingsSection>
 
+            {/* 語音朗讀（2026-10-03 新增）
+                ⚠️ 收合時的摘要必須顯示「開／關 ＋ 音量」——
+                   語音有沒有聲音，是使用者最需要一眼確認的事。 */}
+            <SettingsSection
+              id="settings-sound"
+              icon={<Volume2 className="w-[26px] h-[26px]" />}
+              title={t('settings.sound.title')}
+              summary={
+                ttsSettings.enabled
+                  ? t('settings.sound.summaryOn', { n: Math.round(ttsSettings.volume * 100) })
+                  : t('settings.sound.summaryOff')
+              }
+            >
+              {/* key 讓區塊在設定變動後重建，內部 state 才會跟著更新 */}
+              <TtsSettingsSection key={`${ttsSettings.enabled}-${ttsSettings.volume}`} />
+            </SettingsSection>
+
             {/* 第二部分原本是「日常生理指標量測」（血壓／心跳／血糖／尿酸／血脂
                 與 AI 分析）—— 2026-10-02 使用者指定整區移除，見上方 state 的說明。
                 現在設定頁的順序：身分 → 分析模式 → 慢性病與過敏 → 性別 → 私隱。 */}
@@ -3480,6 +3656,20 @@ export default function App() {
         )}
       </footer>
       </div>
+
+      {/* ── 開發者面板（2026-10-03）：連點主標 7 下才會出現 ──
+          放在最外層、所有頁面之上，因為它不屬於任何一個分頁。 */}
+      {devPanelOpen && (
+        <DeveloperPanel
+          onClose={() => setDevPanelOpen(false)}
+          context={{
+            analysisMode,
+            profileId: learnerProfileId,
+            language,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          }}
+        />
+      )}
     </>
   );
 }

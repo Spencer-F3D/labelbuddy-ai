@@ -28,7 +28,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   /** 反向網域命名。發佈後不可更改（改了等於換一個 App）。 */
   appId: 'ai.labelbuddy.app',
-  appName: 'LabelBuddy AI',
+  appName: '營養放大鏡',
   /** Vite 的輸出目錄 —— 這裡面的東西會被複製進 APK */
   webDir: 'dist',
 

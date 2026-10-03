@@ -717,6 +717,9 @@ const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nv
  */
 const NVIDIA_MODEL_CHAIN = ['openai/gpt-oss-20b', 'z-ai/glm-5.3-flash'];
 
+/** 供 /api/ai-status 回報用（開發者面板要顯示實際在用的模型） */
+export const NVIDIA_MODEL_CHAIN_FOR_STATUS = NVIDIA_MODEL_CHAIN;
+
 /** 單一 NIM 模型的逾時。刻意短 —— 冷啟動慢的模型要快速讓位。 */
 const NVIDIA_ATTEMPT_TIMEOUT_MS = Number(process.env.NVIDIA_ATTEMPT_TIMEOUT_MS) || 25000;
 

@@ -48,6 +48,7 @@ import {
   type ApiResult,
   type CoreDeps,
   type ProviderName,
+  NVIDIA_MODEL_CHAIN_FOR_STATUS,
 } from './core';
 import { buildRecognitionResult } from './labelParser';
 import { analyzeNutritionWithIndicators } from './smartNutritionAnalyzer';
@@ -801,6 +802,19 @@ export async function handleAiStatus(body: any, headers: Headers, deps: CoreDeps
     hasKey,
     providers,
     models: getModelChain(),
+    /**
+     * NVIDIA NIM（2026-10-03 新增到狀態回報）。
+     *
+     * ⚠️ 刻意**不放進 providers 陣列** —— 那一組是「標籤辨識的輪替鏈」，
+     *    NIM 不在鏈上（見 core.ts 的說明）。混進去會讓開發者面板
+     *    顯示成「有三家在輪替」，與事實不符。
+     *    它是獨立的一條路，只服務健身週報，所以在這裡單獨回報。
+     */
+    nvidia: {
+      configured: isValidKey(process.env.NVIDIA_API_KEY || ''),
+      models: NVIDIA_MODEL_CHAIN_FOR_STATUS,
+      purpose: 'fitness-report',
+    },
     cacheEntries: analysisCache.size,
     openrouterQuota: await getOpenRouterQuota(),
     mode: hasKey ? 'cloud_ai' : 'ready_with_fallback',

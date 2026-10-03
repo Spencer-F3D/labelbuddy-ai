@@ -137,6 +137,16 @@ const zhTW = {
   'scan.tapButton': '點下方「📸 拍照看標籤」',
   'scan.checking': '正在把關：',
   'scan.switchProfile': '切換 ➔',
+  /* ── 食物成份表範例（2026-10-03）─────────────────────────────
+     ★ 這一塊同時是「本機 OCR 讀不到」的解方之一：
+       表格在畫面裡佔多大，比引擎參數更能決定辨識成敗。 */
+  'scan.exampleTitle': '要拍的長這樣',
+  'scan.exampleBody': '包裝背面都有一塊「營養標示」表格，鈉、糖、碳水這些數字就在裡面。',
+  'scan.exampleTip1': '讓表格盡量填滿畫面 —— 離太遠拍，字太小會讀不出來',
+  'scan.exampleTip2': '避開反光，光線從側面照比正面直打清楚',
+  'scan.exampleTip3': '讀不到也沒關係，App 會直接告訴您，不會亂猜',
+  'scan.exampleTry': '用這張範例試一次',
+  'scan.exampleAlt': '營養標示範例',
   'scan.demoTitle': '沒有食品？用示範標籤',
   'scan.demoRamen': '🍜 高鈉泡麵標籤',
   'scan.demoRamenTag': '高鈉警示',
@@ -207,6 +217,24 @@ const zhTW = {
   'mode.changeLater': '之後可以在設定裡隨時改，不用重來。',
   'mode.savedVoice': '已切換為「{mode}」',
   'mode.currentLabel': '目前的方式',
+  /* ── 語音朗讀設定（2026-10-03 新增）
+     ★ 這幾句要能回答兩個問題：現在是開的嗎？這台裝置能不能發出聲音？
+       因為「設定關掉了」和「裝置做不到」的處理方式完全不同。 */
+  /* ── 開發者面板（2026-10-03）：連點主標 7 下進入。 */
+  'dev.tapMore': '再按 {n} 下',
+  'settings.sound.title': '語音朗讀',
+  'settings.sound.summaryOn': '已開啟 · 音量 {n}%',
+  'settings.sound.summaryOff': '已關閉',
+  'settings.sound.on': '語音朗讀：開啟',
+  'settings.sound.off': '語音朗讀：關閉',
+  'settings.sound.hint': '開啟後，看結果時會用語音念給您聽。',
+  'settings.sound.volume': '音量',
+  'settings.sound.try': '試聽看看',
+  'settings.sound.sample': '您好，這是語音朗讀的示範。',
+  'settings.sound.unsupported':
+    '這個裝置不支援語音朗讀。網頁版需要 Chrome、Edge 或 Safari；App 版請安裝最新的 APK。',
+  'settings.sound.checkNative': '聽不到聲音的話，請檢查手機的媒體音量（不是來電音量）。',
+  'settings.sound.checkBrowser': '聽不到聲音的話，請檢查系統音量，並確認瀏覽器沒有靜音這個分頁。',
   'settings.mode.title': 'AI 方式',
 
   /* 營養素長條圖 */
@@ -751,6 +779,14 @@ const en: Record<TranslationKey, string> = {
   'scan.tapButton': 'Tap "📸 Photo a label" below',
   'scan.checking': 'Checking for:',
   'scan.switchProfile': 'Change ➔',
+  /* ── Nutrition label example (2026-10-03) ── */
+  'scan.exampleTitle': 'This is what to photograph',
+  'scan.exampleBody': 'On the back of the pack there is a nutrition table — sodium, sugar and carbs are in there.',
+  'scan.exampleTip1': 'Fill the frame with the table — shooting from far away makes the text too small to read',
+  'scan.exampleTip2': 'Avoid glare; light from the side works better than straight on',
+  'scan.exampleTip3': 'If it cannot read, it will say so — it never guesses',
+  'scan.exampleTry': 'Try it with this sample',
+  'scan.exampleAlt': 'Nutrition label example',
   'scan.demoTitle': 'No product? Try a sample label',
   'scan.demoRamen': '🍜 High-sodium instant noodles',
   'scan.demoRamenTag': 'High sodium',
@@ -813,6 +849,22 @@ const en: Record<TranslationKey, string> = {
   'mode.changeLater': 'You can change this in Settings later — no need to start over.',
   'mode.savedVoice': 'Switched to {mode}',
   'mode.currentLabel': 'Current mode',
+  /* ── Speech settings (2026-10-03) ── */
+  /* ── Developer panel (2026-10-03): tap the title 7 times. ── */
+  'dev.tapMore': '{n} more taps',
+  'settings.sound.title': 'Voice reading',
+  'settings.sound.summaryOn': 'On · volume {n}%',
+  'settings.sound.summaryOff': 'Off',
+  'settings.sound.on': 'Voice reading: on',
+  'settings.sound.off': 'Voice reading: off',
+  'settings.sound.hint': 'When on, results are read aloud to you.',
+  'settings.sound.volume': 'Volume',
+  'settings.sound.try': 'Try it',
+  'settings.sound.sample': 'Hello, this is a sample of voice reading.',
+  'settings.sound.unsupported':
+    'This device cannot read text aloud. The web version needs Chrome, Edge or Safari; for the app, please install the latest APK.',
+  'settings.sound.checkNative': 'If you hear nothing, check the media volume on your phone (not the ring volume).',
+  'settings.sound.checkBrowser': 'If you hear nothing, check your system volume and make sure this tab is not muted.',
   'settings.mode.title': 'AI analysis mode',
 
   'nutrient.amount': '{basis}: {value} {unit}',
