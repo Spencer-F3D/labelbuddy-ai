@@ -110,12 +110,24 @@ export function getTtsSettings(profileId?: LearnerProfileId): TtsSettings {
      * 已經手動改過 → 永遠以使用者的選擇為準，不隨身分變動。
      * 沒改過 → 身分變了就重新套用該身分的預設值
      *          （例如從「青年」改成「長者」，語音應該自動打開）。
+     *
+     * ⚠️ 2026-10-03 修正一個真實 bug：這裡原本在 `pid` 為 null 時直接
+     *    `return stored`（或更早的版本退回 'senior'）——
+     *    但**首次載入時 `currentProfile` 永遠是 null**（還沒有任何呼叫帶入身分），
+     *    於是所有身分都拿到「長者」的預設值 → **非長者也預設有聲**。
+     *    使用者實際回報了這個現象。
+     *    → 沒有身分可判斷時，採取**保守**的預設：關閉。
+     *      寧可長者少聽到一次（他按一下就能開），也不要年輕人被突來的語音嚇到。
      */
-    if (stored.touched || !pid) return stored;
+    if (stored.touched) return stored;
+    if (!pid) return { ...stored, enabled: false };
     return { ...stored, enabled: defaultTtsSettings(pid).enabled };
   }
 
-  const fresh = defaultTtsSettings(pid ?? 'senior');
+  // 沒有存檔：同樣只在知道身分時才給「開啟」的預設值
+  const fresh = pid
+    ? defaultTtsSettings(pid)
+    : { enabled: false, volume: DEFAULT_TTS_VOLUME, touched: false };
   cache = fresh;
   return fresh;
 }

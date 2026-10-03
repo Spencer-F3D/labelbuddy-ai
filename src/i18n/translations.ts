@@ -140,6 +140,15 @@ const zhTW = {
   /* ── 食物成份表範例（2026-10-03）─────────────────────────────
      ★ 這一塊同時是「本機 OCR 讀不到」的解方之一：
        表格在畫面裡佔多大，比引擎參數更能決定辨識成敗。 */
+  /* ── 本機讀不到時的雲端備援（2026-10-03）
+     ★ 使用者實測「照片上雲端可以精準識別」，但本機 OCR 在他手機上讀不出來。
+       在找出真正原因之前，給他一條**明示同意**的出路。
+       ⚠️ 文案必須寫清楚「照片會上傳」——本機模式的承諾就是照片不離開裝置，
+          不寫清楚就等於我們自己偷偷違背承諾。 */
+  'scan.cloudFallback': '改用「直接雲端」讀這張照片',
+  'scan.cloudFallbackHint':
+    '雲端模型看整張照片，通常比本機讀得準。照片會上傳，並記住這個設定（可在設定改回）。',
+  'scan.cloudFallbackKeep': '或者，用同一張照片再試一次本機讀取',
   'scan.exampleTitle': '要拍的長這樣',
   'scan.exampleBody': '包裝背面都有一塊「營養標示」表格，鈉、糖、碳水這些數字就在裡面。',
   'scan.exampleTip1': '讓表格盡量填滿畫面 —— 離太遠拍，字太小會讀不出來',
@@ -221,6 +230,46 @@ const zhTW = {
      ★ 這幾句要能回答兩個問題：現在是開的嗎？這台裝置能不能發出聲音？
        因為「設定關掉了」和「裝置做不到」的處理方式完全不同。 */
   /* ── 開發者面板（2026-10-03）：連點主標 7 下進入。 */
+  /* ── 開發者面板（2026-10-03）
+     ★ 使用者指定：面板文字要**跟介面語言一致**。
+       ⚠️ 但 gemini／openrouter／NVIDIA／模型 ID 這些**不翻譯** ——
+          它們是專有名稱，翻譯了反而對不上 API 與日誌。
+          所以那些字串直接寫在元件裡，不走 i18n。 */
+  'dev.title': '開發者資訊',
+  'dev.aiUsage': 'AI 用量（標籤辨識鏈）',
+  'dev.noKey': '未設定金鑰',
+  'dev.cooling': '冷卻中',
+  'dev.available': '可用',
+  'dev.lastError': '上次錯誤',
+  'dev.cooldownUntil': '冷卻至',
+  'dev.models': '模型鏈',
+  'dev.cache': '回應快取',
+  'dev.entries': '{n} 筆',
+  'dev.updated': '更新時間',
+  'dev.nvidiaTitle': 'NVIDIA NIM',
+  'dev.rotationNote': '已加入三供應商輪替；純文字請求會走它，含圖片的請求仍走視覺模型。',
+  'dev.key': '金鑰',
+  'dev.configured': '已設定',
+  'dev.missing': '未設定',
+  'dev.runtime': '執行環境',
+  'dev.platform': '平台',
+  'dev.platformNative': 'App（原生）',
+  'dev.platformBrowser': '瀏覽器',
+  'dev.speech': '語音',
+  'dev.speechNative': '原生 TTS',
+  'dev.speechWeb': '瀏覽器 Web Speech',
+  'dev.speechNone': '此裝置不支援',
+  'dev.localOcr': '本機 OCR',
+  'dev.ocrLoaded': '引擎已載入',
+  'dev.ocrNotLoaded': '尚未載入',
+  'dev.ocrLast': '上次 OCR 結果',
+  'dev.analyzeMode': '分析模式',
+  'dev.profile': '身分',
+  'dev.language': '語言',
+  'dev.refresh': '重新整理',
+  'dev.close': '關閉',
+  'dev.loading': '載入中…',
+  'dev.cannotReach': '連不上 /api/ai-status',
   'dev.tapMore': '再按 {n} 下',
   'settings.sound.title': '語音朗讀',
   'settings.sound.summaryOn': '已開啟 · 音量 {n}%',
@@ -780,6 +829,11 @@ const en: Record<TranslationKey, string> = {
   'scan.checking': 'Checking for:',
   'scan.switchProfile': 'Change ➔',
   /* ── Nutrition label example (2026-10-03) ── */
+  /* ── Cloud fallback when on-device reading fails (2026-10-03) ── */
+  'scan.cloudFallback': 'Read this photo in the cloud instead',
+  'scan.cloudFallbackHint':
+    'The cloud model sees the whole photo and usually reads it more accurately. The photo will be uploaded, and this setting is remembered (you can change it back in Settings).',
+  'scan.cloudFallbackKeep': 'Or try on-device reading again with the same photo',
   'scan.exampleTitle': 'This is what to photograph',
   'scan.exampleBody': 'On the back of the pack there is a nutrition table — sodium, sugar and carbs are in there.',
   'scan.exampleTip1': 'Fill the frame with the table — shooting from far away makes the text too small to read',
@@ -851,6 +905,42 @@ const en: Record<TranslationKey, string> = {
   'mode.currentLabel': 'Current mode',
   /* ── Speech settings (2026-10-03) ── */
   /* ── Developer panel (2026-10-03): tap the title 7 times. ── */
+  /* ── Developer panel (2026-10-03) ── */
+  'dev.title': 'Developer',
+  'dev.aiUsage': 'AI usage (label recognition chain)',
+  'dev.noKey': 'No key',
+  'dev.cooling': 'Cooling down',
+  'dev.available': 'Available',
+  'dev.lastError': 'last',
+  'dev.cooldownUntil': 'until',
+  'dev.models': 'Models',
+  'dev.cache': 'Cache',
+  'dev.entries': '{n} entries',
+  'dev.updated': 'Updated',
+  'dev.nvidiaTitle': 'NVIDIA NIM',
+  'dev.rotationNote': 'Added to the three-provider rotation; text-only requests may use it, image requests still use vision models.',
+  'dev.key': 'Key',
+  'dev.configured': 'configured',
+  'dev.missing': 'missing',
+  'dev.runtime': 'Runtime',
+  'dev.platform': 'Platform',
+  'dev.platformNative': 'App (native)',
+  'dev.platformBrowser': 'Browser',
+  'dev.speech': 'Speech',
+  'dev.speechNative': 'native TTS',
+  'dev.speechWeb': 'browser Web Speech',
+  'dev.speechNone': 'unsupported on this device',
+  'dev.localOcr': 'Local OCR',
+  'dev.ocrLoaded': 'engine loaded',
+  'dev.ocrNotLoaded': 'not loaded yet',
+  'dev.ocrLast': 'Last OCR result',
+  'dev.analyzeMode': 'Mode',
+  'dev.profile': 'Profile',
+  'dev.language': 'Language',
+  'dev.refresh': 'Refresh',
+  'dev.close': 'Close',
+  'dev.loading': 'Loading…',
+  'dev.cannotReach': 'Cannot reach /api/ai-status',
   'dev.tapMore': '{n} more taps',
   'settings.sound.title': 'Voice reading',
   'settings.sound.summaryOn': 'On · volume {n}%',

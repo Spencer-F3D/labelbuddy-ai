@@ -28,6 +28,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { apiUrl } from './utils/apiBase';
 import {
   Camera,
+  Cloud,
   Volume2,
   VolumeX,
   RefreshCw,
@@ -877,6 +878,22 @@ export default function App() {
    *    → 這個旗標讓畫面上出現「重試」而不是「重拍」。
    */
   const [ocrEngineFailed, setOcrEngineFailed] = useState<boolean>(false);
+
+  /**
+   * 是否顯示「改用雲端讀取」的備援按鈕（2026-10-03）。
+   *
+   * 【為什麼要有這個】
+   *   使用者實測：「我拍的照片上雲端也可以精準識別」——
+   *   也就是說照片與伺服器端都沒問題，只有**手機上的本機 OCR** 讀不出來。
+   *   而我在電腦瀏覽器上怎麼測都正常，無法重現。
+   *
+   *   在還沒找出真正原因之前，讓使用者卡在「一直重拍」是不合理的 ——
+   *   給他一個**明示同意**的出路：用雲端讀這張照片。
+   *   ⚠️ 這必須是使用者自己按的，而且按鈕上要寫明「照片會上傳」——
+   *      本機模式的承諾就是「照片不離開裝置」，
+   *      偷偷上傳就變成我們自己違背承諾（這種 bug 本專案已經踩過）。
+   */
+  const [cloudFallbackOffered, setCloudFallbackOffered] = useState<boolean>(false);
   const [analysisResult, setAnalysisResult] = useState<LabelAnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -975,6 +992,25 @@ export default function App() {
     if (!onboarded) return;
     warmUpBrowserOcr();
   }, [onboarded]);
+
+  /**
+   * ★★ 2026-10-03：把「目前身分」餵給語音設定。
+   *
+   * 【為什麼一定要有這個 effect】
+   *   語音的預設值依身分決定（長者開、其他關），但**設定模組本身不知道身分**——
+   *   它只在有人帶身分呼叫它時才知道。而 App 先前只在 `handleChangeProfile`
+   *   （使用者主動切換身分）時才帶身分呼叫。
+   *
+   *   後果：**首次載入時沒有任何呼叫帶身分** → 預設值判斷失去依據 →
+   *   實測就變成「非長者也預設有聲」（使用者回報的現象）。
+   *   → 這個 effect 在掛載時、以及身分每次變動時都重算一次。
+   *
+   * ⚠️ 不能只在 handleChangeProfile 裡做 —— 那條路只在「使用者主動切換」時走，
+   *    從 localStorage 還原身分的那條路不會經過它。
+   */
+  useEffect(() => {
+    setTtsSettingsState(getTtsSettings(learnerProfileId));
+  }, [learnerProfileId]);
 
   // 檢查雲端 AI 服務狀態
   // 【重要】必須以 hasKey 為判斷依據：/api/ai-status 只要伺服器存活就會回 status: 'ok'，
@@ -1107,6 +1143,27 @@ export default function App() {
    *   同一張照片再試一次就有機會成功。
    *   舊版只給「重拍」的建議，等於叫使用者做一件沒有用的事。
    */
+  /**
+   * 改用「直接雲端」讀同一張照片並重跑（2026-10-03）。
+   *
+   * ⚠️ 這裡是**明確切換使用者的分析模式**，不是暫時繞過 ——
+   *    因為「這一張用雲端、下一張又回到本機」會讓隱私設定變得不可預測。
+   *    按鈕上已寫明會記住這個設定（見 scan.cloudFallbackHint）。
+   */
+  const handleUseCloudFallback = async () => {
+    setCloudFallbackOffered(false);
+    setOcrEngineFailed(false);
+    handleChangeAnalysisMode('cloud_image');
+    // handleChangeAnalysisMode 只更新 state，這裡需要等它生效後才重跑，
+    // 所以直接帶著新模式往下走（重新壓縮 → 送雲端）
+    const file = lastPhotoFileRef.current;
+    if (!file) return;
+    const compressed = await compressImage(file, IMAGE_MAX_DIM_CLOUD, 0.8);
+    setPreviewImage(compressed.base64);
+    // ⚠️ 不能呼叫 handleRetryAnalysis：它讀的是舊的 analysisMode state
+    await sendImageForAnalysis(compressed.base64, 'cloud_image');
+  };
+
   const handleRetryAnalysis = async () => {
     const file = lastPhotoFileRef.current;
     if (!file) return;
@@ -1227,13 +1284,23 @@ export default function App() {
    * 發送圖片至中轉後端（Backend Proxy）調用雲端視覺 AI 分析
    * 【重要安全提示】金鑰由後端安全讀取，前端絕無暴露 API Key
    */
-  const sendImageForAnalysis = async (base64Data: string) => {
+  /**
+   * @param modeOverride 覆寫分析模式（2026-10-03 新增）。
+   *   ⚠️ 為什麼需要：`handleUseCloudFallback` 會在**同一次事件**裡
+   *      先切模式、再立刻重跑分析。但 React 的 setState 是非同步的 ——
+   *      此刻讀 `analysisMode` 拿到的仍是舊值，於是「明明按了改用雲端，
+   *      卻還是走本機 OCR」，而且不會報錯。
+   *   → 讓呼叫端明確把要用的模式帶進來，不要依賴 state 已經更新。
+   */
+  const sendImageForAnalysis = async (base64Data: string, modeOverride?: AnalysisMode) => {
+    const mode: AnalysisMode = modeOverride ?? analysisMode;
     setActiveTab('scan');
     setIsLoading(true);
     setIsNetworkDelayed(false);
     setErrorMessage(null);
     setAnalysisResult(null);
     setAutoDowngraded(false);
+    setCloudFallbackOffered(false);
 
     // 每秒更新一次已等待秒數，讓載入畫面能顯示具體進度
     setLoadingSeconds(0);
@@ -1292,7 +1359,7 @@ export default function App() {
           // 不傳的話切到英文後會看到「英文介面 + 中文結論」。
           language,
           // ★ 2026-10-02：不再傳 `gender`（性別與稱謂機制已移除）。
-          localOnly: analysisMode === 'local_only',
+          localOnly: mode === 'local_only',
           // ⚠️ 2026-10-02：不再附帶 `vitals`（血壓／心跳／血糖）。
           //    設定頁的生理指標區塊已移除，App 不再收集醫療數值 ——
           //    若這裡還留著，就會把「預設值」當成使用者的真實數據送給模型，
@@ -1338,7 +1405,7 @@ export default function App() {
       let ocr: Awaited<ReturnType<typeof recognizeLabelTextInBrowser>> | null = null;
 
       // ── 模式 1：直接雲端（照片上傳，不做 OCR）────────────────────
-      if (analysisMode === 'cloud_image') {
+      if (mode === 'cloud_image') {
         setLoadingPhase('analyzing');
         speakText(t('scan.analyzing'), { rate: 0.88, preferLanguage: ttsLang });
         armLatencyTimer();
@@ -1382,6 +1449,7 @@ export default function App() {
          */
         if (ocr && !ocr.ok && ocr.errorKind === 'engine') {
           setOcrEngineFailed(true);
+          setCloudFallbackOffered(analysisMode !== 'cloud_image');
           setErrorMessage(t('scan.errEngineNotFound'));
           speakText(t('scan.errEngineNotFound'), { rate: 0.88, preferLanguage: ttsLang });
           setAnalysisResult(null);
@@ -1392,7 +1460,7 @@ export default function App() {
         // AI 分析狀態語音提示：「正在為您分析」
         speakText(t('scan.analyzing'), { rate: 0.88, preferLanguage: ttsLang });
         // 「只在本機」不連網，所以不需要安撫等待
-        if (analysisMode !== 'local_only') armLatencyTimer();
+        if (mode !== 'local_only') armLatencyTimer();
 
         // 【只送文字，不送照片】`ocrText` 是空的代表沒讀到字，
         // 後端會回「請重拍」，我們不在前端自行捏造結果。
@@ -1437,6 +1505,8 @@ export default function App() {
       //   ② 仍然用語音念出重拍建議 —— 長者最需要的就是這句引導
       // ══════════════════════════════════════════════════════════════════
       if (data.ocr_failed) {
+        // 本機讀不到就去問使用者要不要改用雲端（不自動切換，見 cloudFallbackOffered 的說明）
+        if (analysisMode !== 'cloud_image') setCloudFallbackOffered(true);
         if (data.plain_summary) {
           speakText(data.plain_summary, {
             rate: 0.88,
@@ -2073,7 +2143,7 @@ export default function App() {
                   >
                     <AlertCircle className="w-[40px] h-[40px] text-white" />
                   </span>
-                  <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight`}>
+                  <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight [text-wrap:pretty]`}>
                     {ocrEngineFailed ? t('scan.engineTitle') : t('scan.retakeTitle')}
                   </h3>
                   <p className={`${TYPE.body} ${WEIGHT.normal} text-[#791F1F] leading-snug`}>
@@ -2089,6 +2159,29 @@ export default function App() {
                 {/* ★ 2026-10-02：引擎失敗時，給的是「重試」而不是「重拍」。
                     理由見掃描流程的註解 —— 照片從來不是問題，
                     叫使用者重拍只會讓他一直做沒有用的事。 */}
+
+                {/* ★★ 2026-10-03：本機讀不到時的雲端備援。
+                    ⚠️ 放在重試／重拍按鈕**之前**，因為它是「真的能解決」的那條路
+                      （使用者已實測：照片上雲端可以精準識別）。
+                      但文案一定要寫明「照片會上傳」——
+                      本機模式的承諾就是照片不離開裝置，
+                      不講清楚就等於我們自己偷偷違背承諾。 */}
+                {cloudFallbackOffered && (
+                  <div className="flex flex-col gap-[8px]">
+                    <p className="text-[16px] font-bold text-[#501313] bg-white/70 rounded-[12px] p-[12px] leading-snug border border-[#F09595]">
+                      {t('scan.cloudFallbackHint')}
+                    </p>
+                    <button
+                      type="button"
+                      id="btn-cloud-fallback"
+                      onClick={handleUseCloudFallback}
+                      className="w-full min-h-[64px] rounded-2xl bg-[#185FA5] hover:bg-[#0C447C] text-white font-black text-[19px] flex items-center justify-center gap-[10px] cursor-pointer active:scale-95 border-[3px] border-[#0C447C]"
+                    >
+                      <Cloud className="w-[24px] h-[24px] shrink-0" aria-hidden="true" />
+                      {t('scan.cloudFallback')}
+                    </button>
+                  </div>
+                )}
                 {ocrEngineFailed ? (
                   <div className="flex flex-col gap-[10px]">
                     <p className={`${TYPE.secondary} ${WEIGHT.normal} text-[#501313] bg-white/70 rounded-[12px] p-[12px] leading-snug border border-[#F09595]`}>
@@ -2382,7 +2475,7 @@ export default function App() {
                       </span>
 
                       <h2
-                        className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight`}
+                        className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:pretty]`}
                         style={{ color: TONES.neutral.text }}
                       >
                         {stripLeadingEmoji(analysisResult.warning_title || '') ||
@@ -2502,7 +2595,7 @@ export default function App() {
                     </span>
 
                     <h2
-                      className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight`}
+                      className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:pretty]`}
                       style={{ color: tone.text }}
                     >
                       {riskHeadline}

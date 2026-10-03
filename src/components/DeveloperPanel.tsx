@@ -32,8 +32,9 @@
 import React, { useEffect, useState } from 'react';
 import { X, RefreshCw, Cpu, Server, Activity, Smartphone, Globe } from 'lucide-react';
 import { apiUrl } from '../utils/apiBase';
+import { useI18n } from '../i18n/I18nContext';
 import { isNativeTts, canSpeak } from '../utils/tts';
-import { isBrowserOcrReady } from '../ocr/ocrBrowser';
+import { isBrowserOcrReady, getLastOcrDiagnostics } from '../ocr/ocrBrowser';
 
 /** `/api/ai-status` 的回應形狀（只宣告我們用到的欄位） */
 interface AiStatus {
@@ -67,6 +68,7 @@ export interface DeveloperPanelProps {
 }
 
 export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context }) => {
+  const { t } = useI18n();
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -104,17 +106,17 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
       className="fixed inset-0 z-[80] bg-black/70 flex items-start justify-center overflow-y-auto p-[12px]"
       role="dialog"
       aria-modal="true"
-      aria-label="Developer panel"
+      aria-label={t('dev.title')}
     >
       <div className="w-full max-w-[420px] bg-white rounded-2xl border-2 border-slate-800 flex flex-col my-[16px]">
         {/* ── 標題列 ── */}
         <div className="flex items-center gap-[8px] px-[14px] py-[12px] border-b-2 border-slate-200">
           <Cpu className="w-[24px] h-[24px] shrink-0 text-slate-800" aria-hidden="true" />
-          <h2 className="flex-1 min-w-0 text-[19px] font-black text-slate-950">Developer</h2>
+          <h2 className="flex-1 min-w-0 text-[19px] font-black text-slate-950">{t('dev.title')}</h2>
           <button
             type="button"
             onClick={() => void load()}
-            aria-label="Refresh"
+            aria-label={t('dev.refresh')}
             className="w-[44px] h-[44px] shrink-0 rounded-xl border-2 border-slate-300 flex items-center justify-center cursor-pointer active:scale-90"
           >
             <RefreshCw className={`w-[20px] h-[20px] ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
@@ -123,7 +125,7 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
             type="button"
             id="dev-panel-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('dev.close')}
             className="w-[44px] h-[44px] shrink-0 rounded-xl border-2 border-slate-300 flex items-center justify-center cursor-pointer active:scale-90"
           >
             <X className="w-[20px] h-[20px]" aria-hidden="true" />
@@ -135,13 +137,13 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
           <section className="flex flex-col gap-[8px]">
             <h3 className="flex items-center gap-[6px] text-[17px] font-black text-slate-900">
               <Activity className="w-[20px] h-[20px] text-emerald-700" aria-hidden="true" />
-              AI usage (label recognition chain)
+              {t('dev.aiUsage')}
             </h3>
 
-            {loading && !status && <p className="text-[16px] font-bold text-slate-500">Loading…</p>}
+            {loading && !status && <p className="text-[16px] font-bold text-slate-500">{t('dev.loading')}</p>}
             {failed && (
               <p className="text-[16px] font-bold text-rose-800 bg-rose-50 rounded-lg px-[10px] py-[8px]">
-                Cannot reach /api/ai-status
+                {t('dev.cannotReach')}
               </p>
             )}
 
@@ -151,10 +153,10 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                *    前者等一下會自己好，後者永遠不會 —— 混在一起講會讓人誤判。
                */
               const state = !p.configured
-                ? 'No key'
+                ? t('dev.noKey')
                 : p.coolingDownUntil
-                  ? 'Cooling down'
-                  : 'Available';
+                  ? t('dev.cooling')
+                  : t('dev.available');
               return (
                 <div
                   key={p.name}
@@ -181,11 +183,11 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                     />
                   </div>
                   {p.lastError && (
-                    <p className="text-[15px] font-bold text-rose-800 break-words">last: {p.lastError}</p>
+                    <p className="text-[15px] font-bold text-rose-800 break-words">{t('dev.lastError')}: {p.lastError}</p>
                   )}
                   {p.coolingDownUntil && (
                     <p className="text-[15px] font-bold text-amber-800">
-                      until {new Date(p.coolingDownUntil).toLocaleTimeString()}
+                      {t('dev.cooldownUntil')} {new Date(p.coolingDownUntil).toLocaleTimeString()}
                     </p>
                   )}
                 </div>
@@ -198,23 +200,22 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
               </p>
             )}
 
-            {row('Models', (status?.models ?? []).join(' · ') || '—')}
-            {row('Cache', `${status?.cacheEntries ?? '—'} entries`)}
-            {row('Updated', fetchedAt || '—')}
+            {row(t('dev.models'), (status?.models ?? []).join(' · ') || '—')}
+            {row(t('dev.cache'), status?.cacheEntries != null ? t('dev.entries', { n: status.cacheEntries }) : '—')}
+            {row(t('dev.updated'), fetchedAt || '—')}
           </section>
 
           {/* ── 2. NVIDIA（獨立一條路，不進輪替鏈）──────────── */}
           <section className="flex flex-col gap-[8px]">
             <h3 className="flex items-center gap-[6px] text-[17px] font-black text-slate-900">
               <Server className="w-[20px] h-[20px] text-indigo-700" aria-hidden="true" />
-              NVIDIA NIM (fitness report only)
+              {t('dev.nvidiaTitle')}
             </h3>
-            {row('Key', status?.nvidia?.configured ? 'configured' : 'missing')}
-            {row('Models', (status?.nvidia?.models ?? []).join(' · ') || '—')}
+            {row(t('dev.key'), status?.nvidia?.configured ? t('dev.configured') : t('dev.missing'))}
+            {row(t('dev.models'), (status?.nvidia?.models ?? []).join(' · ') || '—')}
             {/* ⚠️ 這一句是給答辯用的：明確說明它為什麼不在上面的輪替鏈裡 */}
             <p className="text-[15px] font-bold text-slate-500 leading-snug">
-              Not part of the recognition chain on purpose — NIM's available models are text-only
-              and can cold-start for 86–156 s.
+              {t('dev.rotationNote')}
             </p>
           </section>
 
@@ -226,14 +227,34 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
               ) : (
                 <Globe className="w-[20px] h-[20px] text-slate-700" aria-hidden="true" />
               )}
-              Runtime
+              {t('dev.runtime')}
             </h3>
-            {row('Platform', isNativeTts() ? 'native (APK)' : 'browser')}
-            {row('Speech', !canSpeak() ? 'unsupported' : isNativeTts() ? 'native TTS' : 'Web Speech')}
-            {row('Local OCR', isBrowserOcrReady() ? 'engine loaded' : 'not loaded yet')}
-            {row('Mode', context.analysisMode)}
-            {row('Profile', context.profileId)}
-            {row('Language', context.language)}
+            {row(t('dev.platform'), isNativeTts() ? t('dev.platformNative') : t('dev.platformBrowser'))}
+            {row(t('dev.speech'), !canSpeak() ? t('dev.speechNone') : isNativeTts() ? t('dev.speechNative') : t('dev.speechWeb'))}
+            {row(t('dev.localOcr'), isBrowserOcrReady() ? t('dev.ocrLoaded') : t('dev.ocrNotLoaded'))}
+            {/* ★ 上次 OCR 的具體結果（2026-10-03）。
+                這是「使用者說不行、開發者重現不出來」時唯一的線索來源 ——
+                引擎載入失敗的原始錯誤訊息會直接顯示在這裡。
+                ⚠️ 錯誤訊息本身不翻譯（那是引擎原文），只翻譯標籤。 */}
+            {(() => {
+              const d = getLastOcrDiagnostics();
+              if (!d) return null;
+              return (
+                <p
+                  className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-words leading-snug ${
+                    d.outcome === 'ok'
+                      ? 'bg-emerald-50 text-emerald-900'
+                      : 'bg-rose-50 text-rose-900'
+                  }`}
+                >
+                  {t('dev.ocrLast')}: {d.outcome} · {d.textLength} chars · {d.elapsedMs}ms
+                  {d.error ? ` · ${d.error}` : ''}
+                </p>
+              );
+            })()}
+            {row(t('dev.analyzeMode'), context.analysisMode)}
+            {row(t('dev.profile'), context.profileId)}
+            {row(t('dev.language'), context.language)}
           </section>
 
           <p className="text-[15px] font-bold text-slate-400 break-all">{context.userAgent}</p>

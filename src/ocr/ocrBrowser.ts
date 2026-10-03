@@ -49,6 +49,48 @@ const ASSET_PATHS = {
   langPath: '/tessdata',
 };
 
+/**
+ * 最近一次 OCR 的診斷資訊（2026-10-03）。
+ *
+ * ★★【為什麼需要這個】
+ *   使用者回報「本機 OCR 完全不行」，但我在電腦瀏覽器上**怎麼測都正常**：
+ *   完整流水線（OCR ＋ 規則引擎）在標籤只佔畫面 25%、
+ *   甚至在極低對比的情況下都還讀得出 鈉2350／糖8.5／碳水62。
+ *
+ *   也就是說：**問題只在他的裝置上，而我在這裡看不到。**
+ *   繼續盲猜沒有意義 —— 所以改成把失敗的**具體原因**記錄下來，
+ *   由開發者面板顯示，讓使用者直接回報那一行訊息。
+ *
+ *   ⚠️ 這裡刻意記錄的是「最後一次的結果」，不是歷史。
+ *      開發者面板只需要知道「剛才那一次發生什麼事」。
+ */
+export interface OcrDiagnostics {
+  /** 最後一次的結局 */
+  outcome: 'ok' | 'engine-error' | 'image-error';
+  /** 讀到的字數（成功時） */
+  textLength: number;
+  /** 錯誤訊息原文（失敗時） */
+  error: string | null;
+  /** 引擎是否已成功建立過 */
+  engineReady: boolean;
+  /** 花費毫秒 */
+  elapsedMs: number;
+  /** 發生時間 */
+  at: string;
+}
+
+let lastDiagnostics: OcrDiagnostics | null = null;
+
+export function getLastOcrDiagnostics(): OcrDiagnostics | null {
+  return lastDiagnostics;
+}
+
+function recordDiagnostics(d: OcrDiagnostics): void {
+  lastDiagnostics = d;
+  // 同時留在 console：使用者若截圖 console 也能給出線索
+  console.log(`[LabelBuddy AI][OCR] ${d.outcome} len=${d.textLength} ${d.error ?? ''} ${d.elapsedMs}ms`);
+}
+
 export interface BrowserOcrResult {
   /** 是否成功執行 OCR（**不代表讀到的內容足夠**，那由伺服器端的誠實門檻判斷） */
   ok: boolean;
@@ -119,12 +161,21 @@ export async function recognizeLabelTextInBrowser(
     return { ok: false, text: '', error: '沒有圖片', errorKind: 'image' };
   }
 
+  const startedAt = Date.now();
   try {
     const text = await enqueue(async () => {
       const worker = await getWorker();
       // 瀏覽器端的 recognize 直接接受 data URL，不需要先轉成 Buffer
       const { data } = await worker.recognize(imageDataUrl);
       return data.text || '';
+    });
+    recordDiagnostics({
+      outcome: 'ok',
+      textLength: text.length,
+      error: null,
+      engineReady: true,
+      elapsedMs: Date.now() - startedAt,
+      at: new Date().toLocaleTimeString(),
     });
     return { ok: true, text };
   } catch (err: any) {
@@ -137,6 +188,18 @@ export async function recognizeLabelTextInBrowser(
      */
     const msg = err?.message || String(err);
     const isImageProblem = /圖片|image|decode|畫布/i.test(msg);
+    /**
+     * ★ 把失敗的具體原因記錄下來 —— 這是「使用者說不行、我卻重現不出來」
+     *   唯一的突破口（見檔案上方的 OcrDiagnostics 說明）。
+     */
+    recordDiagnostics({
+      outcome: isImageProblem ? 'image-error' : 'engine-error',
+      textLength: 0,
+      error: msg,
+      engineReady: workerPromise !== null,
+      elapsedMs: Date.now() - startedAt,
+      at: new Date().toLocaleTimeString(),
+    });
     return {
       ok: false,
       text: '',

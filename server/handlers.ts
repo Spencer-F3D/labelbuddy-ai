@@ -779,7 +779,13 @@ export async function handleAiStatus(body: any, headers: Headers, deps: CoreDeps
   const keys = providerKeys();
   const now = Date.now();
 
-  const providers = (['gemini', 'openrouter'] as ProviderName[]).map((name) => {
+  /**
+   * ⚠️ 這裡必須與 `orderedProviders` 的候選清單一致。
+   *    2026-10-03 加入 NVIDIA 後，如果這裡忘了加，
+   *    開發者面板就會顯示成「只有兩家在輪替」——**與事實不符**，
+   *    而且不會有任何錯誤訊息（本專案最常犯的那種 bug）。
+   */
+  const providers = (['nvidia', 'gemini', 'openrouter'] as ProviderName[]).map((name) => {
     const st = providerState[name];
     const configured = isValidKey(keys[name]);
     const coolingDown = st.disabledUntil > now;

@@ -167,12 +167,23 @@ export function getModelChain(): string[] {
   return chain.slice(0, MAX_MODEL_CHAIN);
 }
 
-export type ProviderName = 'gemini' | 'openrouter';
+/** 三家供應商。`nvidia` = NVIDIA NIM，2026-10-03 加入輪替。 */
+export type ProviderName = 'gemini' | 'openrouter' | 'nvidia';
 
 /** 各家免費層的每日上限，僅用於輪替權重（非硬性擋阻） */
 export const DAILY_QUOTA: Record<ProviderName, number> = {
   gemini: 1500,
   openrouter: 50,
+  /**
+   * NVIDIA NIM **沒有每日請求上限**，所以給一個很大的數字。
+   *
+   * ⚠️ 這個數字不是「真實上限」，而是**輪替權重**：
+   *    排序是「使用率低者優先」（usedToday / dailyQuota），
+   *    給它大分母＝使用率永遠最低＝**優先被選中**。
+   *    這正是使用者要的「加入輪替以節省額度」——
+   *    讓沒有上限的那家先吃掉請求，Gemini 與 OpenRouter 的免費額度留著。
+   */
+  nvidia: 100000,
 };
 
 /** 一般失敗的冷卻時間；區域封鎖屬永久性，冷卻 6 小時避免白費額度 */
@@ -189,6 +200,7 @@ interface ProviderState {
 export const providerState: Record<ProviderName, ProviderState> = {
   gemini: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
   openrouter: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
+  nvidia: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
 };
 
 let stateDate = new Date().toDateString();
@@ -211,6 +223,7 @@ export function providerKeys(): Record<ProviderName, string> {
   return {
     gemini: (process.env.GEMINI_API_KEY || '').trim(),
     openrouter: (process.env.OPENROUTER_API_KEY || '').trim(),
+    nvidia: nvidiaKey(),
   };
 }
 
@@ -219,17 +232,26 @@ export function providerKeys(): Record<ProviderName, string> {
  * 這是「兩家一起用、不會很快用完一家」的核心：
  * 例如 Gemini 用了 1/1500、OpenRouter 用了 1/50，下一輪會優先選 Gemini。
  */
-function orderedProviders(hasClientKey: boolean): ProviderName[] {
+function orderedProviders(hasClientKey: boolean, hasImage = false): ProviderName[] {
   rollDateIfNeeded();
   const keys = providerKeys();
   const now = Date.now();
 
-  return (['gemini', 'openrouter'] as ProviderName[])
+  return (['nvidia', 'gemini', 'openrouter'] as ProviderName[])
     .filter((name) => {
       // 前端自備金鑰一律走 OpenRouter（避免使用伺服器端的 Gemini 額度）
       if (hasClientKey && name === 'gemini') return false;
       if (!hasClientKey && !isValidKey(keys[name])) return false;
       if (providerState[name].disabledUntil > now) return false;
+      /**
+       * ★★ NIM 已驗證可用的都是**文字**模型，收不下圖片。
+       *
+       * 含圖片的請求（`cloud_image` 模式）如果送給 NIM，它會直接失敗 ——
+       * 那不但浪費一次往返，還會把它的失敗計數往上推，
+       * 最後讓這個「沒有上限」的供應商被冷卻，反而失去節省額度的意義。
+       * → 有圖片時直接把 NVIDIA 排除在候選之外。
+       */
+      if (hasImage && name === 'nvidia') return false;
       return true;
     })
     .sort(
@@ -738,12 +760,28 @@ export async function callNvidiaNim(options: {
   maxTokens?: number;
   temperature?: number;
 }): Promise<{ data: any; model: string } | null> {
-  const key = nvidiaKey();
+  const r = await callNvidia(nvidiaKey(), options);
+  return r.ok ? { data: r.data, model: r.model } : null;
+}
+
+/**
+ * NVIDIA NIM 的 ProviderResult 版本（2026-10-03 加入輪替用）。
+ *
+ * 與上面的包裝差別只在回傳形狀 —— 輪替需要知道「成功／失敗／是否永久」，
+ * 才能決定要不要冷卻這個供應商。
+ * ⚠️ 模型鏈內部會逐一把 404（此帳號不可用）與逾時換掉，
+ *    所以「全部候選都失敗」時回 permanent: false —— 讓輪替機制
+ *    用一般的「連續失敗 2 次才冷卻」規則處理，而不是一次就關掉它。
+ */
+async function callNvidia(
+  key: string,
+  options: { systemInstruction: string; userPrompt: string; maxTokens?: number; temperature?: number }
+): Promise<ProviderResult> {
   if (!isValidKey(key)) {
-    console.log('[LabelBuddy AI] NVIDIA NIM：未設定金鑰，略過');
-    return null;
+    return { ok: false, permanent: true, error: 'NVIDIA_API_KEY 未設定' };
   }
 
+  let lastNimError = '';
   for (const model of NVIDIA_MODEL_CHAIN) {
     const started = Date.now();
     try {
@@ -770,16 +808,19 @@ export async function callNvidiaNim(options: {
 
       if (response.status === 404) {
         // 永久性：這個帳號不能呼叫這個模型。**不要重試**，直接下一個候選。
+        lastNimError = `${model}: 404 此帳號不可用`;
         console.log(`[LabelBuddy AI] NVIDIA ${model}：404（此帳號不可用），換下一個`);
         continue;
       }
       if (response.status === 503 || response.status === 500) {
         // 上游 worker 飽和，屬暫時性 —— 但也不要在同一個模型上耗太久
+        lastNimError = `${model}: HTTP ${response.status}`;
         console.log(`[LabelBuddy AI] NVIDIA ${model}：HTTP ${response.status}（暫時性，換下一個）`);
         continue;
       }
       if (!response.ok) {
         const t = await response.text();
+        lastNimError = `${model}: HTTP ${response.status}`;
         console.log(`[LabelBuddy AI] NVIDIA ${model}：HTTP ${response.status} ${t.slice(0, 120)}`);
         continue;
       }
@@ -798,9 +839,10 @@ export async function callNvidiaNim(options: {
           ` 輸出=${json?.usage?.completion_tokens ?? '?'} tokens`
       );
 
-      if (parsed) return { data: parsed, model: json?.model || model };
+      if (parsed) return { ok: true, data: parsed, model: json?.model || model, provider: 'nvidia' };
     } catch (error: any) {
       // 逾時／連線失敗多為冷啟動，換下一個候選即可，不標記為永久失敗
+      lastNimError = `${model}: ${String(error?.message).slice(0, 80)}`;
       console.log(
         `[LabelBuddy AI] NVIDIA ${model}：例外（${Date.now() - started}ms）` +
           ` ${String(error?.message).slice(0, 120)}`
@@ -809,7 +851,7 @@ export async function callNvidiaNim(options: {
   }
 
   console.log('[LabelBuddy AI] NVIDIA NIM：所有候選都失敗');
-  return null;
+  return { ok: false, permanent: false, error: lastNimError || '所有候選模型都失敗' };
 }
 
 /**
@@ -826,7 +868,8 @@ export async function callAiModel(
 ): Promise<{ data: any; model: string; provider: ProviderName } | null> {
   const clientKey = resolveClientKey(req);
   const keys = providerKeys();
-  const order = orderedProviders(!!clientKey);
+  // ⚠️ 要把「有沒有圖片」傳進去 —— NIM 是文字模型（見 orderedProviders 的說明）
+  const order = orderedProviders(!!clientKey, !!options.image);
 
   if (order.length === 0) {
     console.log('[LabelBuddy AI] 沒有可用的 AI 供應商（金鑰未設定，或全部在冷卻中）');
@@ -847,7 +890,11 @@ export async function callAiModel(
 
     const key = name === 'openrouter' && clientKey ? clientKey : keys[name];
     const result =
-      name === 'gemini' ? await callGemini(key, options) : await callOpenRouter(key, options);
+      name === 'gemini'
+        ? await callGemini(key, options)
+        : name === 'nvidia'
+          ? await callNvidia(key, options)
+          : await callOpenRouter(key, options);
 
     if (result.ok) {
       providerState[name].failures = 0;
@@ -933,7 +980,15 @@ CRITICAL TONE AND COMMUNICATION RULES:
 6. BE CONCISE. This text is read aloud to the user, so long paragraphs are useless. Respect these limits STRICTLY:
    - plain_summary: at most 80 Chinese characters (1 to 3 short sentences)
    - alternative_advice: at most 60 Chinese characters
-   - warning_title: at most 15 Chinese characters
+   - warning_title: at most 10 Chinese characters (count any emoji as 2)
+     ★★ 2026-10-03 由 15 收緊到 10。**這不是隨便定的數字，是版面實測結果**：
+        結果頁的標題框在「長者」模式（最大字級）下寬 274px、字級 24px，
+        一行只放得下約 11 個全形字。
+        原本寫 15 → 模型產出「超重鹹！高鹽分高油不適合」（12 字）→
+        被擠成兩行、**末行只剩 1 個字**（孤行），版面檢查抓到 2 筆。
+        ⚠️ 提示詞的長度上限必須跟**最壞情況的版面**對齊，不能憑感覺寫 ——
+           而且換 AI 供應商就會換一套文案，每次都可能撞到，
+           所以要把約束寫進提示詞，而不是等出問題再改文案。
    - knowledge_point: at most 45 Chinese characters (ONE sentence)
    - label_reading_tip: at most 40 Chinese characters (ONE sentence)
    - daily_limit_context: at most 45 Chinese characters (ONE sentence)
