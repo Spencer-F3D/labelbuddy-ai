@@ -24,6 +24,30 @@
 ★ 沙箱的「防大量刪除」是**累計**計算（門檻 50 檔/回合）：
   一個回合內連續做大檔案刪除會把額度用完，導致後面的 `vite build` 清 dist 被擋。
 
+## 🔊 語音朗讀（TTS）— 2026-10-03 大改
+★★ **APK 是 Capacitor 的 Android WebView，而它不實作 Web Speech 合成 API**
+  （`window.speechSynthesis` 只有 Chrome 瀏覽器有）。
+  舊版只有 Web Speech → `speakText()` 每次靜默 `return false`：
+  **不拋錯、不記錄、畫面無異狀** → 使用者只會說「完全沒聲音」。
+  → 原生走 `@capacitor-community/text-to-speech`，瀏覽器仍走 Web Speech。
+★★ **只裝 npm 套件不算生效，要驗三件事**：
+  ① `android/app/capacitor.build.gradle` 有 `implementation project(':capacitor-community-text-to-speech')`
+  ② APK 內 `assets/capacitor.plugins.json` 有 `...tts.TextToSpeechPlugin`
+  ③ **合併後的 AndroidManifest 有 `<queries><intent><action TTS_SERVICE>`**
+     （Android 11+ 套件可見性；少了它引擎找不到**且不會報錯**）
+  → 驗法：`aapt2 dump xmltree --file AndroidManifest.xml <apk>`
+★ `getVoices()` 是**非同步**的 → 要監聽 `voiceschanged`，否則第一次朗讀挑不到語音。
+★ 澳門要用 `zh-HK`（粵語），不是 `zh-TW`。
+★ 設定存 `labelbuddy_tts_v1`；**長者預設開、其他身分預設關**。
+  有 `touched` 旗標：手動改過就永遠以使用者為準（否則改身分時設定會被覆蓋）。
+★ 「關閉」要在 `speakText` 最前面擋掉，**不是** volume 設 0。
+
+## 🛠️ 開發者面板（隱藏）
+連點主標「LabelBuddy AI」**7 下**進入。計數用 **ref 不用 state**（state 會全樹重繪），
+且必須有**時間窗**（2 秒），否則分幾天點也會開。
+內容：供應商用量／上限、冷卻、上次錯誤、模型鏈、快取、NVIDIA 狀態、執行環境。
+★ NVIDIA **不混進 providers**（那是標籤辨識的輪替鏈，NIM 不在鏈上）。
+
 ## 🏆 比賽（最高優先）
 
 | 項目 | 內容 |
