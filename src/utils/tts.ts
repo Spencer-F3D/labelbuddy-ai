@@ -61,7 +61,18 @@ export interface TTSOptions {
  * 英文介面若仍挑中文語音，會用中文腔去念英文字，決賽的英文 Demo 影片會很糟。
  * 注意：這只影響「挑哪個語音」，不會改變朗讀的文字內容。
  */
-export type TTSLanguage = 'cantonese' | 'mandarin' | 'english';
+/**
+ * ★ 2026-10-03 使用者指定：**鎖定粵語，移除普通話**。
+ *
+ * 原本有 'mandarin' 這個選項，但全站沒有任何地方在用它
+ * （`ttsLanguageFor()` 一直只回傳 cantonese 或 english）——
+ * 留著只會讓人以為「可以選普通話」，實際上根本沒有入口。
+ * 對澳門的使用者來說，中文就該是粵語；留一個沒人用的選項是誤導。
+ *
+ * ⚠️ 'english' **必須保留**：英文介面若用中文語音念英文，
+ *    決賽的英文 Demo 影片會很難聽（比賽要求英文材料）。
+ */
+export type TTSLanguage = 'cantonese' | 'english';
 
 /**
  * 依「介面語言」決定該挑哪個語音 —— **全站唯一來源**。
@@ -91,12 +102,14 @@ export function isNativeTts(): boolean {
   }
 }
 
-/** 轉成 BCP-47 語言標籤（原生引擎與 Web Speech 都吃這個） */
+/**
+ * 轉成 BCP-47 語言標籤（原生引擎與 Web Speech 都吃這個）。
+ *
+ * ★ 2026-10-03：中文**一律 zh-HK（粵語）**，不再有 zh-TW / zh-CN 的分支。
+ *   ⚠️ 設成 zh-TW 會讓 Android TTS 用**國語**朗讀 —— 那正是使用者要移除的東西。
+ */
 function bcp47(preferLang: TTSLanguage): string {
-  if (preferLang === 'english') return 'en-US';
-  // ⚠️ 用 zh-HK 而不是 zh-TW：使用者在澳門，粵語是 zh-HK。
-  //    設 zh-TW 會讓 Android TTS 用國語朗讀。
-  return preferLang === 'cantonese' ? 'zh-HK' : 'zh-TW';
+  return preferLang === 'english' ? 'en-US' : 'zh-HK';
 }
 
 /**
@@ -133,14 +146,15 @@ export function findBestVoice(preferLang: TTSLanguage = 'cantonese'): SpeechSynt
     if (cantoneseVoice) return cantoneseVoice;
   }
 
-  // 次選台灣正體中文或繁體中文
-  const zhTwVoice = voices.find((v) => v.lang === 'zh-TW' || v.lang === 'zh-Hant');
-  if (zhTwVoice) return zhTwVoice;
-
-  // 再次選任意中文語音 (zh, zh-CN)
-  const anyZhVoice = voices.find((v) => v.lang.startsWith('zh'));
-  if (anyZhVoice) return anyZhVoice;
-
+  /**
+   * ⚠️ 2026-10-03：這裡原本會「次選 zh-TW、再次選任意 zh 語音」——
+   *    那等於在使用者要粵語時**偷偷用國語朗讀**（聽起來像另一個人）。
+   *    使用者明確要求移除普通話，所以拿掉這些降級。
+   *
+   *    ★ 但也不是直接回 null 就放生：`utterance.lang` 仍會設成 zh-HK，
+   *      瀏覽器會自己挑最接近的語音。真的完全沒有中文語音時，
+   *      唸出來會很怪，但那是裝置限制 —— 我們至少不會主動選國語。
+   */
   return null;
 }
 

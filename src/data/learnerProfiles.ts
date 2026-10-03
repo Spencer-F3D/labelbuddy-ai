@@ -443,7 +443,44 @@ export function getNutrientDirections(
   return out;
 }
 
-export function getAllLearnerProfiles(): LearnerProfile[] {  return PROFILES;
+/**
+ * 身分選擇的**顯示順序：由年輕到年長**（2026-10-03 使用者指定）。
+ *
+ * 【為什麼不直接重排 PROFILES 陣列】
+ *   那個陣列的順序是「歷史加入順序」，其他程式可能已經依賴它
+ *   （例如預設值、文件對照、日誌可讀性）。
+ *   直接重排，日後新增身分時很容易改錯一處而沒發現。
+ *   → 資料順序不動，**另外給一份明確的顯示順序**，要排序的地方呼叫
+ *     `getAllLearnerProfiles()`（目前只有身分選擇器在用）。
+ *
+ * 【健身人士為什麼放在青年與中年之間】
+ *   它不以年齡定義（任何成年人都可能是健身人士）。
+ *   放在年輕與年長成人之間，是「由年輕到年長」這條線最不打斷閱讀的位置。
+ */
+export const PROFILE_AGE_ORDER: LearnerProfileId[] = [
+  'child', // 兒童
+  'teen', // 青少年
+  'student', // 學生
+  'young', // 青年
+  'fitness', // 健身人士（不以年齡定義）
+  'middle', // 中年
+  'senior', // 長者
+];
+
+/**
+ * 取得所有身分，**依年齡由小到大排序**。
+ * 引導頁與設定頁共用身分選擇器，所以在這裡排序就能一次修好兩邊。
+ */
+export function getAllLearnerProfiles(): LearnerProfile[] {
+  const rank = new Map(PROFILE_AGE_ORDER.map((id, i) => [id, i]));
+  return [...PROFILES].sort(
+    (a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99)
+  );
+}
+
+/** 取得未排序的原始清單（需要資料順序時使用，例如預設值推導） */
+export function getProfilesInDataOrder(): LearnerProfile[] {
+  return PROFILES;
 }
 
 /** 判斷字串是否為有效的身分 ID */
@@ -460,15 +497,26 @@ export function describeProfiles(ids: LearnerProfileId[]): string {
 /** 主題的顯示名稱 */
 export const TOPIC_LABELS: Record<KnowledgeTopic, string> = {
   basics: '讀標基本功',
+  reading: '數字怎麼看',
   dangers: '三大危險成分',
+  sodium_sugar: '鈉與糖陷阱',
   profiles: '我的專屬眉角',
   shopping: '聰明採買術',
 };
 
 /** 主題的固定顯示順序 */
+/**
+ * 主題的固定顯示順序。
+ * ⚠️ 這個順序就是**學習難度順序**：先會看（basics）→ 再看懂數字（reading）
+ *    → 認識地雷（dangers）→ 針對最常見的兩項（sodium_sugar）
+ *    → 套用到自己（profiles）→ 實際採買（shopping）。
+ *    新增主題時請想一下它該插在哪個位置，不要直接接在最後面。
+ */
 export const TOPIC_ORDER: KnowledgeTopic[] = [
   'basics',
+  'reading',
   'dangers',
+  'sodium_sugar',
   'profiles',
   'shopping',
 ];

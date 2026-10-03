@@ -442,6 +442,39 @@ export function analyzeNutritionWithIndicators(
     }
   }
 
+  /**
+   * ★★ 基準安全判定（2026-10-03 修正一個安全漏洞）
+   *
+   * 【問題】上面 1～12 項的評分**全部綁在使用者勾選的慢性病上**：
+   *   例如鈉的評分只在 `hasHypertension` 為真時才執行。
+   *   於是「沒有勾選任何慢性病」的使用者，掃到一份
+   *   **鈉 2350 毫克（每日上限 118%）** 的泡麵，
+   *   會得到 riskScore = 0 → **綠燈** →「✅ 綠燈安心！…很適合您」。
+   *
+   *   最難看的是**同一份回應自己在打自己**：
+   *   `nutrient_facts` 明明寫著鈉 118%（紅色長條），結論卻說很適合。
+   *
+   * 【為什麼這是安全問題，不只是體驗問題】
+   *   本專案的核心原則是「顏色一律以規則引擎為準」，
+   *   而「該紅卻報綠」比誤報更危險 —— 使用者會直接買回家。
+   *   沒有勾慢性病 ≠ 吃下 118% 的每日鈉上限沒關係。
+   *
+   * 【修法】把「超過每日上限」當成**下限保護**：
+   *   只要有任何一項達到/超過每日上限，至少給黃燈，
+   *   並在說明裡講清楚是哪一項超標。
+   *   ⚠️ 刻意不直接給紅燈 —— 沒勾慢性病的人（例如健康的年輕人）
+   *      偶爾吃一次不至於有立即危險，給紅燈會造成不必要的恐慌，
+   *      反而讓使用者學會忽略紅燈。這是「至少黃燈」的理由。
+   *
+   * ⚠️ 必須在「決定總體風險」之前算，所以這裡先建 nutrientFacts，
+   *    後面直接沿用同一份（不要重算，避免兩處算法分歧）。
+   */
+  const nutrientFactsForRisk = buildLocalNutrientFacts(profile, numericLimits);
+  const overLimit = nutrientFactsForRisk.filter((f) => f.percent >= 100);
+  if (overLimit.length > 0 && riskScore < 1) {
+    riskScore = 1; // 至少黃燈
+  }
+
   // 決定總體風險等級
   let riskLevel: RiskLevel = 'green';
   let warningTitle = '✅ 成分很清淡，可以放心吃';
@@ -462,9 +495,26 @@ export function analyzeNutritionWithIndicators(
     alternativeAdvice = '建議在超市改買：新鮮豆腐、綠色蔬菜、清蒸魚、燕麥片或無糖豆漿，清淡又顧健康！';
   } else if (riskScore >= 1) {
     riskLevel = 'yellow';
-    warningTitle = '🟡 黃燈提醒：嚐一兩口就好，不要吃太多';
-    plainSummary = `您好！這款【${profile.foodName}】味道雖然香，但對您的身體（${matchedConditions.slice(0, 2).join('、')}）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！`;
-    alternativeAdvice = '吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。';
+    /**
+     * ⚠️ 兩種黃燈要分開講：
+     *   ① 有勾慢性病 → 針對那個病說明（原本的文案）
+     *   ② 沒勾慢性病、但某項超過每日上限 → 講「是哪一項超標」
+     *      不能沿用 ① 的句子 —— matchedConditions 是空的，
+     *      會變成「對您的身體（）還是稍微有點油鹽糖」，括號裡什麼都沒有。
+     */
+    if (matchedConditions.length === 0 && overLimit.length > 0) {
+      const worst = overLimit[0];
+      warningTitle = '🟡 黃燈提醒：這一項已經超標';
+      plainSummary =
+        `您好！這款【${profile.foodName}】的「${worst.name}」每份就有 ${worst.value} ${worst.unit}，` +
+        `已經佔了整天上限的 ${worst.percent}%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；` +
+        `但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。`;
+      alternativeAdvice = '想吃的話，份量減半、多喝開水，也可以分給家人一起吃。';
+    } else {
+      warningTitle = '🟡 黃燈提醒：嚐一兩口就好，不要吃太多';
+      plainSummary = `您好！這款【${profile.foodName}】味道雖然香，但對您的身體（${matchedConditions.slice(0, 2).join('、')}）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！`;
+    }
+    alternativeAdvice = alternativeAdvice || '吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。';
   } else {
     riskLevel = 'green';
     warningTitle = '✅ 綠燈安心！沒有太鹹太甜，很適合您';
@@ -472,8 +522,9 @@ export function analyzeNutritionWithIndicators(
     alternativeAdvice = '平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！';
   }
 
-  // 成分對照表（前端百分比長條圖用），同時用來挑選教學內容
-  const nutrientFacts = buildLocalNutrientFacts(profile, numericLimits);
+  // 成分對照表（前端百分比長條圖用）—— 沿用上面為了風險判定先算好的那一份，
+  // ⚠️ 不要重算：兩處各算一次，日後改了一處就會出現「判定用 A、顯示用 B」的分歧。
+  const nutrientFacts = nutrientFactsForRisk;
 
   return {
     risk_level: riskLevel,

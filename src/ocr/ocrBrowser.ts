@@ -77,6 +77,12 @@ export interface OcrDiagnostics {
   elapsedMs: number;
   /** 發生時間 */
   at: string;
+  /**
+   * OCR 讀出的**原始文字**（截斷 500 字）。
+   * 開發者面板要看的「上次標籤原文」—— 沒有這個就只能看到「讀到幾個字」，
+   * 看不出「讀到了什麼、錯在哪」。
+   */
+  rawText: string;
 }
 
 let lastDiagnostics: OcrDiagnostics | null = null;
@@ -176,6 +182,7 @@ export async function recognizeLabelTextInBrowser(
       engineReady: true,
       elapsedMs: Date.now() - startedAt,
       at: new Date().toLocaleTimeString(),
+      rawText: text.slice(0, 500),
     });
     return { ok: true, text };
   } catch (err: any) {
@@ -199,6 +206,7 @@ export async function recognizeLabelTextInBrowser(
       engineReady: workerPromise !== null,
       elapsedMs: Date.now() - startedAt,
       at: new Date().toLocaleTimeString(),
+      rawText: '',
     });
     return {
       ok: false,

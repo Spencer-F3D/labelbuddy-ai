@@ -48,6 +48,8 @@ interface AiStatus {
     dailyQuota: number;
     coolingDownUntil: string | null;
     lastError: string | null;
+    /** 最後一次呼叫的耗時（毫秒，-1 = 還沒跑過） */
+    lastLatencyMs?: number;
   }>;
   models?: string[];
   nvidia?: { configured: boolean; models: string[]; purpose: string };
@@ -58,6 +60,17 @@ interface AiStatus {
 
 export interface DeveloperPanelProps {
   onClose: () => void;
+  /**
+   * 上一次分析的 AI 結果（2026-10-03 使用者要求「增加上次標籤原文」）。
+   *
+   * ⚠️ 由 App 傳進來而不是面板自己去抓 —— 面板是純顯示元件，
+   *    不應該為了顯示而再發一次請求（那會多花一次 AI 額度）。
+   */
+  lastAi?: {
+    provider?: string;
+    model?: string;
+    rawText?: string;
+  } | null;
   /** 目前的執行環境資訊（由 App 提供，避免面板自己去猜） */
   context: {
     analysisMode: string;
@@ -67,7 +80,7 @@ export interface DeveloperPanelProps {
   };
 }
 
-export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context }) => {
+export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context, lastAi }) => {
   const { t } = useI18n();
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,7 +110,11 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
   const row = (label: string, value: React.ReactNode) => (
     <div className="flex items-start gap-[8px] text-[16px] leading-snug">
       <span className="shrink-0 font-black text-slate-500 min-w-[104px]">{label}</span>
-      <span className="flex-1 min-w-0 font-bold text-slate-900 break-words">{value}</span>
+      {/* ⚠️ 用 break-all 而不是 break-words：
+          模型 ID（dots-studio/dots-3-note-preview:free）這種字串**沒有空白**，
+          break-words 找不到斷點 → 直接穿出框框（使用者回報的溢出問題）。
+          break-all 允許在任何字元斷行，長 token 才不會溢出。 */}
+      <span className="flex-1 min-w-0 font-bold text-slate-900 break-all">{value}</span>
     </div>
   );
 
@@ -162,7 +179,7 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                   key={p.name}
                   className="rounded-xl border-2 border-slate-200 bg-slate-50 px-[10px] py-[8px] flex flex-col gap-[4px]"
                 >
-                  <div className="flex items-center gap-[8px]">
+                  <div className="flex items-center gap-[8px] min-w-0">
                     <span
                       className={`w-[10px] h-[10px] rounded-full shrink-0 ${
                         p.available ? 'bg-emerald-600' : p.coolingDownUntil ? 'bg-amber-500' : 'bg-slate-400'
@@ -171,8 +188,15 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                     />
                     <span className="text-[17px] font-black text-slate-900">{p.name}</span>
                     <span className="text-[16px] font-bold text-slate-600">{state}</span>
-                    <span className="ml-auto text-[16px] font-black text-slate-900">
+                    <span className="ml-auto shrink-0 text-[16px] font-black text-slate-900">
                       {p.usedToday} / {p.dailyQuota}
+                      {/* 最後一次耗時 —— 使用者反映「NVIDIA API 過慢」，
+                          有數字才能判斷是冷啟動還是模型本身慢 */}
+                      {typeof p.lastLatencyMs === 'number' && p.lastLatencyMs >= 0 && (
+                        <span className="ml-[6px] font-bold text-slate-500">
+                          {(p.lastLatencyMs / 1000).toFixed(1)}s
+                        </span>
+                      )}
                     </span>
                   </div>
                   {/* 用量長條：一眼看出離上限多遠 */}
@@ -255,6 +279,45 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
             {row(t('dev.analyzeMode'), context.analysisMode)}
             {row(t('dev.profile'), context.profileId)}
             {row(t('dev.language'), context.language)}
+          </section>
+
+          {/* ── 4. 上次標籤原文（2026-10-03 使用者要求）─────────────
+              排查「模型／引擎到底回了什麼」時，只看解析後的欄位是不夠的。
+              ⚠️ 用 <pre> + whitespace-pre-wrap + break-all：
+                 原文可能很長且沒有空白，不這樣設定會直接穿出框框。 */}
+          <section className="flex flex-col gap-[8px]">
+            <h3 className="text-[17px] font-black text-slate-900">{t('dev.rawTitle')}</h3>
+
+            {(() => {
+              const d = getLastOcrDiagnostics();
+              return (
+                <div className="flex flex-col gap-[4px]">
+                  <span className="text-[16px] font-black text-slate-600">{t('dev.rawOcr')}</span>
+                  {d?.rawText ? (
+                    <pre className="text-[15px] font-bold text-slate-800 bg-slate-50 border border-slate-300 rounded-lg p-[8px] whitespace-pre-wrap break-all max-h-[160px] overflow-y-auto m-0">
+                      {d.rawText}
+                    </pre>
+                  ) : (
+                    <p className="text-[15px] font-bold text-slate-400">{t('dev.rawEmpty')}</p>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex flex-col gap-[4px]">
+              <span className="text-[16px] font-black text-slate-600">
+                {t('dev.rawAi')}
+                {lastAi?.provider ? ` · ${lastAi.provider}` : ''}
+                {lastAi?.model ? ` · ${lastAi.model}` : ''}
+              </span>
+              {lastAi?.rawText ? (
+                <pre className="text-[15px] font-bold text-slate-800 bg-slate-50 border border-slate-300 rounded-lg p-[8px] whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto m-0">
+                  {lastAi.rawText}
+                </pre>
+              ) : (
+                <p className="text-[15px] font-bold text-slate-400">{t('dev.rawEmpty')}</p>
+              )}
+            </div>
           </section>
 
           <p className="text-[15px] font-bold text-slate-400 break-all">{context.userAgent}</p>

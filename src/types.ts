@@ -339,7 +339,19 @@ export interface NutritionTarget {
 }
 
 /** 知識卡主題分類 */
-export type KnowledgeTopic = 'basics' | 'dangers' | 'profiles' | 'shopping';
+/**
+ * 食育主題。
+ * ★ 2026-10-03 新增 `reading` 與 `sodium_sugar` ——
+ *   使用者要求「增加類別，每類別 ≥10 題」。
+ *   原本 4 類（共 14 題）擴充為 6 類 × 10 題 = 60 題。
+ */
+export type KnowledgeTopic =
+  | 'basics' // 讀標基本功
+  | 'reading' // 數字怎麼看
+  | 'dangers' // 三大危險成分
+  | 'sodium_sugar' // 鈉與糖陷阱
+  | 'profiles' // 我的專屬眉角
+  | 'shopping'; // 聰明採買術
 
 /** 食育知識卡 */
 export interface KnowledgeCard {

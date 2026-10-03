@@ -366,6 +366,13 @@ ${promptContext}`;
         aiResult.data.analysis_mode = 'cloud_ai';
         aiResult.data.ai_model = aiResult.model;
         aiResult.data.ai_provider = aiResult.provider;
+        /**
+         * 開發者面板要看的「AI 原始回傳」（2026-10-03 使用者要求）。
+         * ⚠️ 截斷 2000 字元 —— 原始文字可能包含模型多餘的說明，
+         *    全部塞進回應會讓 payload 變大（照片模式的回應本來就不小）。
+         * 這是使用者自己的資料，不會外洩給第三方。
+         */
+        aiResult.data.ai_raw_text = String(aiResult.rawText || '').slice(0, 2000);
         aiResult.data.data_handling = 'cloud';
         aiResult.data.learner_profile_id = learnerProfile.id;
         aiResult.data.learner_profile_name = profileName(learnerProfile.id, learnerProfile.name, language);
@@ -795,6 +802,9 @@ export async function handleAiStatus(body: any, headers: Headers, deps: CoreDeps
       available: configured && !coolingDown,
       usedToday: st.usedToday,
       dailyQuota: DAILY_QUOTA[name],
+      // 最後一次耗時（毫秒，-1 = 還沒跑過）。使用者反映「API 過慢」，
+      // 有了數字才能判斷是冷啟動、模型慢，還是鏈裡有拖油瓶。
+      lastLatencyMs: st.lastLatencyMs,
       coolingDownUntil: coolingDown ? new Date(st.disabledUntil).toISOString() : null,
       lastError: st.lastError || null,
     };

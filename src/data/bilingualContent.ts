@@ -223,7 +223,9 @@ export function categoryName(categoryId: string, fallback: string, language: Lan
 
 export const TOPIC_LABEL_EN: Record<KnowledgeTopic, string> = {
   basics: 'Label basics',
+  reading: 'Reading the numbers',
   dangers: 'Three danger ingredients',
+  sodium_sugar: 'Sodium and sugar traps',
   profiles: 'Tips for your profile',
   shopping: 'Smart shopping',
 };

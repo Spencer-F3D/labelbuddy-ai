@@ -404,6 +404,512 @@ export const QUIZ_QUESTIONS_EN: Record<string, QuizQuestionText> = {
     explanation:
       '"Sugar free" must meet a legal standard (under 0.5 g of sugar per 100 ml). "Reduced sugar" only means less than the original recipe, and it may still be very sweet.',
   },
+  b6: {
+    question:
+      'A pack shows both "per 100 g" and "per serving" columns. Which should you look at?',
+    options: [
+      'Just per serving',
+      'Both: per serving tells you what you actually eat, per 100 g is the fair way to compare brands',
+      'Just per 100 g',
+],
+    explanation:
+      '"Per serving" answers "how much am I eating"; "per 100 g" answers "how heavy is this product really". Serving sizes are defined by each brand (20 g vs 50 g), so comparing per-serving numbers is easily misleading — per 100 g is the fair comparison.',
+  },
+  b7: {
+    question:
+      'The pack says "zero trans fat". Does that mean there is none at all?',
+    options: [
+      'Definitely none',
+      'Below 0.3 g per 100 g may be labelled "zero", so there can still be a little',
+      'It depends on the sugar',
+],
+    explanation:
+      'Regulations allow "zero" when trans fat is under 0.3 g per 100 g. If the ingredient list contains "hydrogenated vegetable oil" or "margarine", it is still there and accumulates. The ingredient list is more honest than the nutrition numbers.',
+  },
+  b8: {
+    question:
+      'What is the difference between "best before" and "expiry date"?',
+    options: [
+      'They are the same',
+      'Best before usually assumes the pack is unopened; the expiry date is the last day it is safe to eat',
+      'The expiry date is the production date',
+],
+    explanation:
+      '"Best before" typically means unopened and stored as stated; the "expiry date" is the last day it is safe to eat. Once opened, the shelf life no longer applies — follow the "consume soon after opening" note.',
+  },
+  b9: {
+    question:
+      'A snack says "one serving 25 g, 4 servings per pack, 130 kcal". You eat the whole pack. How many kcal?',
+    options: [
+      '130 kcal',
+      '520 kcal',
+      '260 kcal',
+],
+    explanation:
+      '130 × 4 = 520 kcal. This is the most common label mistake: reading only the per-serving number while actually finishing the pack. Before buying, ask yourself: how many servings will I really eat?',
+  },
+  b10: {
+    question:
+      'Two soda crackers: brand A has 300 mg sodium per 100 g, brand B has 620 mg. What does that tell you?',
+    options: [
+      'They are about the same',
+      'For the same weight, B has twice the salt — A is the better choice',
+      'B tastes better',
+],
+    explanation:
+      'The same kind of product can differ more than twofold between brands. Comparing within the same category is the single most effective shopping habit — better than memorising any absolute number.',
+  },
+  r1: {
+    question:
+      'What does the "% Daily Value" column on a nutrition label mean?',
+    options: [
+      'How much of one day\'s allowance this food uses',
+      'How nutritious the food is',
+      'Its ranking against other foods',
+],
+    explanation:
+      'It answers "if I eat this serving, what share of my daily allowance is used?". It is more usable than absolute numbers — you do not need to remember that the sodium limit is 2000 mg, only what share this item takes.',
+  },
+  r2: {
+    question:
+      'A label says "sodium 800 mg, 40% Daily Value". How was that 40% worked out?',
+    options: [
+      'It is arbitrary',
+      '800 ÷ 2000 (adult daily sodium limit) = 40%',
+      '800 ÷ 800 = 100%',
+],
+    explanation:
+      'The reference sodium limit is 2000 mg (about 5 g of salt), so 800 ÷ 2000 = 40%. Once you know who the denominator is, you can work it out yourself without memorising tables.',
+  },
+  r3: {
+    question:
+      'A serving contains 5 g of sugar. Against a 50 g daily added-sugar limit, what does that mean?',
+    options: [
+      'Negligible',
+      'It uses 10% of the day\'s allowance; five servings reaches the limit',
+      'It is already over the limit',
+],
+    explanation:
+      '5 ÷ 50 = 10%. One serving is not much, but this kind of food is usually eaten several servings at a time. For sugar, ask "how many servings will I eat", not "how much per serving".',
+  },
+  r4: {
+    question:
+      'To compare two products whose serving sizes are defined differently, which column should you use?',
+    options: [
+      'Per serving',
+      'Per 100 g',
+      'Per pack',
+],
+    explanation:
+      'Per 100 g is a fixed basis that does not depend on the brand\'s definition of a serving. When comparing across brands, always convert to per 100 g.',
+  },
+  r5: {
+    question:
+      'A label says "energy 2100 kJ". Roughly how many kcal is that?',
+    options: [
+      '2100 kcal',
+      'About 500 kcal',
+      'About 210 kcal',
+],
+    explanation:
+      '1 kcal ≈ 4.184 kJ, so 2100 ÷ 4.184 ≈ 502 kcal. Imported packs often use kJ — do not panic at the big number before converting.',
+  },
+  r6: {
+    question:
+      'A label says "carbohydrate 60 g". Does that include the 8 g of sugar?',
+    options: [
+      'No, they are separate',
+      'Yes, sugar is part of carbohydrate',
+      'It depends whether added sugar is listed',
+],
+    explanation:
+      'Carbohydrate is the family; sugars and starches are both inside it. So the sugar number is always less than or equal to the carbohydrate number. High carbohydrate with low sugar usually means starch (noodles, rice).',
+  },
+  r7: {
+    question:
+      'Which is more directly harmful to the heart: saturated fat or trans fat?',
+    options: [
+      'Saturated fat',
+      'Trans fat',
+      'Exactly the same',
+],
+    explanation:
+      'Trans fat raises bad cholesterol and also lowers good cholesterol — it is bad on both counts. Watch for "hydrogenated vegetable oil", "shortening" and "margarine" in the ingredient list.',
+  },
+  r8: {
+    question:
+      'Are the percentages on the pack based on one serving or the whole pack?',
+    options: [
+      'The whole pack',
+      'One serving',
+      'It depends on the pack size',
+],
+    explanation:
+      'By regulation it is per serving. If you finish the whole pack, multiply the percentage by the number of servings.',
+  },
+  r9: {
+    question:
+      'Dietary fibre shows 0 g. Does that mean there is none at all?',
+    options: [
+      'None at all',
+      'Below the labelling threshold it may show 0, so there can be a trace',
+      'It must be fake',
+],
+    explanation:
+      'As with trans fat, small amounts may be rounded to zero. Fibre is a "more is better" nutrient, so 0 g simply means no credit here — get fibre from vegetables and whole grains.',
+  },
+  r10: {
+    question:
+      'Why do most packs not show a "% Daily Value" for protein?',
+    options: [
+      'Regulations do not require it',
+      'Because it does not taste good',
+      'Because protein does not matter',
+],
+    explanation:
+      'Regulations only mandate percentages for a few core nutrients, and protein is not among them. Some rows show a percentage and some are blank — that is a regulatory difference, not a brand hiding something.',
+  },
+  d6: {
+    question:
+      'The ingredient list mentions "high-fructose corn syrup". How should you read that?',
+    options: [
+      'It is natural, so it is fine',
+      'It is an added sugar, very sweet and cheap, common in drinks',
+      'It is a kind of fibre',
+],
+    explanation:
+      'High-fructose corn syrup is a very common added sugar in drinks and processed food. Its metabolism is debated, but the practical conclusion is the same: it is an added sugar and counts toward the daily limit.',
+  },
+  d7: {
+    question:
+      'The ingredient list says "hydrogenated vegetable oil". What does that usually mean?',
+    options: [
+      'A healthier oil',
+      'The process can create trans fat, which burdens blood vessels',
+      'It is olive oil',
+],
+    explanation:
+      'Hydrogenation turns liquid oil semi-solid (for flaky texture and long shelf life), and partial hydrogenation can create trans fat. This is one of the key words to remember on an ingredient list.',
+  },
+  d8: {
+    question:
+      'Is a shorter ingredient list always better?',
+    options: [
+      'Shorter usually means less processed — a good quick signal',
+      'Length does not matter; what matters is what the ingredients are',
+      'Longer means more nutritious',
+],
+    explanation:
+      'A short list usually means less processing. It is a quick filter, not an absolute rule — some necessary fortification also lengthens the list. The useful habit: within the same category, prefer the shorter list.',
+  },
+  d9: {
+    question:
+      'Should you worry about "monosodium glutamate" (MSG)?',
+    options: [
+      'Avoid it completely',
+      'It mainly adds savouriness; the real thing to watch is the total sodium in the pack',
+      'It is a harmful chemical',
+],
+    explanation:
+      'MSG is generally regarded as safe at normal culinary amounts. But it contains sodium — so the question is not "does it have MSG" but "how much sodium does this pack total".',
+  },
+  d10: {
+    question:
+      'A pack says "no added cane sugar" but tastes very sweet. Why might that be?',
+    options: [
+      'It must be a lie',
+      'It may use fructose, syrup or juice concentrate — all count as added sugar',
+      'Sweeteners have no health effect at all',
+],
+    explanation:
+      'No added cane sugar only rules out cane sugar. Judge sugar from the nutrition panel and the ingredient list (syrups, juice concentrate, maltodextrin), not from the claim on the front.',
+  },
+  n1: {
+    question:
+      'Instant noodles often approach or exceed a whole day\'s sodium. Where does it mostly come from?',
+    options: [
+      'The noodles themselves',
+      'The seasoning and soup',
+      'The packaging',
+],
+    explanation:
+      'The noodles contain little sodium; most of it is in the powder, sauce and oil sachets. So not drinking the soup really works — it usually removes more than half the sodium.',
+  },
+  n2: {
+    question:
+      'The daily sodium limit is 2000 mg. Roughly how much table salt is that?',
+    options: [
+      '5 g (about one teaspoon)',
+      '20 g',
+      '50 g',
+],
+    explanation:
+      'Salt is about 40% sodium, so 2000 mg sodium ≈ 5 g salt, about one dessert spoon. This conversion is handy: "sodium 800 mg" means you just ate half a teaspoon of salt.',
+  },
+  n3: {
+    question:
+      'Why is "do not drink the soup" one of the most effective ways to cut sodium?',
+    options: [
+      'Soup has no nutrition',
+      'Salt dissolves into the soup, so skipping it removes a large share of the sodium',
+      'Soup is high in calories',
+],
+    explanation:
+      'Salt is water-soluble, so it dissolves into the broth during cooking. Eating the noodles but leaving the soup is one of the few ways to cut sodium without changing how the food tastes.',
+  },
+  n4: {
+    question:
+      'What does a "low sodium" claim actually mean?',
+    options: [
+      'No sodium at all',
+      'Below a regulatory threshold per 100 g — lower than usual, but not low enough to eat freely',
+      'You can eat it without limit',
+],
+    explanation:
+      '"Low sodium" is a relative claim: lower than comparable products, not a licence to eat unlimited amounts. The safest habit is still to read the actual milligrams on the nutrition panel.',
+  },
+  n5: {
+    question:
+      'About how much sugar is in a 330 ml can of soft drink?',
+    options: [
+      'About 3 g',
+      'About 30 g (6–7 sugar cubes)',
+      'About 100 g',
+],
+    explanation:
+      'Soft drinks run about 8–10 g sugar per 100 ml, so a 330 ml can is 26–33 g. One can uses more than half the daily added-sugar allowance — and it does not fill you up.',
+  },
+  n6: {
+    question:
+      'What is the difference between "sugar free" and "zero sugar"?',
+    options: [
+      'They are identical',
+      '"Sugar free" usually means under 0.5 g per 100 ml, so traces may remain; both are relative claims',
+      'Only "zero" means truly none',
+],
+    explanation:
+      'Both are regulated content claims with slightly different thresholds, but the point is the same: they mean "below a certain amount", not "absolutely none". The only truly sugar-free drinks are water and unsweetened tea.',
+  },
+  n7: {
+    question:
+      'Does pure fruit juice deserve the same sugar attention?',
+    options: [
+      'No, it is natural',
+      'Yes: the sugar is natural but the fibre is gone, so it absorbs quickly and is easy to overdrink',
+      'Juice sugar does not count',
+],
+    explanation:
+      'Whole fruit has fibre that slows absorption; juicing removes most of it, so one glass can carry the sugar of two or three fruits. Eat the fruit when you can.',
+  },
+  n8: {
+    question:
+      'When do you actually need a sports drink?',
+    options: [
+      'Every day',
+      'After heavy sweating, more than an hour of exercise, or on medical advice',
+      'Whenever you are thirsty',
+],
+    explanation:
+      'Sports drinks are designed to replace lost electrolytes and sugar. If you have not been sweating heavily, it is just a sugary drink. For everyday thirst, water is best.',
+  },
+  n9: {
+    question:
+      'How does sugar affect teeth versus blood sugar?',
+    options: [
+      'Exactly the same',
+      'Teeth are affected mainly by how often you eat sugar; blood sugar by the total amount',
+      'It only affects teeth',
+],
+    explanation:
+      'Cavities depend on how often and how long sugar sits in the mouth, so small amounts many times is worse than once. Blood sugar depends on total amount. The same sweet, viewed two ways.',
+  },
+  n10: {
+    question:
+      'What is the most overlooked source of sodium?',
+    options: [
+      'Salt added at home',
+      'Bread, toast and biscuits — processed foods that do not taste salty',
+      'Fruit',
+],
+    explanation:
+      'Bread and baked goods often carry significant sodium (for fermentation and texture) while tasting not salty at all. Watching only "salty foods" misses these. That is why you read labels instead of trusting your tongue.',
+  },
+  pf3: {
+    question:
+      'Which two items should older adults check first?',
+    options: [
+      'Calories and protein',
+      'Sodium and sugar',
+      'Fibre and vitamins',
+],
+    explanation:
+      'Blood pressure and blood sugar are the most common health concerns in later life, and sodium and sugar are their most direct dietary drivers. Checking these two first blocks most of the risk.',
+  },
+  pf4: {
+    question:
+      'Why are the sodium and sugar limits for children lower than for adults?',
+    options: [
+      'Children weigh less, so the same amount is relatively larger',
+      'Because children do not like them',
+      'There is no real difference',
+],
+    explanation:
+      'Reference values are scaled by body weight and metabolism. The same serving that is "a bit salty" for an adult can be close to a whole day\'s allowance for a child.',
+  },
+  pf5: {
+    question:
+      'Teenagers are very active. What should they watch on a label?',
+    options: [
+      'Nothing, just eat',
+      'Whether calories are enough, and whether the sugar comes from drinks',
+      'Only protein',
+],
+    explanation:
+      'High activity does need more calories, but they are best from proper meals rather than sugary drinks. Drink sugar is the easiest to overdo and the least filling.',
+  },
+  pf6: {
+    question:
+      'Which item should people who train check first?',
+    options: [
+      'Protein and total calories',
+      'Sodium',
+      'Dietary fibre',
+],
+    explanation:
+      'Both bulking and cutting depend on protein and total calories. But processed meats (sausages, bacon) are high in protein and also very high in sodium — hitting your protein target does not make them a good choice.',
+  },
+  pf7: {
+    question:
+      'What is the most practical label habit for a student eating out?',
+    options: [
+      'Memorise every nutrient limit',
+      'Check sodium and sugar per serving, then think about how many servings you will eat',
+      'Only look at calories',
+],
+    explanation:
+      'When eating out there is no time for a full audit. Two habits — check sodium and sugar, then multiply by servings — block most of the problems and take ten seconds.',
+  },
+  pf8: {
+    question:
+      'From midlife onward, which values matter most because they accumulate?',
+    options: [
+      'Sodium and saturated fat',
+      'Vitamin C',
+      'Water',
+],
+    explanation:
+      'Blood pressure and blood lipids change gradually and do not send an acute warning. In midlife the goal is "a little less, consistently", not "very strict occasionally".',
+  },
+  pf9: {
+    question:
+      'Do the recommendations for the same food differ between profiles?',
+    options: [
+      'Exactly the same',
+      'Yes — daily reference values depend on age and health status',
+      'Only on body weight',
+],
+    explanation:
+      'This is why the app asks you to choose a profile first. The same instant noodles can be red for an older adult and yellow for an active teenager. The standard is not inconsistent; the denominator is different.',
+  },
+  pf10: {
+    question:
+      'For someone with high blood pressure, what single habit is most useful when shopping?',
+    options: [
+      'Avoid everything',
+      'Within the same category, always pick up two and compare their sodium',
+      'Just do not drink soup',
+],
+    explanation:
+      'You do not need absolute numbers — just the habit of comparing within the same shelf. Over time you notice that a just-as-tasty option with half the sodium is usually right next to it.',
+  },
+  sh3: {
+    question:
+      'Two products in the same category: one cheap, one dear. How to choose?',
+    options: [
+      'Take the cheap one',
+      'Compare sodium and sugar per 100 g; if the gap is large, the dearer one is worth it',
+      'Take the prettier pack',
+],
+    explanation:
+      'A price difference is a one-off; a formulation difference is a daily accumulation. If the dearer one has half the sodium, the long-term effect outweighs the few extra dollars.',
+  },
+  sh4: {
+    question:
+      'Is a larger pack always better value?',
+    options: [
+      'Always',
+      'The unit price may be lower, but you may eat more, so the total can be worse',
+      'Larger packs keep longer',
+],
+    explanation:
+      'Large packs usually cost less per gram, but "how much you take is how much you eat" is a well-documented effect. Ask "how much of this will I eat in one go", not "how much per gram".',
+  },
+  sh5: {
+    question:
+      'Canned and frozen ready meals usually run high in which item?',
+    options: [
+      'Sodium',
+      'Vitamins',
+      'Fibre',
+],
+    explanation:
+      'For preservation and flavour, canned and ready meals are usually high in sodium. They are not forbidden — just understand they belong to the "already seasoned" group, so compare them with their peers, not with fresh food.',
+  },
+  sh6: {
+    question:
+      'What is the difference between "contains whole grain" and "100% whole grain"?',
+    options: [
+      'None',
+      '"Contains" only means some was added, possibly very little; "100%" means all of the grain is whole',
+      '"Contains" has more',
+],
+    explanation:
+      '"Contains whole grain" does not guarantee a proportion. To judge, look at how early the whole grain appears in the ingredient list, or find a product that states the percentage.',
+  },
+  sh7: {
+    question:
+      'What is the fastest useful check when buying a drink?',
+    options: [
+      'Read the big claims on the front',
+      'Turn it over: sugar per 100 ml, then the total volume',
+      'Look at the colour',
+],
+    explanation:
+      'Front-of-pack claims are marketing; the nutrition panel on the back is fact. Sugar per 100 ml × volume ÷ 100 gives the total sugar in the bottle — one mental calculation is enough.',
+  },
+  sh8: {
+    question:
+      'Why prefer foods with a shorter ingredient list?',
+    options: [
+      'Short means cheap',
+      'It usually means less processing and fewer additives',
+      'Short is always more nutritious',
+],
+    explanation:
+      'A short ingredient list usually means the food is closer to its original form. It is a quick filter, not an absolute rule — the nutrition numbers still decide.',
+  },
+  sh9: {
+    question:
+      'Does shopping for fresh food first change what ends up in your trolley?',
+    options: [
+      'No effect',
+      'Yes — it makes the trolley about "what shall I cook" rather than "what snacks do I fancy"',
+      'Snacks first saves time',
+],
+    explanation:
+      'Order affects the final trolley. Starting in the fresh section frames your shopping around meals rather than around snacks.',
+  },
+  sh10: {
+    question:
+      'What is the most rational response to a "buy one get one free" offer?',
+    options: [
+      'Great value, always buy',
+      'Ask "would I have bought this anyway?" — a discount on something you do not need saves nothing',
+      'Check the shelf life',
+],
+    explanation:
+      'A discount changes the price, not your need. A useful self-check: "if it were not on offer, would I buy it today?" If not, the discount saved you nothing.',
+  },
 };
 
 /* ===========================================================================

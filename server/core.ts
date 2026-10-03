@@ -195,12 +195,22 @@ interface ProviderState {
   disabledUntil: number;
   usedToday: number;
   lastError: string;
+  /**
+   * 最後一次成功／失敗的耗時（毫秒）。
+   *
+   * 【為什麼要記這個】使用者反映「NVIDIA API 響應過慢」。
+   *   「慢」是感覺，有了數字才能判斷是冷啟動、模型本身慢，還是鏈裡有拖油瓶
+   *   （實測就是 glm-5.3-flash 的 33 秒在拖）。
+   *   開發者面板會顯示這個值，之後調效能夠有前後對照。
+   *   -1 代表還沒跑過。
+   */
+  lastLatencyMs: number;
 }
 
 export const providerState: Record<ProviderName, ProviderState> = {
-  gemini: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
-  openrouter: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
-  nvidia: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '' },
+  gemini: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '', lastLatencyMs: -1 },
+  openrouter: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '', lastLatencyMs: -1 },
+  nvidia: { failures: 0, disabledUntil: 0, usedToday: 0, lastError: '', lastLatencyMs: -1 },
 };
 
 let stateDate = new Date().toDateString();
@@ -215,6 +225,7 @@ export function rollDateIfNeeded(): void {
     providerState[name].failures = 0;
     providerState[name].disabledUntil = 0;
     providerState[name].lastError = '';
+    providerState[name].lastLatencyMs = -1;
   });
   console.log('[LabelBuddy AI] 已跨日，重置供應商使用計數');
 }
@@ -536,7 +547,23 @@ export interface AiCallOptions {
 }
 
 export type ProviderResult =
-  | { ok: true; data: any; model: string; provider: ProviderName }
+  | {
+      ok: true;
+      data: any;
+      model: string;
+      provider: ProviderName;
+      /**
+       * 模型回傳的**原始文字**（解析成 JSON 之前的那一份）。
+       *
+       * 【為什麼要留】2026-10-03 使用者要求開發者面板能看到
+       *   「上次標籤原文（AI 返回值）」。
+       *   排查「模型回了什麼」時，只看解析後的 JSON 是不夠的 ——
+       *   例如模型加了說明文字、JSON 被截斷、或欄位名稱寫錯，
+       *   都只有原始文字看得出來。
+       * ⚠️ 只在開發者面板顯示，且會截斷長度（見 handlers）。
+       */
+      rawText: string;
+    }
   | { ok: false; permanent: boolean; error: string };
 
 /**
@@ -591,7 +618,7 @@ async function callGemini(key: string, options: AiCallOptions): Promise<Provider
     console.log(`[LabelBuddy AI] Gemini 成功（${elapsed}ms）解析=${parsed ? 'OK' : '失敗'}`);
 
     if (!parsed) return { ok: false, permanent: false, error: 'JSON 解析失敗' };
-    return { ok: true, data: parsed, model: GEMINI_MODEL, provider: 'gemini' };
+    return { ok: true, data: parsed, model: GEMINI_MODEL, provider: 'gemini', rawText: content };
   } catch (error: any) {
     console.log(`[LabelBuddy AI] Gemini 例外（${Date.now() - start}ms）${String(error?.message).slice(0, 150)}`);
     return { ok: false, permanent: false, error: String(error?.message).slice(0, 120) };
@@ -681,7 +708,13 @@ async function callOpenRouter(key: string, options: AiCallOptions): Promise<Prov
       );
 
       if (parsed) {
-        return { ok: true, data: parsed, model: json?.model || 'unknown', provider: 'openrouter' };
+        return {
+          ok: true,
+          data: parsed,
+          model: json?.model || 'unknown',
+          provider: 'openrouter',
+          rawText: text,
+        };
       }
       lastError = 'JSON 解析失敗';
     } catch (error: any) {
@@ -737,13 +770,32 @@ const NVIDIA_BASE_URL = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nv
  *   等於每次都先白等 25 秒才輪到能用的 —— 那比沒有備援更糟。
  *   → 只放實測可用的；日後要加，**先用同樣的方法量一次**再加入。
  */
-const NVIDIA_MODEL_CHAIN = ['openai/gpt-oss-20b', 'z-ai/glm-5.3-flash'];
+/**
+ * ★ 2026-10-03 用**這把金鑰重新實測**（使用者反映「API 響應過慢」）：
+ *
+ *   openai/gpt-oss-20b                 基準 6.67s
+ *   openai/gpt-oss-20b + reasoning_effort=low  **2.71s**  ← 快 2.5 倍
+ *   z-ai/glm-5.3-flash                 **32.87s** ← 不可用，移除
+ *   nvidia/nemotron-3.5-lightning-30b  69.84s（逾時）← 早已移除
+ *
+ * 【為什麼把 glm 拿掉】
+ *   33 秒不是「慢一點」，是**完全不能用**。它排第二，
+ *   只要第一個模型失敗就會多等 33 秒，使用者早就以為當掉了。
+ *   備援的意義是「快一點的另一條路」，不是「一定會逾時的第二條路」。
+ *   → NIM 只留一個模型；失敗就交給輪替鏈的下一家（gemini／openrouter）。
+ *
+ * 【為什麼一定要 reasoning_effort=low】
+ *   實測輸出裡 reasoning token 高達 208～1117 個 —— 那全是**看不到的等待**。
+ *   本任務只需要一份簡短 JSON，不需要長鏈推理。
+ *   ★ 這是 6.67s → 2.71s 的唯一原因，不是換模型。
+ */
+const NVIDIA_MODEL_CHAIN = ['openai/gpt-oss-20b'];
 
 /** 供 /api/ai-status 回報用（開發者面板要顯示實際在用的模型） */
 export const NVIDIA_MODEL_CHAIN_FOR_STATUS = NVIDIA_MODEL_CHAIN;
 
 /** 單一 NIM 模型的逾時。刻意短 —— 冷啟動慢的模型要快速讓位。 */
-const NVIDIA_ATTEMPT_TIMEOUT_MS = Number(process.env.NVIDIA_ATTEMPT_TIMEOUT_MS) || 25000;
+const NVIDIA_ATTEMPT_TIMEOUT_MS = Number(process.env.NVIDIA_ATTEMPT_TIMEOUT_MS) || 12000;
 
 export function nvidiaKey(): string {
   return (process.env.NVIDIA_API_KEY || '').trim();
@@ -800,6 +852,14 @@ async function callNvidia(
           temperature: options.temperature ?? 0.4,
           max_tokens: options.maxTokens ?? 1200,
           stream: false,
+          /**
+           * ★★ 這一行是「NVIDIA 太慢」的解方（2026-10-03 實測）。
+           *   gpt-oss 是推理模型，預設會產生大量思考 token
+           *   （實測 208～1117 個）—— 那些我們完全看不到，只能等。
+           *   設為 low 之後：6.67 秒 → **2.71 秒**（快 2.5 倍），
+           *   而輸出仍然是可解析的 JSON。
+           */
+          reasoning_effort: 'low',
         }),
         signal: AbortSignal.timeout(NVIDIA_ATTEMPT_TIMEOUT_MS),
       });
@@ -839,7 +899,9 @@ async function callNvidia(
           ` 輸出=${json?.usage?.completion_tokens ?? '?'} tokens`
       );
 
-      if (parsed) return { ok: true, data: parsed, model: json?.model || model, provider: 'nvidia' };
+      if (parsed) {
+        return { ok: true, data: parsed, model: json?.model || model, provider: 'nvidia', rawText: text };
+      }
     } catch (error: any) {
       // 逾時／連線失敗多為冷啟動，換下一個候選即可，不標記為永久失敗
       lastNimError = `${model}: ${String(error?.message).slice(0, 80)}`;
@@ -865,7 +927,7 @@ async function callNvidia(
 export async function callAiModel(
   req: PlatformRequest,
   options: AiCallOptions
-): Promise<{ data: any; model: string; provider: ProviderName } | null> {
+): Promise<{ data: any; model: string; provider: ProviderName; rawText: string } | null> {
   const clientKey = resolveClientKey(req);
   const keys = providerKeys();
   // ⚠️ 要把「有沒有圖片」傳進去 —— NIM 是文字模型（見 orderedProviders 的說明）
@@ -889,6 +951,7 @@ export async function callAiModel(
     }
 
     const key = name === 'openrouter' && clientKey ? clientKey : keys[name];
+    const providerStarted = Date.now();
     const result =
       name === 'gemini'
         ? await callGemini(key, options)
@@ -896,6 +959,7 @@ export async function callAiModel(
           ? await callNvidia(key, options)
           : await callOpenRouter(key, options);
 
+    providerState[name].lastLatencyMs = Date.now() - providerStarted;
     if (result.ok) {
       providerState[name].failures = 0;
       providerState[name].lastError = '';
@@ -908,6 +972,8 @@ export async function callAiModel(
         data: deepToTraditionalChinese(result.data),
         model: result.model,
         provider: result.provider,
+        // 原始文字一併往上傳，開發者面板要顯示（見 ProviderResult 的說明）
+        rawText: result.rawText,
       };
     }
 

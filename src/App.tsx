@@ -1956,7 +1956,18 @@ export default function App() {
                *   放在 render 裡過濾才會跟著 state 即時重算。
                */
               (item) => item.tab !== 'fitness' || learnerProfileId === 'fitness'
-            ).map(({ tab, labelKey, hintKey, Icon }) => {
+            )
+              /**
+               * ★ 2026-10-03 使用者指定：**健身專區置於第一欄**。
+               *
+               * 【為什麼是「排到最前」而不是改 MENU_ITEMS 的順序】
+               *   那個常數同時定義了其他分頁的順序，直接搬動會影響
+               *   全部身分的選單；而且它看不到 state（見上面的說明）。
+               *   這裡只把 fitness 拉到最前，其他項目的相對順序完全不動 ——
+               *   對非健身身分而言，因為根本沒有 fitness 這一項，結果一模一樣。
+               */
+              .sort((a, b) => (a.tab === 'fitness' ? -1 : b.tab === 'fitness' ? 1 : 0))
+              .map(({ tab, labelKey, hintKey, Icon }) => {
               const isActive = activeTab === tab;
               return (
                 <button
@@ -3075,13 +3086,14 @@ export default function App() {
               icon={<Volume2 className="w-[26px] h-[26px]" />}
               title={t('settings.sound.title')}
               summary={
-                ttsSettings.enabled
+                ttsSettings.volume > 0
                   ? t('settings.sound.summaryOn', { n: Math.round(ttsSettings.volume * 100) })
                   : t('settings.sound.summaryOff')
               }
             >
               {/* key 讓區塊在設定變動後重建，內部 state 才會跟著更新 */}
-              <TtsSettingsSection key={`${ttsSettings.enabled}-${ttsSettings.volume}`} />
+              {/* key 帶音量：使用者在滑桿放手後，區塊會以新值重建 */}
+              <TtsSettingsSection key={ttsSettings.volume} />
             </SettingsSection>
 
             {/* 第二部分原本是「日常生理指標量測」（血壓／心跳／血糖／尿酸／血脂
@@ -3755,6 +3767,19 @@ export default function App() {
       {devPanelOpen && (
         <DeveloperPanel
           onClose={() => setDevPanelOpen(false)}
+          /**
+           * 上次分析的 AI 原始回傳（2026-10-03 使用者要求）。
+           * ⚠️ 從既有的 analysisResult 取，不另外發請求 —— 面板只是顯示。
+           */
+          lastAi={
+            analysisResult
+              ? {
+                  provider: (analysisResult as any).ai_provider,
+                  model: (analysisResult as any).ai_model,
+                  rawText: (analysisResult as any).ai_raw_text,
+                }
+              : null
+          }
           context={{
             analysisMode,
             profileId: learnerProfileId,
