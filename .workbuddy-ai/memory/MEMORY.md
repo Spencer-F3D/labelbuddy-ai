@@ -129,6 +129,19 @@
 Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回 `400 FAILED_PRECONDITION`
 → **換帳號無用**。用 VPN 或謊報地區繞過屬服務條款問題，**不做**。（詳見 `ARCHITECTURE.md`）
 
+## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
+★ **診斷鐵則：要測 App 真正在跑的那份程式碼。**
+  用探針頁載入 tesseract.js 的 **UMD 版**會繞過 App 的 ESM 路徑
+  →「探針說可以、使用者說不行」。正確做法：跑 Vite dev server，
+  在頁面裡 `await import('/src/ocr/ocrBrowser.ts')` 再呼叫它。
+  工具：`scripts/check-ocr-pipeline.mjs`（標籤佔畫面 100%→25% 逐級測完整流水線）。
+★ 2026-10-03 實測結論：**完整流水線（OCR＋規則引擎）在電腦瀏覽器上全部通過**
+  （連標籤只佔 25% 也讀到 鈉2350／糖8.5／碳水62），前處理四種情境也全過。
+  → 使用者手機上的失敗**仍未重現**，已改為在開發者面板顯示 `OcrDiagnostics`
+    （結局／字數／原始錯誤／耗時），請使用者回報那一行。
+★ 本機讀不到時有「改用直接雲端」按鈕（明示同意，會記住設定）。
+★ Capacitor 的 MIME 沒問題：`.js`→application/javascript、`.wasm`→application/wasm。
+
 ## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）
 現役主力 **OpenRouter**（Gemini 冷卻中）。`DEFAULT_MODEL_CHAIN` **上限 3 個**。
 ★ **免費模型會變動** → 失敗時先查 `GET /api/v1/models` 過濾 `pricing.prompt == 0`
@@ -136,7 +149,18 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 ★ 額度四層：雙供應商輪替｜健康冷卻｜**回應快取**（最有效）｜額度預檢。
 ⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。詳見 `ARCHITECTURE.md`。
 
-### NVIDIA NIM（2026-10-02 新增，**只給健身週報**）
+### NVIDIA NIM（2026-10-03 **已加入三供應商輪替**）
+★ **NIM 是文字模型，收不下圖片** → 含圖片的請求（cloud_image）必須跳過它。
+  不跳過的話不只浪費往返，還會把失敗計數推高，最後讓這個「沒有上限」的
+  供應商被冷卻 → 反而失去省額度的意義。
+  → `orderedProviders(hasClientKey, hasImage)`。
+★ `DAILY_QUOTA.nvidia = 100000` 是**輪替權重**（排序＝使用率低者優先）→
+  讓沒有上限的它優先吃掉請求，Gemini／OpenRouter 的免費額度留著。
+★ 實測：第 2、3 次請求由 `openai/gpt-oss-20b` 處理 ✅
+★ **改供應商清單時要同步改 `/api/ai-status` 的 providers 迴圈** ——
+  漏了不會報錯，面板只會顯示「少一家在輪替」而與事實不符。
+
+### 舊說明：NIM 原本只給健身週報
 金鑰 = Worker secret `NVIDIA_API_KEY`（`wrangler secret put`，**不進版控**；
 本機測試放 `.dev.vars`）。Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。
 ★ **刻意不接進 `callAiModel` 的輪替鏈** —— 那條鏈服務標籤辨識（需要視覺、
