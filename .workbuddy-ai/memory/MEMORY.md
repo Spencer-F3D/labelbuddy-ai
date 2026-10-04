@@ -2,23 +2,26 @@
 
 > **本檔只放「規則與紅線」，每條一行。實作細節一律放 `ARCHITECTURE.md`**（不注入，可任意長）。
 > 逐日 `memory/YYYY-MM-DD.md`｜UI 規則 `UI_RULES.md`｜跨 AI 溝通板 `AI_COLLAB.md`。
-> ⚠️ **本檔超過約 17KB 會在注入時被截斷（尾段整段消失）→ 重要規則往前放、新內容先想能不能
-> 放 `ARCHITECTURE.md`。**｜最後整理：2026-10-04
+> ⚠️ **超過約 17KB 會被截斷（尾段消失）→ 重要規則往前放。**｜整理：2026-10-04
 
 ## 🏆 比賽（最高優先）
 2026 全球青少年人工智能未來創新競賽（澳門中學生賽區）｜**截止 2026-10-09**
-（初步評審 10-10~10-30｜複評 11-01~11-15 線上｜決賽 11-26 澳門線下）。
-年度主題 **AI 與教育**；作品三選一：AI for Education／Social Innovation／Less Developed
-Countries，且須說明與 SDG 的關係。
+（初審 10-10~10-30｜複評 11-01~11-15 線上｜決賽 11-26 澳門線下）。
+主題 **AI 與教育**；須說明與 SDG 的關係。
 評審比重：**AI 技術 25%**／教育價值 20%／創意 20%／原型與測試 20%／英文 10%／倫理私隱 5%。
 **四條致命規則**：① **所有材料只接受英文**（含影片字幕、簡報、答辯）② **雲端真實 AI 必須是主角**
 ③ 報告須列明 AI 工具名稱／版本／用途／學生分工（隱瞞**取消資格**）④ 不得提交學生不能理解的系統。
 **四份交付物**：`ProjectIntroduction`(≤2頁)／`ResearchReport`(6–12頁)／`Poster`(0.8×1.1m 直向)／
 `DemoVideo`(≤5分)；檔名 `X_ProjectName.pdf`／`.mp4`，每檔 ≤50MB。三人均須參與答辯。
-使用者＝**參賽學生本人**｜**不花錢**（只用免費模型）｜團隊 3 人，他負責 App 全部技術。
-提交物 → `Desktop/{ProjectIntroduction,ResearchReport,Poster}_LabelBuddyAI.pdf`（來源 `.typ` 在 `Desktop/LabelBuddyAI_競賽提交_來源/`）。
-排程：09-28~10-02 已完成（雙語／中性化／三模式／APK）→ 10-03~05 四份英文文件 →
-10-06~08 Poster＋影片 → **10-09 提交**。
+使用者＝**參賽學生本人（Kan Hou Fai）**｜**不花錢**（只用免費模型）。
+★★ **隊伍資訊（2026-10-04 定案）**：隊名 **Whatever**／學校 **Instituto Salesiano Macau**
+（**無 "de"**）／成員 **Kan Hou Fai**（架構·程式·文件）· **Lau Hei Long**
+（研究·訪談·資料收集）· **Leong Sin Hang**（美編·影片·簡報）／指導老師**暫不寫**。
+★ 產品名 **LabelBuddy AI** ≠ 隊名：**檔名與封面作品名不變**（章程 `ProjectName`＝作品名）。
+★★ **開發期 AI 工具（必須揭露）**：**WorkBuddy AI**（AI agent，模型 **DeepSeek-V4.1-Flash**）
+＝實作／重構／測試腳本／建置部署；**Google AI Studio**（**Gemini 3.8 Flash**）＝產品原型與試驗。
+提交物 → `Desktop/*_LabelBuddyAI.pdf`（來源 `.typ` 在同名 `_競賽提交_來源/`；排版細節見 `ARCHITECTURE.md`）。
+★ RR 有 **11 個刻意保留的中文字元**（`公克`／`酒石酸`／`花生`／`粵語（香港）`）＝技術引用，**不可刪**。
 
 ## 👤 使用者決策與節奏
 1. **🚀 每次任務完成後自動部署上線** → **不用問、不用等確認**；做法是 `npm run ship`。
@@ -35,17 +38,16 @@ Countries，且須說明與 SDG 的關係。
 ## 🛡️ 安全鐵則（違反會害到人）
 ★★ **顏色一律以規則引擎為準，AI 只提供文字**（實測 158/96＋血糖 8.4：規則 red、雲端 AI yellow；
 「該紅卻報黃」比誤報危險）。**性別絕不可影響紅黃綠**。
-★★ **AI 回錯顏色時前端救不了**（`photo_issue` 的唯一消費端只是「重拍按鈕的文字」）
+★★ **AI 回錯顏色時前端救不了**（`photo_issue` 唯一消費端只是「重拍按鈕的文字」）
 → 後端強制覆寫：`photo_issue` 存在（不是食物標籤／照片模糊）一律**至少黃燈**。
 ★★ **12 項評分不能只綁 `selectedConditions`**：沒勾慢性病 → riskScore 恆 0 → **永遠綠燈**
-（鈉 2350mg／上限 118% 也說「很適合您」，卻同時在 `nutrient_facts` 顯示紅條，**自己打自己**）
-→ 任一項 >= 每日上限即**至少黃燈**並寫出是哪一項；未勾慢性病時的黃燈文案**不可沿用原本那句**
-（`matchedConditions` 是空的 → 出現「對您的身體（）」）。
-★ 解析門檻：「至少 3 欄位 ＋ 必須有鈉或糖」**不夠**，還要 `FOOD_CONTEXT`（必須出現食品情境詞）；
+→ 任一項 >= 每日上限即**至少黃燈**並寫出是哪一項；未勾慢性病時黃燈文案**不可沿用原句**
+（`matchedConditions` 空 → 出現「對您的身體（）」）。
+★ 解析門檻：「至少 3 欄位 ＋ 必須有鈉或糖」**不夠**，還要 `FOOD_CONTEXT`（須出現食品情境詞）；
 關鍵字**刻意取寬**（過嚴會誤殺真標籤，比漏放更糟）。
 ★★ **五類「不會報錯」的 bug**（詳表在 `ARCHITECTURE.md`）：① **對照表鍵對不上**（踩 4 次）
 ② **插值變數漏翻** ③ **快取鍵用錯內容來源** ④ **改了映射函式沒改呼叫端**
-⑤ **後端沒產生某個值，前端卻寫了分支**。★ 通則：**UI 有 if/else 的值，都要確認每個值真的有生產者。**
+⑤ **後端沒產生某值，前端卻寫了分支**。★ 通則：**UI 有 if/else 的值，都要確認每個值真有生產者。**
 ★★ **送 API 的欄位名不能猜**：`profileId`（不是 `learnerProfileId`）、`conditions`
 （不是 `conditionNames`）、`localOnly`（不是 `analysisMode`）。
 **寫測試要驗證「伺服器真的收到我要的參數」**；★ 測試腳本自己會誤判（`/適合/` 也命中正確拒絕
@@ -63,36 +65,34 @@ Countries，且須說明與 SDG 的關係。
 
 ## 🚀 部署與「三管道一致」（每次任務完成**自動**執行）
 正式網址 `https://app.labelbuddy-ai.workers.dev`；版控 `Spencer-F3D/labelbuddy-ai`（Private）。
-★★ **收尾的唯一正確動作是 `npm run ship`**（＝`scripts/ship-all.mjs`／雙擊「一鍵同步.bat」）：
+★★ **收尾的唯一正確動作是 `npm run ship`**（＝`scripts/ship-all.mjs`／「一鍵同步.bat」）：
 工作區乾淨 → 檢查 → `vite build` → `git push` → `wrangler deploy` → 出 APK →
-**`check-consistency.ts` 驗證線上／GitHub／APK 三者一致**（沒過以非零結束碼失敗）。
-⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。
-★★ **判定「一致」＝比對建置指紋 ＋ bundle 的 sha256**（`dist/index.html` 的
-`<meta name="x-build-id">`）。**不比檔名**、**不比時間**。**指紋不可注入 JS**。
-★ **判準兩級**：內容／sha256 不同或用未提交內容建置（`-dirty`）→ **失敗**；
-**只有 commit 雜湊不同 → 警告**（`--strict-commit` 可收緊）。
-★ **驗證有沒有推上去要看 `origin/main`，不要只看結束碼**。
+`check-consistency.ts` 驗證線上／GitHub／APK 一致（沒過以非零結束碼失敗）。
+⚠️⚠️ **`git commit` 只是本機動作**——不上 GitHub、更不上線。
+★★ **判「一致」＝比對建置指紋 ＋ bundle 的 sha256**（`dist/index.html` 的
+`<meta name="x-build-id">`）。**不比檔名、不比時間；指紋不可注入 JS**。
+★ **判準兩級**：內容／sha256 不同或 `-dirty` 建置 → **失敗**；只有 commit 不同 → **警告**
+（`--strict-commit` 可收緊）。★ **驗有沒有推上去要看 `origin/main`，不要只看結束碼**。
 
 ## 📦 APK 建置（`npm run apk`／建立APK.bat）
 應用名稱與桌面檔名都是 **營養放大鏡**。★ **打包網頁進 APK**（不用 `server.url`）→
 WebView origin 是 `https://localhost` → API 一律走 `src/utils/apiBase.ts` 的 `apiUrl()`。
-★★ **`gradlew.bat` 不能直接 `spawnSync`**（回 `EINVAL errno:-4071`，訊息像權限問題）
+★★ **`gradlew.bat` 不能直接 `spawnSync`**（`EINVAL errno:-4071`，訊息像權限問題）
 → 走 `cmd.exe /d /s /c`，**不要用 `shell: true`**。
-★ JDK **21**（17 會編譯失敗）；檔名日期用**本機時區**；驗章用 `apksigner verify`
-（**不要**看 META-INF 有沒有 `.RSA`）。簽章檔**不可進版控**。
+★ JDK **21**；檔名日期用**本機時區**；驗章用 `apksigner verify`（**不要**看 META-INF）。
+簽章檔**不可進版控**。
 
 ## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
-★★ **`warmUpBrowserOcr()` 必須在完成引導頁後就呼叫** —— 否則 6.4MB 在按下快門那一刻才開始下載
-→ 弱訊號下失敗 → App 說「請重拍」→ **使用者一直重拍而照片從來沒問題**。
-★★ **`chi_tra` 會把小數點全部吃掉**（`6.80`→`680`，差 100 倍，看起來像正常數字）→
+★★ **`warmUpBrowserOcr()` 必須在完成引導頁後就呼叫**——否則 6.4MB 在按下快門那一刻才下載
+→ 弱訊號失敗 → App 說「請重拍」→ **使用者一直重拍而照片從來沒問題**。
+★★ **`chi_tra` 會吃掉全部小數點**（`6.80`→`680`，差 100 倍，看起來像正常數字）→
 **兩輪各用一組語言模型**：第一輪 `chi_tra+eng`、第二輪 `chi_tra`。
 ⚠️ worker 快取必須以**語言組合為鍵**（單一 promise 會沿用第一輪 → 白跑且不報錯）。
-★ **`tessdata_best` 實測是退步 → 不採用**（結論已寫進 `ocrBrowser.ts` 註解，**不要重跑**）。
+★ **`tessdata_best` 實測是退步 → 不採用**（結論已寫進 `ocrBrowser.ts`，**不要重跑**）。
 ★★ **診斷鐵則：要測 App 真正在跑的那份程式碼**（探針頁載 UMD 版會繞過 App 的 ESM 路徑
-→「探針說可以、使用者說不行」）→ 跑 Vite dev server，頁面裡
-`await import('/src/ocr/ocrBrowser.ts')`。
+→「探針說可以、使用者說不行」）→ 跑 Vite dev server，頁面裡 `await import('/src/ocr/ocrBrowser.ts')`。
 ★ 失敗要分「引擎」與「照片」（`errorKind`）；**引擎失敗不要叫使用者重拍**；
-實測數據、商標被當成字的限制、三支工具 → `ARCHITECTURE.md`（**先讀檔頭再用**）。
+實測數據與工具 → `ARCHITECTURE.md`（**先讀檔頭再用**）。
 
 ## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）
 輪替鏈 `orderedProviders(hasClientKey, hasImage)` = **nvidia → gemini → openrouter**
@@ -110,26 +110,22 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 → **換帳號無用**。用 VPN 或謊報地區繞過屬服務條款問題，**不做**。
 
 ## 🎓 8 身分（`LearnerProfileId`）
-`senior`／`child`／`teen`／`fitness`／`young`／`middle`／`student`／`pregnant`（10-04 新增）。
+`senior`／`child`／`teen`／`fitness`／`young`／`middle`／`student`／`pregnant`。
 定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**。
 ★★ **孕婦與其他七個性質不同**：別人是「數字低一點」，孕婦多了「**成分絕對不能有**」——
 **酒精 0.5 公克不會讓任何數字超標**，但對胎兒就是風險，靠營養上限永遠抓不到
 → `PREGNANCY_HAZARDS` 成分層級把關（酒精／生食未殺菌／高汞魚＝紅燈；咖啡因＝至少黃燈）。
-⚠️ 關鍵字要避開「同字不同物」：`酒` 排除 `酒石酸`；`生` **不能單獨比對**（花生／生菜／生粉）。
-⚠️ 尚未做孕期教學卡與題庫；咖啡因只靠**成分關鍵字**抓（解析器沒有咖啡因欄位）。
-★ 名稱不得含評價性字眼（「長者三高」→**長者**）；卡片不得顯示說明文字。
-⚠️ `PROFILE_NAME_EN` 曾漏改（**只有英文介面看得到**）。
-★ **改 id 一定要同時寫遷移**（`LEGACY_PROFILE_IDS`）：否則舊裝置的值被判無效而**靜默退回長者**
-（鈉上限 2000→1500、字級放大），使用者不會知道為什麼。
-★ 「中年」＝**一般成人上限**，重點放在三高**長期累積**。
+⚠️ 關鍵字要避開「同字不同物」：`酒` 排除 `酒石酸`；`生` **不能單獨比對**。
+⚠️ 尚未做孕期教學卡與題庫；咖啡因只靠**成分關鍵字**抓。★ 名稱不得含評價性字眼。
+★ **改 id 一定要同時寫遷移**（`LEGACY_PROFILE_IDS`）：否則舊裝置的值被判無效而**靜默退回長者**。
+★ 「中年」＝**一般成人上限**，重點在三高**長期累積**。
 ⚠️ **快取鍵必須含身分**；`targets[].target` 是給人看的字串，**不能做數學運算**。
 
-## 🗣️ 稱謂與性別（**2026-10-02 已整套移除**）
-已刪除 `GenderPicker`／性別步驟／`gender` state／`buildAddressRule`／`check-honorific.ts`。
-★★ **但 `core.ts` 的 `ADDRESS_RULE` 絕對不能跟著刪** ——「不可用阿公／阿伯／爺爺／奶奶等長輩稱呼」
-＋「你一律寫成您」。原本綁在性別分支裡，整段刪掉的話模型會叫 13 歲使用者「阿公」，
-**而且要等實際輸出才會發現**。
-★ 健身專區的 BMR 公式**需要**生理性別參數（生理事實，與稱謂無關）→ 由使用者在該頁**自己填**。
+## 🗣️ 稱謂（**性別功能 2026-10-02 已整套移除**）
+已刪 `GenderPicker`／性別步驟／`gender` state／`buildAddressRule`／`check-honorific.ts`。
+★★ **但 `core.ts` 的 `ADDRESS_RULE` 絕對不能跟著刪**——「不可用阿公／阿伯／爺爺／奶奶等稱呼」
+＋「你一律寫成您」；原本綁在性別分支裡，刪掉模型會叫 13 歲使用者「阿公」，
+**要等實際輸出才會發現**。★ 健身 BMR **需要**生理性別（生理事實）→ 由使用者在該頁自己填。
 
 ## 🏋️ 健身專區（2026-10-02）
 只在身分＝`fitness` 時出現（★ 過濾寫在 **render** 裡，不是 `MENU_ITEMS` 常數 ——
@@ -161,10 +157,10 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 
 ## 🔤 難字簡化（2026-09-30 使用者指定）
 鈉→**鹽分**、膳食纖維→**纖維**、飽和脂肪→**動物油**、添加糖→**糖**（碳水化合物不變）。
-★ **單一對照表**（`src/data/bilingual.ts`）＋**進出邊界轉換**：提示詞用簡化名稱、內部鍵保持
-**canonical**、`nutrient_facts.name` 輸出 canonical（後端寫死簡化名 → **英文介面會露出中文**）。
-★ `simplifyNutrientWording()` 只換**片語**、**不碰單一個「鈉」字**（**L-麩酸鈉／苯甲酸鈉／
-碳酸鈉** 也是「鈉」結尾）—— **寧可漏換，不要錯換**；**不套用到 `ingredients_detected`**。
+★ **單一對照表**（`src/data/bilingual.ts`）＋**進出邊界轉換**：提示詞用簡化名、內部鍵保持
+**canonical**、`nutrient_facts.name` 輸出 canonical（後端寫死簡化名 → **英文介面會露中文**）。
+★ `simplifyNutrientWording()` 只換**片語**、**不碰單一個「鈉」字**（L-麩酸鈉／苯甲酸鈉／
+碳酸鈉也是「鈉」結尾）——**寧可漏換，不要錯換**；**不套用到 `ingredients_detected`**。
 ⚠️ **1mg 鈉 ≈ 2.5mg 鹽**；**改中文文案必須同步改 `localEngineEn.ts` 的鍵**（已踩 4 次）。
 
 ## 📊 後端數值與文字處理
@@ -178,22 +174,19 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 
 ## 🧪 驗證機制（改動翻譯／稱謂／快取／模式／引導頁後必跑）
 `check:i18n`｜`check:cache`｜`check:diet`｜`check:mode`（**閘門＋用字＋方向**）｜`check:lookup`
-（**對照表孤兒鍵**）｜`check:ui`（Chrome **17 畫面**）｜`check:layout`（**中英 × 長者/健身**）
-｜`measure:onboarding`｜`verify:all`。
-★★★ **「假通過」比紅燈危險**：① 腳本寫死頁數 ② **不確定性**（只走雲端，模型不一定回傳
+（對照表孤兒鍵）｜`check:ui`（Chrome **17 畫面**）｜`check:layout`（**中英 × 長者/健身**）｜`verify:all`。
+★★★ **「假通過」比紅燈危險**：① 腳本寫死頁數 ② **不確定性**（只走雲端，模型不一定回
 `nutrient_facts` → 長條圖不渲染 → 掃不到 → 通過但沒驗到）③ 改按鈕文字但腳本還在找舊字。
 → **頁數用 `\d+`；要有確定性來源；要斷言「東西真的出現了」**。
-★★★ **檢查腳本的錨點一律用穩定 id，不要用文案**（已踩三次）；★ 靜態掃描（grep）只能找線索，
-**不能當驗收**；★ **設定 localStorage 要在走完引導頁之後**；★ 不要用 `| head` 接 node 腳本。
+★★★ **檢查腳本錨點一律用穩定 id，不要用文案**（已踩三次）；★ 靜態掃描（grep）只能找線索、
+**不能當驗收**；★ 設 localStorage 要在走完引導頁之後。
 
 ## 💾 儲存鍵
 全部以 `labelbuddy` 開頭。★ 「清除所有資料」用**前綴掃描**（`k.startsWith('labelbuddy')`），
 不是寫死清單；清完 `location.reload()`。
 
 ## 📄 關鍵文件位置
-章程 PDF（掃描版，要渲染成圖）→ `C:\Users\Spencer\Downloads\labelbuddy-ai\`；
-競賽提交物（3 份 PDF）→ `Desktop/*_LabelBuddyAI.pdf`；來源 `.typ` 在 `Desktop/LabelBuddyAI_競賽提交_來源/`；
-UI 規則 → `.workbuddy-ai/memory/UI_RULES.md`；**架構細節（不注入，可任意長）** →
-`.workbuddy-ai/memory/ARCHITECTURE.md`；逐日誌 → `.workbuddy-ai/memory/YYYY-MM-DD.md`；
-專案交接文件 → `docs/專案交接文件.md`（＋ .pdf）；跨 AI 溝通板 → `AI_COLLAB.md`。
-品牌與介面原則（副標留空、flex-col、不出現技術詞、翻譯字串不寫 Markdown）→ `UI_RULES.md`。
+提交物 3 份 PDF → `Desktop/*_LabelBuddyAI.pdf`（來源 `.typ`＋素材在同名 `_競賽提交_來源/`）；
+章程 PDF（掃描版）→ `Downloads/labelbuddy-ai/`；UI 規則 → `memory/UI_RULES.md`；
+**架構／實作細節（不注入，可任意長）** → `memory/ARCHITECTURE.md`；逐日誌 → `memory/YYYY-MM-DD.md`；
+交接文件 → `docs/專案交接文件.md`；跨 AI 溝通板 → `AI_COLLAB.md`。
