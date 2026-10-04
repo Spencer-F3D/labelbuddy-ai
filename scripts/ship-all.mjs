@@ -47,8 +47,6 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -212,8 +210,30 @@ distStamp ? ok(`本機建置指紋：${distStamp}`) : bad('dist 沒有建置指�
 
 /* ── 步驟 3：GitHub ───────────────────────────────────────── */
 step(3, '推送到 GitHub');
+/**
+ * ★★ 判準是「`origin/main` 有沒有變成 HEAD」，**不是 `git push` 的結束碼**（2026-10-05 修）。
+ *
+ * 【為什麼】
+ *   實際踩過兩次，方向相反：
+ *     · 一次是 `git push` 用「cmd.exe 重導到檔案」跑 —— 結束碼 0，
+ *       但實際上**沒有推上去**（見本檔 `git()` 的說明）。
+ *     · 一次（2026-10-05）是結束碼**非零**回報「推送失敗」，
+ *       但 `origin/main` 其實已經更新到 HEAD —— **推送是成功的**。
+ *   → 兩次都證明同一件事：**結束碼不可信**。
+ *     push 需要 GCM 憑證時，回傳碼會被雜訊污染。
+ *   → 判準改成：push 之後重新讀 `origin/main`，
+ *     等於本機 HEAD 就算成功；不等於才算失敗。
+ */
 if (headBefore !== remoteBefore) {
-  git(['push', 'origin', 'main']) === 0 ? ok('已推送') : bad('推送失敗');
+  const pushCode = git(['push', 'origin', 'main']);
+  // ★ 用 fetch 後重讀的 origin/main 當判準（不是 pushCode）。
+  git(['fetch', 'origin']);
+  const pushed = (git(['rev-parse', 'origin/main']).stdout ?? '').trim();
+  if (pushed === headBefore) {
+    ok(`已推送${pushCode !== 0 ? '（結束碼非零，但 origin/main 已更新 → 視為成功）' : ''}`);
+  } else {
+    bad(`推送失敗 —— origin/main 仍是 ${pushed.slice(0, 7)}，本機是 ${headBefore.slice(0, 7)}`);
+  }
 } else {
   ok('本機與遠端已同步，無需推送');
 }
@@ -237,20 +257,24 @@ if (!NO_APK) {
    *     所以這裡用 spawnSync 直接取 `.status`，寫法明確。
    */
   /**
-   * ★ 記錄建置前的 APK 時間 —— 用來在事後確認「檔案真的被換掉了」。
-   *   實際踩過：結束碼是 0、畫面也有輸出，但**桌面上那個 APK 的時間沒變**
-   *   （也就是根本沒有產出新檔）。只看結束碼是抓不到的。
+   * ★★ 關於「APK 是不是真的更新了」——已改由 `build-apk.mjs` 自己判斷（2026-10-05）。
+   *
+   * 【原本的寫法與它的問題】
+   *   這裡原本記錄「建置前／後桌面 APK 的 mtime」，若結束碼 0 但時間沒變就報錯。
+   *   ★ 問題一：gradle 對「資產沒變」的建置會合理地判 `packageRelease` UP-TO-DATE
+   *     → 桌面 APK 不被重新複製、時間不變，但**內容其實完全正確**。
+   *     於是每次「沒改程式碼也重新 ship」都會亮紅燈 —— 典型的「狼來了」。
+   *   ★ 問題二：顯示文案 `(apkAfter - apkBefore) / 1000 + "s 前更新"` 本來就寫錯 ——
+   *     它算的是「新舊檔的時間差」，不是「距今多久」
+   *     （實測會印出「31133s 前更新」＝ 8.6 小時，看起來像 bug）。
+   *
+   * 【現在的做法】
+   *   `build-apk.mjs` 已經改成*讀 APK 內的建置指紋*與 `dist` 比對：
+   *     · 指紋相同 → 內容正確 → 通過（即使檔案時間較舊）
+   *     · 指紋不同 → 真的拿到舊包 → 以非零結束碼失敗
+   *   → 所以這裡**只要看結束碼就好**，不要再自己比時間
+   *     （重複實作只會製造新的不一致 —— 見本檔檔頭）。
    */
-  const desktopDir = path.join(homedir(), 'Desktop');
-  const apkBefore = (() => {
-    try {
-      const f = readdirSync(desktopDir).filter((n) => /^營養放大鏡_.*\.apk$/i.test(n)).sort().pop();
-      return f ? statSync(path.join(desktopDir, f)).mtimeMs : 0;
-    } catch {
-      return 0;
-    }
-  })();
-
   const apkCode = spawnSync(NODE, [path.join(ROOT, 'scripts/build-apk.mjs')], {
     cwd: ROOT,
     stdio: 'inherit',
@@ -258,25 +282,11 @@ if (!NO_APK) {
     env: { ...process.env, CODEBUDDY_SAFE_DELETE_ENABLED: '0' },
   }).status;
 
-  /**
-   * ★★ 結束碼為 0 **不代表檔案真的更新了**。
-   *   實測發生過：結束碼 0、輸出看起來正常，但桌面 APK 的 mtime 沒變 ——
-   *   也就是舊檔還在，而腳本會回報「成功」。
-   *   這種「靜默地什麼都沒做」是最難發現的失敗，所以要在這裡擋下來。
-   */
-  const apkAfter = (() => {
-    try {
-      const f = readdirSync(desktopDir).filter((n) => /^營養放大鏡_.*\.apk$/i.test(n)).sort().pop();
-      return f ? statSync(path.join(desktopDir, f)).mtimeMs : 0;
-    } catch {
-      return 0;
-    }
-  })();
-
-  if (apkCode !== 0) bad('APK 建置失敗（輸出在上面）');
-  else if (apkAfter <= apkBefore) {
-    bad('APK 建置回報成功，但桌面上的檔案時間沒有變 —— 舊檔可能還在，請手動確認');
-  } else ok(`APK 完成（${((apkAfter - apkBefore) / 1000).toFixed(0)}s 前更新）`);
+  if (apkCode !== 0) {
+    bad('APK 建置失敗（輸出在上面）');
+  } else {
+    ok('APK 完成（內容指紋已由 build-apk 驗證）');
+  }
 } else {
   warn('已跳過 APK（--no-apk）');
 }
