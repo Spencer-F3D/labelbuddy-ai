@@ -196,5 +196,4 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 UI 規則 → `.workbuddy-ai/memory/UI_RULES.md`；**架構細節（不注入，可任意長）** →
 `.workbuddy-ai/memory/ARCHITECTURE.md`；逐日誌 → `.workbuddy-ai/memory/YYYY-MM-DD.md`；
 專案交接文件 → `docs/專案交接文件.md`（＋ .pdf）；跨 AI 溝通板 → `AI_COLLAB.md`。
-（品牌與介面原則見 `UI_RULES.md`：主標 LabelBuddy AI＋副標營養放大鏡、英文模式副標留空、
-副標 flex-col 疊在主標下、畫面不出現技術詞、翻譯字串不寫 Markdown。）
+品牌與介面原則（副標留空、flex-col、不出現技術詞、翻譯字串不寫 Markdown）→ `UI_RULES.md`。
