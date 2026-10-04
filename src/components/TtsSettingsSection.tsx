@@ -32,6 +32,8 @@ import {
   getLastTtsDiagnostic,
   isLanguageAvailable,
   listAvailableLanguages,
+  describeNativeVoice,
+  loadNativeVoices,
   type TTSLanguage,
 } from '../utils/tts';
 
@@ -183,14 +185,26 @@ export const TtsVoiceLangSection: React.FC = () => {
     lang: TTSLanguage;
     supported: boolean | null;
     languages: string[] | null;
+    /**
+     * ★ 這台手機**實際**會用來唸該語言的語音名稱（原生才有）。
+     *
+     * 【為什麼不能只看「支不支援」】
+     *   實測有些 Android TTS 引擎回報支援 zh-HK，
+     *   實際卻用預設（國語）發音 —— 問「支不支援」會得到誤導的答案。
+     *   所以額外顯示**實際挑到哪一個語音**（`getSupportedVoices()` 的比對結果）。
+     *   `null` 就代表挑不到，那正是「只說普通話」的原因。
+     */
+    voiceName: string | null;
   } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      await loadNativeVoices();
       const supported = await isLanguageAvailable(voiceLang);
       const languages = supported === false ? await listAvailableLanguages() : null;
-      if (!cancelled) setNativeSupport({ lang: voiceLang, supported, languages });
+      const voiceName = await describeNativeVoice(voiceLang);
+      if (!cancelled) setNativeSupport({ lang: voiceLang, supported, languages, voiceName });
     })();
     return () => {
       cancelled = true;
@@ -242,14 +256,27 @@ export const TtsVoiceLangSection: React.FC = () => {
       {/* ★ 顯示這台裝置對「目前選的語言」實際會用哪個語音。
           `null` = 這個裝置沒有該語言的語音 —— 使用者需要知道，
           否則他會一直以為是 App 壞了（而那是系統層面的限制）。 */}
-      <p
-        className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-all leading-snug ${
-          describeVoiceFor(voiceLang) ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-900'
-        }`}
-      >
-        {t('settings.sound.voiceUsed')}:{' '}
-        {describeVoiceFor(voiceLang) ?? t('settings.sound.noVoice')}
-      </p>
+      {(() => {
+        /**
+         * ★ 手機（原生）與網頁走不同的查法：
+         *   原生 → `getSupportedVoices()` 實際比對出來的語音名稱
+         *   網頁 → `describeVoiceFor()`（Web Speech 的 getVoices()）
+         *   兩者都可能回 null（＝這台裝置沒有該語言的語音）。
+         */
+        const name =
+          nativeSupport && nativeSupport.lang === voiceLang
+            ? nativeSupport.voiceName
+            : describeVoiceFor(voiceLang);
+        return (
+          <p
+            className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-all leading-snug ${
+              name ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-900'
+            }`}
+          >
+            {t('settings.sound.voiceUsed')}: {name ?? t('settings.sound.noVoice')}
+          </p>
+        );
+      })()}
 
       {/* ★ 手機上的額外檢查：這台裝置到底有沒有這個語言的語音？
           沒有的話要**講清楚怎麼修**，否則使用者只會覺得 App 壞了。 */}

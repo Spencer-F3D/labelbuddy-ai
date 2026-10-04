@@ -1,7 +1,8 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { BUILD_ID_META_NAME, computeBuildStamp } from './scripts/build-stamp.mjs';
 
 /**
  * 允許透過反向代理（Cloudflare Tunnel 等）存取開發伺服器。
@@ -24,9 +25,42 @@ const extraAllowedHosts = (process.env.VITE_ALLOWED_HOSTS || '.trycloudflare.com
   .map((s) => s.trim())
   .filter(Boolean);
 
+/**
+ * 建置指紋（2026-10-04）
+ *
+ * 【為什麼要有這個 plugin】
+ *   這個專案有三個必須一致的產物：GitHub 原始碼／線上網站／桌面 APK。
+ *   實際踩過：APK 裡的 JS bundle 是上一個版本，而線上已經換新的了 ——
+ *   沒有任何錯誤訊息，只有向評審展示時才會發現。
+ *
+ *   這個 plugin 把指紋寫進 `dist/index.html` 的
+ *   `<meta name="x-build-id">`。`cap sync` 會把整個 `dist/` 複製進 Android
+ *   專案，所以 APK 也會帶著同一個指紋；線上網站同理。
+ *   → `scripts/check-consistency.ts` 就能用同一個值比對三者。
+ *
+ *   指紋的組成與理由見 `scripts/build-stamp.mjs` 的檔頭。
+ *
+ * ⚠️ 只在 `vite build` 時注入（`apply: 'build'`）。
+ *    開發伺服器不需要 —— 而且 dev 時工作區通常是髒的，注入只會誤導。
+ */
+function buildStampPlugin(): Plugin {
+  const stamp = computeBuildStamp(import.meta.dirname);
+  return {
+    name: 'labelbuddy-build-stamp',
+    apply: 'build',
+    transformIndexHtml(html) {
+      const meta = `<meta name="${BUILD_ID_META_NAME}" content="${stamp.id}" />`;
+      return html.replace('</head>', `    ${meta}\n  </head>`);
+    },
+    config() {
+      return { define: { __BUILD_ID__: JSON.stringify(stamp.id) } };
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), buildStampPlugin()],
     resolve: {
       alias: {
         // 使用 import.meta.dirname 而非 __dirname：

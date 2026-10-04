@@ -113,7 +113,7 @@ import {
   categoryName as localizedCategoryName,
   profileDisplayName as localizedProfileDisplayName,
 } from './data/bilingualContent';
-import { speakText, stopSpeech, ttsLanguageFor } from './utils/tts';
+import { speakText, stopSpeech, ttsLanguageFor, loadNativeVoices } from './utils/tts';
 import { getTtsSettings } from './utils/ttsSettings';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';

@@ -264,6 +264,12 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
               {t('dev.runtime')}
             </h3>
             {row(t('dev.platform'), isNativeTts() ? t('dev.platformNative') : t('dev.platformBrowser'))}
+            {/* ★ 建置指紋（2026-10-04）
+                「我手機上裝的是哪一版？」以前只能靠檔名日期猜。
+                現在 APK／線上網站的首頁都帶著同一個 `<meta name="x-build-id">`，
+                面板直接把執行中的這一份顯示出來。
+                ⚠️ 值本身不翻譯 —— 它是識別碼，不是給人讀的句子。 */}
+            {row(t('dev.buildId'), __BUILD_ID__)}
             {row(t('dev.speech'), !canSpeak() ? t('dev.speechNone') : isNativeTts() ? t('dev.speechNative') : t('dev.speechWeb'))}
             {row(t('dev.localOcr'), isBrowserOcrReady() ? t('dev.ocrLoaded') : t('dev.ocrNotLoaded'))}
             {/* ★ 上次 OCR 的具體結果（2026-10-03）。

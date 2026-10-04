@@ -281,6 +281,66 @@ export async function isLanguageAvailable(lang: TTSLanguage): Promise<boolean | 
   }
 }
 
+/**
+ * ★★ 這台裝置上「該語言要用第幾個語音」（原生用）。
+ *
+ * 【為什麼不能只問 isLanguageSupported】
+ *   使用者回報「有手機的語音仍是普通話，但有手機可以正常」。
+ *   有些 Android TTS 引擎會**回報支援 zh-HK，實際卻用預設（通常是國語）發音** ——
+ *   問「支不支援」得到 true，但使用者聽到的是普通話。
+ *   → 改成**明確挑出 zh-HK 的 voice，並把它的索引傳給 speak()**。
+ *     原生的 `speak()` 接受 `voice?: number`（`getSupportedVoices()` 的索引）。
+ *     指定了就沒有「引擎自己挑」的空間。
+ *
+ * ⚠️ 快取起來：`speak()` 是同步呼叫的，但查語音是 async。
+ *    沒快取的話每次朗讀都得等一次查詢。
+ */
+let nativeVoiceIndex: Partial<Record<TTSLanguage, number>> | null = null;
+
+/** 預先查好語音索引（App 啟動時呼叫一次；失敗不影響其他功能） */
+export async function loadNativeVoices(): Promise<void> {
+  if (!isNativeTts()) return;
+  try {
+    const { voices } = await TextToSpeech.getSupportedVoices();
+    const pick = (match: (v: { lang: string; name: string }) => boolean): number | undefined => {
+      const i = voices.findIndex((v) => v.lang && match({ lang: v.lang, name: v.name ?? '' }));
+      return i >= 0 ? i : undefined;
+    };
+    const isYue = (v: { lang: string; name: string }) =>
+      v.lang === 'zh-HK' ||
+      v.lang.toLowerCase().includes('yue') ||
+      /cantonese|粵|廣東/i.test(v.name);
+
+    nativeVoiceIndex = {
+      cantonese: pick(isYue),
+      // 普通話：排除粵語，避免「選普通話卻拿到粵語」
+      mandarin: pick(
+        (v) =>
+          !isYue(v) && (v.lang === 'zh-TW' || v.lang === 'zh-CN' || v.lang.startsWith('zh'))
+      ),
+      english: pick((v) => v.lang.startsWith('en')),
+    };
+    console.log('[LabelBuddy AI] 原生語音索引：', JSON.stringify(nativeVoiceIndex));
+  } catch {
+    nativeVoiceIndex = null;
+  }
+}
+
+/** 這台裝置**實際**會用來唸該語言的語音名稱（原生用） */
+export async function describeNativeVoice(lang: TTSLanguage): Promise<string | null> {
+  if (!isNativeTts()) return null;
+  try {
+    if (!nativeVoiceIndex) await loadNativeVoices();
+    const idx = nativeVoiceIndex?.[lang];
+    if (idx === undefined) return null;
+    const { voices } = await TextToSpeech.getSupportedVoices();
+    const v = voices[idx];
+    return v ? `${v.name}（${v.lang}）` : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 列出這台裝置支援的語言（原生才有；網頁回 null） */
 export async function listAvailableLanguages(): Promise<string[] | null> {
   if (!isNativeTts()) return null;
@@ -440,6 +500,8 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
 
   /* ── 原生（APK）路徑 ─────────────────────────────────────────── */
   if (isNativeTts()) {
+    // 第一次朗讀時背景補上語音索引（不阻塞這次朗讀）
+    if (!nativeVoiceIndex) void loadNativeVoices();
     lastDiagnostic = { sent: true, lang: preferLanguage, voiceName: 'native', outcome: 'started', error: null };
     options.onStart?.();
     void speakNative(text, preferLanguage, rate, pitch, volume).catch((err) => {

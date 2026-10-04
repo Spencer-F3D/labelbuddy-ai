@@ -1,13 +1,23 @@
 /**
  * LabelBuddy AI — Cloudflare Workers 部署助手
  *
- * 用途：一次完成「登入 Cloudflare → 設定 API 金鑰 → 部署上線」。
+ * 用途：一次完成「登入 Cloudflare → 設定 API 金鑰 → 建置 → 部署上線」。
  *
  * 【為什麼需要這個腳本，而不是直接打 wrangler 指令】
  *   1. 要按正確的順序做四件事，漏一步就會失敗（例如沒設金鑰就部署，
  *      線上版本會沒有 AI 功能卻看起來「部署成功」）。
  *   2. 金鑰要從 .env 讀出來餵給 wrangler，不該讓使用者手動複製貼上。
  *   3. 中文訊息與錯誤說明放在這裡（.bat 不能放中文，見 scripts/launch.mjs 的說明）。
+ *
+ * ★ 2026-10-04 補上「建置」這一步。
+ *   【為什麼原本沒有會出事】
+ *     `wrangler.toml` 的 `[assets] directory = "./dist"` ——
+ *     `wrangler deploy` 上傳的是**磁碟上現有的 `dist/`**。
+ *     這支腳本原本直接部署，所以只要忘了先 `vite build`，
+ *     就會把**上一次建置的舊版本**推上線，而且畫面會顯示「部署成功」。
+ *     npm 的 `worker:deploy` 有做這一步（`vite build && wrangler deploy`），
+ *     兩條路不一致 → 用 .bat 的人拿到舊版、用 npm 的人拿到新版。
+ *     → 現在兩條路都會先建置。
  *
  * 【為什麼不把金鑰寫進 wrangler.toml】
  *   那個檔案會進版控。金鑰一律用 `wrangler secret put` 存成加密的 Secret。
@@ -20,8 +30,15 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WRANGLER = path.join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
 
-/** 要上傳到 Cloudflare 的金鑰（.env 裡的名字 → Secret 名稱） */
-const SECRETS = ['OPENROUTER_API_KEY', 'GEMINI_API_KEY'];
+/**
+ * 要上傳到 Cloudflare 的金鑰（.env 裡的名字 → Secret 名稱）。
+ *
+ * ⚠️ 2026-10-04：補上 `NVIDIA_API_KEY`。
+ *    它原本不在清單裡 —— 意思是「用這個 .bat 做一次全新部署」時，
+ *    線上不會有 NIM 金鑰，健身週報會**靜默退回本機版**（畫面不會報錯）。
+ *    三個供應商都要有金鑰，線上才是完整功能。
+ */
+const SECRETS = ['OPENROUTER_API_KEY', 'GEMINI_API_KEY', 'NVIDIA_API_KEY'];
 
 const C = {
   reset: '\u001b[0m',
@@ -128,7 +145,7 @@ if (!existsSync(WRANGLER)) {
 }
 
 // --- 步驟 1：檢查登入狀態 ---
-console.log(`  ${C.dim}[1/4]${C.reset} 檢查 Cloudflare 登入狀態...`);
+console.log(`  ${C.dim}[1/5]${C.reset} 檢查 Cloudflare 登入狀態...`);
 const whoami = wrangler(['whoami'], { capture: true });
 const whoamiText = `${whoami.stdout || ''}${whoami.stderr || ''}`;
 const loggedIn = whoami.status === 0 && /account|email|associated/i.test(whoamiText) && !/not authenticated|not logged in/i.test(whoamiText);
@@ -159,7 +176,7 @@ if (!loggedIn) {
 
 // --- 步驟 2：上傳 API 金鑰 ---
 console.log('');
-console.log(`  ${C.dim}[2/4]${C.reset} 設定 API 金鑰（加密儲存，不會寫進版控）...`);
+console.log(`  ${C.dim}[2/5]${C.reset} 設定 API 金鑰（加密儲存，不會寫進版控）...`);
 const env = readEnv();
 let uploaded = 0;
 for (const name of SECRETS) {
@@ -186,9 +203,27 @@ if (uploaded === 0) {
   console.log(`  ${C.yellow}⚠️ 沒有成功上傳任何金鑰 —— 線上版本會只能用「本機模式」，無法呼叫雲端 AI。${C.reset}`);
 }
 
-// --- 步驟 3：部署 ---
+// --- 步驟 3：建置 ---
+// ★ 這一步不能省：`wrangler deploy` 上傳的是磁碟上的 `dist/`。
+//   不先建置就會把**上一次的舊版本**推上線，而畫面照樣顯示「部署成功」。
 console.log('');
-console.log(`  ${C.dim}[3/4]${C.reset} 部署中（首次會上傳約 28 MB 的靜態資源，請稍候）...`);
+console.log(`  ${C.dim}[3/5]${C.reset} 建置網頁（vite build）...`);
+const build = spawnSync(
+  process.execPath,
+  [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'],
+  { cwd: ROOT, stdio: 'inherit', env: process.env }
+);
+if (build.status !== 0) {
+  fail(
+    '建置失敗。',
+    `請先修正上面的錯誤。也可以手動執行：${C.cyan}node node_modules/vite/bin/vite.js build${C.reset}`
+  );
+}
+console.log(`  ${C.green}✅ 建置完成${C.reset}`);
+
+// --- 步驟 4：部署 ---
+console.log('');
+console.log(`  ${C.dim}[4/5]${C.reset} 部署中（首次會上傳約 28 MB 的靜態資源，請稍候）...`);
 console.log('');
 const deploy = await wranglerStreaming(['deploy']);
 
@@ -200,7 +235,7 @@ if (deploy.status !== 0) {
   );
 }
 
-// --- 步驟 4：顯示結果 ---
+// --- 步驟 5：顯示結果 ---
 // 從 wrangler 的輸出解析網址，而不是寫死 ——
 // 網址格式是 <Worker名稱>.<子網域>.workers.dev，改名就會變。
 const urlMatch = deploy.output.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/);
