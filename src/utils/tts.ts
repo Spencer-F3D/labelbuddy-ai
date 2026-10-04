@@ -51,6 +51,16 @@ export interface TTSOptions {
   preferLanguage?: TTSLanguage; // 偏好語言（⚠️ 僅為偏好，實際由文字字集決定）
   /** 目前介面語言，用來在使用者選了英文語音卻要唸中文時決定替代語言 */
   uiLanguage?: 'zh-TW' | 'en';
+  /**
+   * 強制使用 `preferLanguage`，**不要**依文字字集改寫。
+   *
+   * ★ 只有一個地方該用：設定頁的「語言試聽」——
+   *   使用者按「English」就是要聽英文，但那裡的示範文字可能剛好是中文
+   *   （介面語言中文時），若照常改寫就會唸成粵語 ——
+   *   使用者按 English 卻聽到粵語，會直接認為功能壞了。
+   *   實測使用者回報的「網頁的英文說的話仍是粵語」就是這個。
+   */
+  forceLanguage?: boolean;
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: any) => void;
@@ -240,6 +250,41 @@ export function describeVoiceFor(lang: TTSLanguage): string | null {
   return v ? `${v.name}（${v.lang}）` : null;
 }
 
+/**
+ * ★★ 檢查**這台裝置**有沒有某個語言的語音（2026-10-04）。
+ *
+ * 【為什麼需要】
+ *   使用者回報「有的手機APP只說普通話」。
+ *   原因不在 App —— 是那台手機**沒有安裝粵語語音資料**，
+ *   於是 Android 的 TTS 引擎收到 `zh-HK` 時退回預設語言（通常是國語）。
+ *   使用者聽到的是普通話，只會覺得「App 壞了」，
+ *   但實際上是系統層面的限制，而且**可以在系統設定裡安裝**。
+ *
+ * → 主動檢查並把結果顯示在設定頁，讓使用者知道要做什麼。
+ *
+ * @returns true=有 / false=沒有 / null=無法判斷（網頁版沒有這個 API）
+ */
+export async function isLanguageAvailable(lang: TTSLanguage): Promise<boolean | null> {
+  if (!isNativeTts()) return null; // 網頁版另有 findBestVoice 可判斷
+  try {
+    const r = await TextToSpeech.isLanguageSupported({ lang: bcp47(lang) });
+    return r.supported;
+  } catch {
+    return null;
+  }
+}
+
+/** 列出這台裝置支援的語言（原生才有；網頁回 null） */
+export async function listAvailableLanguages(): Promise<string[] | null> {
+  if (!isNativeTts()) return null;
+  try {
+    const r = await TextToSpeech.getSupportedLanguages();
+    return r.languages ?? [];
+  } catch {
+    return null;
+  }
+}
+
 export function isSpeechSupported(): boolean {
   if (isNativeTts()) return true;
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -378,11 +423,13 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
    *    真正的語言由**文字本身的字集**決定（見 resolveLanguageForText）。
    *    這裡刻意不信任呼叫端，因為呼叫端只知道介面語言，不知道要唸什麼。
    */
-  const preferLanguage = resolveLanguageForText(
-    text,
-    options.preferLanguage ?? 'cantonese',
-    (options.uiLanguage ?? 'zh-TW') as 'zh-TW' | 'en'
-  );
+  const preferLanguage = options.forceLanguage
+    ? (options.preferLanguage ?? 'cantonese')
+    : resolveLanguageForText(
+        text,
+        options.preferLanguage ?? 'cantonese',
+        (options.uiLanguage ?? 'zh-TW') as 'zh-TW' | 'en'
+      );
 
   /* ── 原生（APK）路徑 ─────────────────────────────────────────── */
   if (isNativeTts()) {

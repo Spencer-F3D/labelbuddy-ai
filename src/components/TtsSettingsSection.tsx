@@ -20,7 +20,7 @@
  *   文字要直接講出目前狀態，不要讓他猜。
  * ============================================================================
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Volume2, VolumeX, Languages } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { getTtsSettings, setTtsVolume, setTtsVoiceLang, resolveVoiceLang } from '../utils/ttsSettings';
@@ -30,6 +30,8 @@ import {
   isNativeTts,
   describeVoiceFor,
   getLastTtsDiagnostic,
+  isLanguageAvailable,
+  listAvailableLanguages,
   type TTSLanguage,
 } from '../utils/tts';
 
@@ -169,16 +171,61 @@ export const TtsVoiceLangSection: React.FC = () => {
   const [voiceLang, setVoiceLang] = useState<TTSLanguage>(() => resolveVoiceLang(language));
   const deviceCanSpeak = canSpeak();
 
+  /**
+   * ★★ 手機（原生）上檢查這台裝置**有沒有**目前選的語言（2026-10-04）。
+   *
+   * 【為什麼】使用者回報「有的手機APP只說普通話」——
+   *   因為那台手機沒有裝粵語語音資料，Android 收到 zh-HK 會退回預設語言。
+   *   那不是 App 的問題，但使用者只會覺得「壞了」。
+   *   → 主動檢查並講清楚「要去系統設定安裝」，他才知道能做什麼。
+   */
+  const [nativeSupport, setNativeSupport] = useState<{
+    lang: TTSLanguage;
+    supported: boolean | null;
+    languages: string[] | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supported = await isLanguageAvailable(voiceLang);
+      const languages = supported === false ? await listAvailableLanguages() : null;
+      if (!cancelled) setNativeSupport({ lang: voiceLang, supported, languages });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [voiceLang]);
+
+
+  /** 每個語言對應的示範句鍵（用該語言本身寫的句子，不是介面語言那句） */
+  const SAMPLE_KEY = {
+    cantonese: 'settings.sound.sampleCantonese',
+    mandarin: 'settings.sound.sampleMandarin',
+    english: 'settings.sound.sampleEnglish',
+  } as const;
+
   const pick = (next: TTSLanguage) => {
     setVoiceLang(next);
     setTtsVoiceLang(next);
     /**
      * 選完立刻唸一句 —— 語言這種東西**非聽不可**，
      * 只看「粵語／普通話」四個字，使用者無法確認差別。
+     *
+     * ★★ 兩個關鍵（2026-10-04 修）：
+     *   ① 唸的是**該語言自己的示範句**，不是介面語言那句
+     *   ② `forceLanguage: true` —— 不然示範句若含中文，
+     *      會被「依文字字集改寫」的邏輯改成中文語音，
+     *      使用者按 English 卻聽到粵語（實測回報的現象）
      * ⚠️ 音量為 0 時不唸（使用者就是要安靜）。
      */
     if (volume > 0) {
-      speakText(t('settings.sound.sample'), { rate: 0.88, volume, preferLanguage: next });
+      speakText(t(SAMPLE_KEY[next]), {
+        rate: 0.88,
+        volume,
+        preferLanguage: next,
+        forceLanguage: true,
+      });
     }
   };
 
@@ -203,6 +250,21 @@ export const TtsVoiceLangSection: React.FC = () => {
         {t('settings.sound.voiceUsed')}:{' '}
         {describeVoiceFor(voiceLang) ?? t('settings.sound.noVoice')}
       </p>
+
+      {/* ★ 手機上的額外檢查：這台裝置到底有沒有這個語言的語音？
+          沒有的話要**講清楚怎麼修**，否則使用者只會覺得 App 壞了。 */}
+      {nativeSupport && nativeSupport.lang === voiceLang && nativeSupport.supported === false && (
+        <p className="text-[15px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[8px] break-all leading-snug">
+          {t('settings.sound.nativeMissing')}
+          {nativeSupport.languages && nativeSupport.languages.length > 0 && (
+            <>
+              {' '}
+              {t('settings.sound.nativeHas')}
+              {nativeSupport.languages.slice(0, 6).join('、')}
+            </>
+          )}
+        </p>
+      )}
       {/* ⚠️ 用 flex-wrap 讓按鈕整顆換行，不要用 overflow-x-auto 水平捲動 ——
           長者看不到「右邊還有東西」，會以為只有這兩個選項。 */}
       <div className="flex flex-wrap gap-[8px]" role="group" aria-label={t('settings.sound.voiceLang')}>

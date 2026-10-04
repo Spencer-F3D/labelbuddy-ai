@@ -286,6 +286,9 @@ const zhTW = {
   'settings.sound.muted': '目前沒有聲音',
   'settings.sound.hint': '放開滑桿就會念一句讓您聽聽看。',
   'settings.sound.mutedHint': '把滑桿往右拉就會有聲音。',
+  'settings.sound.nativeMissing':
+    '這台手機沒有安裝這個語言的語音，所以會用預設語言（通常是普通話）念。請到手機的「設定 → 語言與輸入 → 文字轉語音」安裝對應的語音資料。',
+  'settings.sound.nativeHas': '目前這台手機有的是：',
   'settings.sound.voiceUsed': '這個裝置會用',
   'settings.sound.noVoice': '找不到這個語言的語音（請在系統設定安裝）',
   'settings.sound.sentOk': '已送出朗讀',
@@ -298,6 +301,14 @@ const zhTW = {
   'settings.sound.langMandarin': '普通話',
   'settings.sound.langEnglish': 'English',
   'settings.sound.volume': '音量',
+  /* ── 語言試聽的示範句（2026-10-04）─────────────────────────────
+     ★ 每一句都用**那個語言本身**寫，不要用介面語言那一句。
+       原本三種語言都唸同一句 `settings.sound.sample`（依介面語言），
+       於是中文介面按「English」時唸出來的還是中文 ——
+       使用者按 English 卻聽到中文／粵語，會直接認為功能壞了。 */
+  'settings.sound.sampleCantonese': '您好，而家為您用粵語讀出嚟。',
+  'settings.sound.sampleMandarin': '您好，現在為您用普通話念出來。',
+  'settings.sound.sampleEnglish': 'Hello, this is the English voice.',
   'settings.sound.sample': '您好，這是語音朗讀的示範。',
   'settings.sound.unsupported':
     '這個裝置不支援語音朗讀。網頁版需要 Chrome、Edge 或 Safari；App 版請安裝最新的 APK。',
@@ -976,6 +987,9 @@ const en: Record<TranslationKey, string> = {
   'settings.sound.muted': 'No sound right now',
   'settings.sound.hint': 'Let go of the slider and it will read a line to you.',
   'settings.sound.mutedHint': 'Drag the slider to the right to enable sound.',
+  'settings.sound.nativeMissing':
+    'This phone does not have this language installed, so it will fall back to the default voice (usually Mandarin). Install it in Settings → Languages & input → Text-to-speech.',
+  'settings.sound.nativeHas': 'Available on this phone:',
   'settings.sound.voiceUsed': 'This device will use',
   'settings.sound.noVoice': 'no voice for this language (install it in system settings)',
   'settings.sound.sentOk': 'sent',
@@ -988,6 +1002,10 @@ const en: Record<TranslationKey, string> = {
   'settings.sound.langMandarin': 'Mandarin',
   'settings.sound.langEnglish': 'English',
   'settings.sound.volume': 'Volume',
+  /* ── Voice samples, one per language (2026-10-04) ── */
+  'settings.sound.sampleCantonese': '您好，而家為您用粵語讀出嚟。',
+  'settings.sound.sampleMandarin': '您好，現在為您用普通話念出來。',
+  'settings.sound.sampleEnglish': 'Hello, this is the English voice.',
   'settings.sound.sample': 'Hello, this is a sample of voice reading.',
   'settings.sound.unsupported':
     'This device cannot read text aloud. The web version needs Chrome, Edge or Safari; for the app, please install the latest APK.',

@@ -371,10 +371,35 @@ function inferPurineLevel(text: string): 'high' | 'medium' | 'low' {
 export function buildRecognitionResult(rawText: string): OcrRecognitionResult {
   const parsed = parseNutritionLabel(rawText);
 
-  // 【誠實門檻】至少讀到 3 個核心欄位，且必須有鈉或糖其中之一。
-  // 未達門檻就回 ok=false，讓前端請使用者重拍 —— 絕不用預設值湊出結論。
+  /**
+   * ★★ 2026-10-04 新增第二道門檻：**這張圖到底是不是食品標籤**。
+   *
+   * 【為什麼】使用者回報「本機模式時會把不是食物但沒有任何成分的東西（如紙）
+   *   也說可以食用」。實測 9 種非食物文字（白紙、名片、發票、講義、書頁、
+   *   洗髮精包裝、純數字表格、木紋亂碼）在兩種本機模式下**都正確被拒絕** ——
+   *   所以那個回報我重現不出來。
+   *
+   *   但只靠「3 個欄位 ＋ 有鈉或糖」是不夠的：
+   *   **只要 OCR 把一段不相干的文字誤讀成「鈉 800 毫克」之類的組合，
+   *   就會通過門檻**，然後本機規則引擎看到一份「數值都很正常」的資料，
+   *   回你一個綠燈「很適合您」——那就是拿一張紙說可以吃。
+   *
+   * 【這道門檻】要求文字裡**至少出現一個「食品情境」詞**。
+   *   一份真正的營養標示一定會出現「營養標示／成分／每份／熱量／
+   *   Nutrition Facts／Ingredients／Serving」之中的至少一個。
+   *   紙、名片、發票、書頁都不會有這些詞。
+   *
+   * ⚠️ 關鍵字刻意取寬（中英都收）——過嚴會誤殺真的標籤，
+   *    那比漏放更糟（使用者會一直重拍）。寧可放過少數，也不要誤殺。
+   */
+  const FOOD_CONTEXT = /營養|成分|成份|熱量|每份|每一份量|食品|飲料|食用|nutrition|ingredient|serving|energy|calorie|protein|carbohydrate|sodium|fat/i;
+  const hasFoodContext = FOOD_CONTEXT.test(rawText.replace(/\s+/g, ''));
+
+  // 【誠實門檻】至少讀到 3 個核心欄位，必須有鈉或糖其中之一，
+  // 而且要能看出「這是食品標示」。未達門檻就回 ok=false，
+  // 讓前端請使用者重拍 —— 絕不用預設值湊出結論。
   const hasKeyNutrient = parsed.sodiumMg !== undefined || parsed.sugarG !== undefined;
-  const ok = parsed.matchedFields >= 3 && hasKeyNutrient;
+  const ok = parsed.matchedFields >= 3 && hasKeyNutrient && hasFoodContext;
 
   if (!ok) {
     return {
@@ -382,7 +407,9 @@ export function buildRecognitionResult(rawText: string): OcrRecognitionResult {
       profile: null,
       matchedFields: parsed.matchedFields,
       rawText,
-      error: `只讀到 ${parsed.matchedFields} 個營養欄位，不足以判斷`,
+      error: hasFoodContext
+        ? `只讀到 ${parsed.matchedFields} 個營養欄位，不足以判斷`
+        : '看不出這是食品標示（沒有營養或成分相關字樣）',
     };
   }
 
