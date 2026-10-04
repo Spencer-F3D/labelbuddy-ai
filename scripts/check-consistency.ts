@@ -35,6 +35,21 @@
  *     時間只能證明「檔案被寫過」。複製、checkout、切分支都會改時間；
  *     本專案已經吃過一次「時間對了但內容是舊的」的虧。
  *
+ * 【判準的輕重（2026-10-04 定案）】
+ *   ❌ 失敗（真的不一致）：
+ *     · 三個產物的**原始碼內容指紋**不同 → App 內容不一樣
+ *     · bundle 的 sha256 不同 → 同上
+ *     · 產物是用**未提交**的內容建置的（帶 `-dirty`）
+ *   ⚠️ 警告（不算失敗）：
+ *     · 只有建置指紋裡的 **commit 雜湊**不同。
+ *       這個工作區**同時有兩個 AI 在提交** —— 對方提交一份文件，
+ *       我方剛建好的產物立刻變成「上一個 commit」。
+ *       若把這當成失敗，檢查會**永遠是紅的**，而紅的原因與 App 無關
+ *       → 久了沒人看它，真正的保證反而死掉。
+ *       內容指紋相同就代表三者是**同一份程式碼**（那段期間的 commit
+ *       沒動到 App 內容，否則指紋就會不同）。
+ *   → 要嚴格語意（每個 commit 都必須重新同步）：加 `--strict-commit`。
+ *
  * 用法：npm run check:consistency
  */
 
@@ -50,11 +65,19 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const APP_URL = process.env.APP_URL || 'https://app.labelbuddy-ai.workers.dev';
 const DESKTOP = path.join(homedir(), 'Desktop');
 
+/**
+ * `--strict-commit`：把「建置時的 commit 與目前 HEAD 不同」也視為失敗。
+ * 預設是**警告**（見 `warnOnly` 的說明）—— 這個工作區同時有多個 AI 在提交，
+ * 嚴格語意會讓檢查永遠是紅的。
+ */
+const STRICT_COMMIT = process.argv.includes('--strict-commit');
+
 /** APK 的命名模式（與 `build-apk.mjs` 的清理邏輯一致） */
 const APK_PATTERNS = [/^營養放大鏡_.*\.apk$/i, /^LabelBuddyAI_.*\.apk$/i];
 
 let pass = 0;
 let fail = 0;
+let warn = 0;
 function check(name: string, cond: boolean, extra = '') {
   if (cond) {
     pass++;
@@ -64,16 +87,97 @@ function check(name: string, cond: boolean, extra = '') {
     console.log(`  ❌ ${name}${extra ? ` — ${extra}` : ''}`);
   }
 }
+/**
+ * 警告（不算失敗）。
+ *
+ * ★ 為什麼需要「警告」這個等級（2026-10-04，與另一個 AI 同時提交時發現）：
+ *   建置指紋含 commit 雜湊，所以「任何 commit 都要重新同步」。
+ *   但這個工作區**同時有兩個 AI 在提交** —— 對方提交一份文件時，
+ *   我方剛建好的產物就立刻變成「上一個 commit」。
+ *   若把「commit 不同」當成失敗，這個檢查會**永遠是紅的**，
+ *   而紅的原因卻與 App 內容無關 → 久了就沒人看它，真正的保證反而死掉。
+ *
+ *   → 判準改成：
+ *     · **原始碼內容指紋**不同 → ❌ 失敗（這是真的不一致：App 內容不一樣）
+ *     · bundle 的 sha256 不同   → ❌ 失敗（同上）
+ *     · 只有 commit 雜湊不同    → ⚠️ 警告（三個產物是**同一份程式碼**，
+ *        只是建置時的 commit 較早；那段期間的 commit 沒動到 App 內容，
+ *        否則指紋就會不同）
+ *   ★ 想要嚴格語意（每個 commit 都必須重新同步）→ 加 `--strict-commit`。
+ */
+function warnOnly(name: string, extra = '') {
+  if (STRICT_COMMIT) {
+    fail++;
+    console.log(`  ❌ ${name}${extra ? ` — ${extra}` : ''}（--strict-commit）`);
+    return;
+  }
+  warn++;
+  console.log(`  ⚠️  ${name}${extra ? ` — ${extra}` : ''}`);
+}
 function section(title: string) {
   console.log(`\n── ${title} ──`);
 }
 
 const sha256 = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
 
+/**
+ * 把建置指紋拆成「commit」與「原始碼內容雜湊」。
+ * 格式：`<commit>[-dirty]+<內容雜湊>`（見 `scripts/build-stamp.mjs`）
+ */
+function parseBuildId(
+  id: string | null
+): { commit: string; fingerprint: string; dirty: boolean } | null {
+  if (!id) return null;
+  const m = id.match(/^([0-9a-zA-Z]+)(-dirty)?\+(.+)$/);
+  if (!m) return null;
+  return { commit: m[1], fingerprint: m[3], dirty: !!m[2] };
+}
+
 /** 從 HTML 取出建置指紋 */
 function readBuildId(html: string): string | null {
   const m = html.match(new RegExp(`<meta\\s+name="${BUILD_ID_META_NAME}"\\s+content="([^"]+)"`, 'i'));
   return m ? m[1] : null;
+}
+
+/**
+ * 比對一個產物的建置指紋。
+ *
+ * @returns 該產物的 commit（供最後彙總警告用；null = 沒有指紋）
+ */
+function compareStamp(
+  label: string,
+  rawId: string | null,
+  expected: { commit: string; fingerprint: string }
+): string | null {
+  if (!rawId) {
+    check(`${label} 有建置指紋`, false, '沒有指紋 → 這是加了指紋之前的舊版，要重新建置');
+    return null;
+  }
+  const art = parseBuildId(rawId);
+  if (!art) {
+    check(`${label} 的建置指紋格式正確`, false, `看不懂：${rawId}`);
+    return null;
+  }
+
+  // ① 內容指紋 —— 硬性判準
+  check(
+    `${label} 的原始碼指紋等於目前原始碼（${expected.fingerprint}）`,
+    art.fingerprint === expected.fingerprint,
+    `是 ${art.fingerprint} → App 內容不同，要重新建置／部署`
+  );
+  // ② 用髒的工作區建置出來的產物 —— 對應不到任何 commit
+  check(`${label} 不是用未提交的內容建置的（沒有 -dirty）`, !art.dirty, '是 -dirty → 請重新建置');
+
+  // ③ commit 只差在建置時間 —— 軟性
+  if (art.commit !== expected.commit) {
+    warnOnly(
+      `${label} 建置於 commit ${art.commit}，目前是 ${expected.commit}`,
+      art.fingerprint === expected.fingerprint
+        ? '內容指紋相同 → 三個產物仍是同一份程式碼，只是有人在那之後又提交了（若動到 App 內容，指紋就會不同）'
+        : '（內容指紋也不同，見上面的 ❌）'
+    );
+  }
+  return art.commit;
 }
 
 /** 從 HTML 取出主要 JS bundle 的檔名（例如 `assets/index-9t5DLi1e.js`） */
@@ -207,12 +311,7 @@ if (!existsSync(distIndex)) {
 } else {
   check('dist/index.html 存在', true);
   distHtml = readFileSync(distIndex, 'utf8');
-  const distId = readBuildId(distHtml);
-  check(
-    `dist 的建置指紋等於目前原始碼（${expected.id}）`,
-    distId === expected.id,
-    distId ? `dist 是 ${distId} → 原始碼已改，要重新建置` : 'dist 裡沒有建置指紋'
-  );
+  compareStamp('dist', readBuildId(distHtml), expected);
 
   distBundlePath = readBundlePath(distHtml);
   if (distBundlePath) {
@@ -235,12 +334,7 @@ let liveBundlePath: string | null = null;
 try {
   const res = await fetch(`${APP_URL}/`, { headers: { 'cache-control': 'no-cache' } });
   const html = await res.text();
-  const liveId = readBuildId(html);
-  check(
-    `線上的建置指紋等於目前原始碼（${expected.id}）`,
-    liveId === expected.id,
-    liveId ? `線上還是 ${liveId} → 要重新部署` : '線上首頁沒有建置指紋（可能是舊版）'
-  );
+  compareStamp('線上', readBuildId(html), expected);
 
   liveBundlePath = readBundlePath(html);
   check(
@@ -277,12 +371,7 @@ if (!apkPath) {
     check('APK 內有網頁資產（assets/public/index.html）', false, 'APK 可能沒跑過 cap sync');
   } else {
     const apkHtml = apkIndexHtml.toString('utf8');
-    const apkId = readBuildId(apkHtml);
-    check(
-      `APK 的建置指紋等於目前原始碼（${expected.id}）`,
-      apkId === expected.id,
-      apkId ? `APK 是 ${apkId} → 要重新建置 APK` : 'APK 首頁沒有建置指紋（可能是舊版）'
-    );
+    compareStamp('APK', readBuildId(apkHtml), expected);
 
     const apkBundlePath = readBundlePath(apkHtml);
     check(
@@ -311,11 +400,20 @@ if (!apkPath) {
 /* ── 結論 ────────────────────────────────────────────────────────────── */
 console.log('\n' + '='.repeat(66));
 if (fail === 0) {
-  console.log(`  ✅ 三個產物一致：${pass} 項全部通過`);
-  console.log(`     建置指紋 ${expected.id}`);
+  console.log(`  ✅ 三個產物一致：${pass} 項全部通過${warn ? `（另有 ${warn} 項警告）` : ''}`);
+  console.log('');
+  console.log(`  ${'建置指紋'}：${expected.id}`);
+  if (warn > 0) {
+    console.log('');
+    console.log('  ⚠️ 上面的警告是「建置時的 commit 與目前 HEAD 不同」，');
+    console.log('     但**內容指紋相同** —— 也就是三個產物是同一份程式碼，');
+    console.log('     只是有人在那之後又提交了（沒動到 App 內容，否則指紋會不同）。');
+    console.log('     要讓 commit 也一致：再跑一次 npm run ship。');
+    console.log('     要讓「commit 不同」直接算失敗：加 --strict-commit。');
+  }
   console.log('='.repeat(66));
 } else {
-  console.log(`  ❌ 不一致：${fail} 項失敗（通過 ${pass} 項）`);
+  console.log(`  ❌ 不一致：${fail} 項失敗（通過 ${pass} 項${warn ? `，警告 ${warn} 項` : ''}）`);
   console.log('');
   console.log('  修正方式（缺哪一個就跑哪一個）：');
   console.log('    · GitHub 落後   → git push origin main');

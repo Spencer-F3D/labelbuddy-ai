@@ -36,6 +36,23 @@ import { useI18n } from '../i18n/I18nContext';
 import { isNativeTts, canSpeak } from '../utils/tts';
 import { isBrowserOcrReady, getLastOcrDiagnostics } from '../ocr/ocrBrowser';
 
+/**
+ * 讀取「執行中的這一份」的建置指紋。
+ *
+ * ⚠️ 從 `<meta name="x-build-id">` 讀，**不是**用 Vite 的 `define` 注入成常數。
+ *    注入進 JS 會讓 bundle 的雜湊取決於指紋（而指紋含 commit），
+ *    於是「同一份程式碼、只是有人後來又提交了文件」也會產生不同的 bundle
+ *    → 破壞 `scripts/check-consistency.ts` 的 sha256 比對。
+ *    詳見 `vite.config.ts` 的 `buildStampPlugin` 說明。
+ *
+ * 開發模式（vite dev）不會注入這個 meta，所以顯示「（開發模式）」。
+ */
+function getBuildId(): string {
+  if (typeof document === 'undefined') return '—';
+  const el = document.querySelector('meta[name="x-build-id"]');
+  return el?.getAttribute('content') || '（開發模式）';
+}
+
 /** `/api/ai-status` 的回應形狀（只宣告我們用到的欄位） */
 interface AiStatus {
   status?: string;
@@ -269,7 +286,7 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                 現在 APK／線上網站的首頁都帶著同一個 `<meta name="x-build-id">`，
                 面板直接把執行中的這一份顯示出來。
                 ⚠️ 值本身不翻譯 —— 它是識別碼，不是給人讀的句子。 */}
-            {row(t('dev.buildId'), __BUILD_ID__)}
+            {row(t('dev.buildId'), getBuildId())}
             {row(t('dev.speech'), !canSpeak() ? t('dev.speechNone') : isNativeTts() ? t('dev.speechNative') : t('dev.speechWeb'))}
             {row(t('dev.localOcr'), isBrowserOcrReady() ? t('dev.ocrLoaded') : t('dev.ocrNotLoaded'))}
             {/* ★ 上次 OCR 的具體結果（2026-10-03）。

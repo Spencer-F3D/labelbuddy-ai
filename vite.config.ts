@@ -42,6 +42,15 @@ const extraAllowedHosts = (process.env.VITE_ALLOWED_HOSTS || '.trycloudflare.com
  *
  * ⚠️ 只在 `vite build` 時注入（`apply: 'build'`）。
  *    開發伺服器不需要 —— 而且 dev 時工作區通常是髒的，注入只會誤導。
+ *
+ * ⚠️⚠️ **刻意不用 Vite 的 `define` 把指紋注入 JS**（2026-10-04 修正）。
+ *    原本用 `define: { __BUILD_ID__ }` 讓開發者面板直接讀。
+ *    但那會讓 **JS bundle 的雜湊取決於指紋** ——
+ *    而指紋含 commit 雜湊，於是「同一份程式碼、只是有人後來又提交了文件」
+ *    也會產生**不同的 bundle 檔名與 sha256**，
+ *    讓「三者 bundle 必須相同」的一致性比對失去意義（會被判成不一致）。
+ *    → 指紋只留在 `index.html` 的 meta 裡；JS 保持是「App 程式碼的函式」。
+ *      開發者面板改成從 DOM 讀那個 meta（見 `DeveloperPanel.tsx` 的 `getBuildId`）。
  */
 function buildStampPlugin(): Plugin {
   const stamp = computeBuildStamp(import.meta.dirname);
@@ -51,9 +60,6 @@ function buildStampPlugin(): Plugin {
     transformIndexHtml(html) {
       const meta = `<meta name="${BUILD_ID_META_NAME}" content="${stamp.id}" />`;
       return html.replace('</head>', `    ${meta}\n  </head>`);
-    },
-    config() {
-      return { define: { __BUILD_ID__: JSON.stringify(stamp.id) } };
     },
   };
 }
