@@ -2217,7 +2217,7 @@ export default function App() {
                   >
                     <AlertCircle className="w-[40px] h-[40px] text-white" />
                   </span>
-                  <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight [text-wrap:pretty]`}>
+                  <h3 className={`${TYPE.conclusion} ${WEIGHT.strong} text-[#501313] leading-tight [text-wrap:balance]`}>
                     {ocrEngineFailed ? t('scan.engineTitle') : t('scan.retakeTitle')}
                   </h3>
                   <p className={`${TYPE.body} ${WEIGHT.normal} text-[#791F1F] leading-snug`}>
@@ -2549,7 +2549,7 @@ export default function App() {
                       </span>
 
                       <h2
-                        className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:pretty]`}
+                        className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:balance]`}
                         style={{ color: TONES.neutral.text }}
                       >
                         {stripLeadingEmoji(analysisResult.warning_title || '') ||
@@ -2669,7 +2669,7 @@ export default function App() {
                     </span>
 
                     <h2
-                      className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:pretty]`}
+                      className={`${TYPE.conclusion} ${WEIGHT.strong} leading-tight [text-wrap:balance]`}
                       style={{ color: tone.text }}
                     >
                       {riskHeadline}

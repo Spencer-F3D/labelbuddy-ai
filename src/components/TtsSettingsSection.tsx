@@ -24,7 +24,14 @@ import React, { useState } from 'react';
 import { Volume2, VolumeX, Languages } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import { getTtsSettings, setTtsVolume, setTtsVoiceLang, resolveVoiceLang } from '../utils/ttsSettings';
-import { speakText, canSpeak, isNativeTts, type TTSLanguage } from '../utils/tts';
+import {
+  speakText,
+  canSpeak,
+  isNativeTts,
+  describeVoiceFor,
+  getLastTtsDiagnostic,
+  type TTSLanguage,
+} from '../utils/tts';
 
 /** 朗讀語言的三個選項（2026-10-04 使用者指定） */
 const VOICE_LANGS: TTSLanguage[] = ['cantonese', 'mandarin', 'english'];
@@ -108,11 +115,43 @@ export const TtsVolumeSection: React.FC = () => {
         className="w-full h-[48px] cursor-pointer accent-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
       />
 
-      {/* 試聽之後才顯示 —— 沒聽到聲音時要能判斷是哪一種問題 */}
+      {/* 試聽之後才顯示 —— 沒聽到聲音時要能判斷是哪一種問題
+          ★★ 2026-10-04：使用者回報「朗讀示範完全沒有聲」，
+             但實測程式是對的（三種語言都挑到正確語音、事件正常）。
+             → 與其再猜，不如把**實際發生的事**顯示出來：
+               挑了哪個語音、有沒有送出去、有沒有被瀏覽器擋下。
+             這四種原因的處理方式完全不同，不該都只說「沒聲音」。 */}
       {played && isOn && deviceCanSpeak && (
-        <p className="text-[16px] font-bold text-slate-600 leading-snug">
-          {isNativeTts() ? t('settings.sound.checkNative') : t('settings.sound.checkBrowser')}
-        </p>
+        <div className="flex flex-col gap-[4px]">
+          {(() => {
+            const d = getLastTtsDiagnostic();
+            return (
+              <p
+                className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-all leading-snug ${
+                  d.outcome === 'started'
+                    ? 'bg-emerald-50 text-emerald-900'
+                    : 'bg-amber-50 text-amber-900'
+                }`}
+              >
+                {t('settings.sound.voiceUsed')}: {d.voiceName ?? t('settings.sound.noVoice')}
+                {' · '}
+                {d.outcome === 'started'
+                  ? t('settings.sound.sentOk')
+                  : d.outcome === 'blocked'
+                    ? t('settings.sound.blocked')
+                    : d.outcome === 'disabled'
+                      ? t('settings.sound.muted')
+                      : d.outcome === 'unsupported'
+                        ? t('settings.sound.unsupportedShort')
+                        : t('settings.sound.sentNo')}
+                {d.error ? ` · ${d.error}` : ''}
+              </p>
+            );
+          })()}
+          <p className="text-[16px] font-bold text-slate-600 leading-snug">
+            {isNativeTts() ? t('settings.sound.checkNative') : t('settings.sound.checkBrowser')}
+          </p>
+        </div>
       )}
     </div>
   );
@@ -152,6 +191,17 @@ export const TtsVoiceLangSection: React.FC = () => {
       )}
       <p className="text-[16px] font-bold text-slate-600 leading-snug">
         {t('settings.sound.voiceLangDesc')}
+      </p>
+      {/* ★ 顯示這台裝置對「目前選的語言」實際會用哪個語音。
+          `null` = 這個裝置沒有該語言的語音 —— 使用者需要知道，
+          否則他會一直以為是 App 壞了（而那是系統層面的限制）。 */}
+      <p
+        className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-all leading-snug ${
+          describeVoiceFor(voiceLang) ? 'bg-slate-50 text-slate-700' : 'bg-amber-50 text-amber-900'
+        }`}
+      >
+        {t('settings.sound.voiceUsed')}:{' '}
+        {describeVoiceFor(voiceLang) ?? t('settings.sound.noVoice')}
       </p>
       {/* ⚠️ 用 flex-wrap 讓按鈕整顆換行，不要用 overflow-x-auto 水平捲動 ——
           長者看不到「右邊還有東西」，會以為只有這兩個選項。 */}

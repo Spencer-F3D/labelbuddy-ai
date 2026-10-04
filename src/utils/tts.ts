@@ -48,7 +48,9 @@ export interface TTSOptions {
   pitch?: number;      // 音調，預設 1.0
   /** 音量覆寫（0～1）。不給就用使用者在設定裡選的音量。 */
   volume?: number;
-  preferLanguage?: TTSLanguage; // 偏好語言
+  preferLanguage?: TTSLanguage; // 偏好語言（⚠️ 僅為偏好，實際由文字字集決定）
+  /** 目前介面語言，用來在使用者選了英文語音卻要唸中文時決定替代語言 */
+  uiLanguage?: 'zh-TW' | 'en';
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: any) => void;
@@ -184,6 +186,65 @@ export function findBestVoice(preferLang: TTSLanguage = 'cantonese'): SpeechSynt
   return null;
 }
 
+/**
+ * 最近一次朗讀嘗試的診斷（2026-10-04）。
+ *
+ * ★★【為什麼要這個】
+ *   使用者回報「網頁的朗讀示範完全沒有聲」。實測後發現 **程式是對的** ——
+ *   三種語言都挑到正確的語音、`onstart`/`onend` 都正常觸發
+ *   （先前看到的 `error:not-allowed` 純粹是無頭瀏覽器沒有使用者手勢）。
+ *   也就是說：**在他那邊發生什麼事，我從這裡看不出來。**
+ *
+ *   繼續猜沒有意義 —— 改成把「實際挑了哪個語音、結果如何」記錄下來，
+ *   並顯示在設定頁：使用者一眼就能分辨是
+ *     ① 音量是 0（根本沒送出去）
+ *     ② 裝置沒有該語言的語音
+ *     ③ 瀏覽器擋下（需要先點一下畫面）
+ *     ④ 真的唸了但沒聽到（系統音量／靜音）
+ *   這四種的處理方式完全不同，不該都只顯示「沒聲音」。
+ */
+export interface TtsDiagnostic {
+  /** 有沒有真的送出朗讀請求 */
+  sent: boolean;
+  /** 實際使用的語言 */
+  lang: TTSLanguage | null;
+  /** 實際挑到的語音名稱（找不到語音時為 null） */
+  voiceName: string | null;
+  /** 結局 */
+  outcome: 'started' | 'blocked' | 'unsupported' | 'disabled' | 'no-voice' | 'pending';
+  /** 錯誤原文（如果有的話） */
+  error: string | null;
+}
+
+let lastDiagnostic: TtsDiagnostic = {
+  sent: false,
+  lang: null,
+  voiceName: null,
+  outcome: 'pending',
+  error: null,
+};
+
+export function getLastTtsDiagnostic(): TtsDiagnostic {
+  return lastDiagnostic;
+}
+
+/**
+ * 描述某個語言在**這台裝置上**實際會用哪個語音。
+ *
+ * @returns 語音名稱；`null` 代表這台裝置**沒有**該語言的語音
+ *          （此時唸出來會很怪，或根本不發聲 —— 使用者需要知道這件事）
+ */
+export function describeVoiceFor(lang: TTSLanguage): string | null {
+  if (isNativeTts()) return '系統語音引擎';
+  const v = findBestVoice(lang);
+  return v ? `${v.name}（${v.lang}）` : null;
+}
+
+export function isSpeechSupported(): boolean {
+  if (isNativeTts()) return true;
+  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+}
+
 /* ── 瀏覽器路徑的狀態 ───────────────────────────────────────────── */
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 let speakTimeoutId: any = null;
@@ -258,12 +319,50 @@ async function speakNative(
  *
  * @returns 是否真的送出了朗讀請求（`false` 代表語音被關閉或環境不支援）
  */
+/**
+ * ★★ 依「要唸的文字」決定語言，而不是依介面語言（2026-10-04 修 bug）。
+ *
+ * 【問題（使用者回報：「手機APP的英文要真英文，你現是以英文說中文拼音」）】
+ *   全站朗讀呼叫點傳進來的是 `ttsLanguageFor(介面語言)` ——
+ *   也就是**用介面語言決定發音語言**。
+ *   但**要唸的文字語言不一定等於介面語言**：
+ *     - 介面英文、但內容是中文（飲食紀錄跟隨「標籤本身的語言」、
+ *       中文知識卡、中文食品名）→ 英文語音去唸中文字
+ *       → 聽起來就是「用英文念中文拼音」，完全聽不懂。
+ *     - 介面中文、但內容是英文（進口包裝的英文成分表）
+ *       → 中文語音去唸英文，同樣難聽。
+ *
+ * 【修法】以**文字本身的字集**為準：
+ *   含中日韓字元 → 用使用者選定的中文語言（粵語／普通話）
+ *   只有拉丁字元 → 一律英文語音
+ *
+ * ★ 為什麼寫在 `speakText` 裡面而不是各呼叫點：
+ *   全站有 12 個朗讀呼叫點，改在呼叫端又要記得改 12 處
+ *   （本專案已經踩過五次以上「改了 A 沒改 B」）。
+ *   放在這裡，任何呼叫端都自動正確。
+ */
+function resolveLanguageForText(text: string, preferred: TTSLanguage, uiLanguage: 'zh-TW' | 'en'): TTSLanguage {
+  /** 中日韓統一表意文字（含擴充 A）與相容表意文字 */
+  const hasCJK = /[\u3400-\u9FFF\uF900-\uFAFF]/.test(text);
+
+  if (!hasCJK) {
+    // 純拉丁（英文、數字、符號）→ 一定要英文語音，否則會變成「中文腔念英文」
+    return 'english';
+  }
+
+  // 中文內容：使用者若選了英文語音，那是衝突的組合 ——
+  // 英文語音唸中文只會得到拼音般的噪音，改用中文語音。
+  if (preferred === 'english') return resolveVoiceLang(uiLanguage) === 'english' ? 'cantonese' : resolveVoiceLang(uiLanguage);
+  return preferred;
+}
+
 export function speakText(text: string, options: TTSOptions = {}): boolean {
   /**
    * ★★ 第一道關卡：使用者關掉了語音就直接結束。
    *    這是**唯一**該擋掉的地方 —— 設 volume 0 不算關閉（見檔頭說明）。
    */
   if (!isTtsEnabled()) {
+    lastDiagnostic = { sent: false, lang: null, voiceName: null, outcome: 'disabled', error: null };
     return false;
   }
 
@@ -274,13 +373,24 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
   const rate = options.rate ?? 0.88;
   const pitch = options.pitch ?? 1.0;
   const volume = options.volume ?? getTtsVolume();
-  const preferLanguage = options.preferLanguage ?? 'cantonese';
+  /**
+   * ⚠️ 呼叫端傳進來的語言只是「偏好」——
+   *    真正的語言由**文字本身的字集**決定（見 resolveLanguageForText）。
+   *    這裡刻意不信任呼叫端，因為呼叫端只知道介面語言，不知道要唸什麼。
+   */
+  const preferLanguage = resolveLanguageForText(
+    text,
+    options.preferLanguage ?? 'cantonese',
+    (options.uiLanguage ?? 'zh-TW') as 'zh-TW' | 'en'
+  );
 
   /* ── 原生（APK）路徑 ─────────────────────────────────────────── */
   if (isNativeTts()) {
+    lastDiagnostic = { sent: true, lang: preferLanguage, voiceName: 'native', outcome: 'started', error: null };
     options.onStart?.();
     void speakNative(text, preferLanguage, rate, pitch, volume).catch((err) => {
       nativeSpeaking = false;
+      lastDiagnostic = { sent: true, lang: preferLanguage, voiceName: 'native', outcome: 'unsupported', error: String(err) };
       options.onError?.(err);
     });
     return true;
@@ -289,6 +399,13 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
   /* ── 瀏覽器路徑（Web Speech API）────────────────────────────── */
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     // 兩條路都不通：明確回報，不要再靜默失敗
+    lastDiagnostic = {
+      sent: false,
+      lang: preferLanguage,
+      voiceName: null,
+      outcome: 'unsupported',
+      error: '瀏覽器沒有 Web Speech API',
+    };
     options.onError?.(new Error('此環境不支援語音朗讀（既非原生 App，瀏覽器也沒有 Web Speech API）'));
     return false;
   }
@@ -328,6 +445,14 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
     utterance.lang = bcp47(preferLanguage);
   }
 
+  lastDiagnostic = {
+    sent: true,
+    lang: preferLanguage,
+    voiceName: voice ? `${voice.name}（${voice.lang}）` : null,
+    outcome: 'started',
+    error: null,
+  };
+
   utterance.onstart = () => {
     options.onStart?.();
   };
@@ -349,6 +474,17 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
       options.onEnd?.();
       return;
     }
+    /**
+     * ★ `not-allowed` = 瀏覽器以「沒有使用者手勢」為由擋下。
+     *   這是最容易被誤認為「功能壞了」的一種 —— 要明確講出來。
+     */
+    lastDiagnostic = {
+      sent: true,
+      lang: preferLanguage,
+      voiceName: lastDiagnostic.voiceName,
+      outcome: 'blocked',
+      error: String(e?.error ?? e),
+    };
     // 僅在發生非取消的真正錯誤時回呼
     options.onError?.(e);
   };
