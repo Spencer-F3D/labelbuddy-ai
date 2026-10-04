@@ -46,10 +46,9 @@
  *   node scripts/ship-all.mjs --no-apk       只做線上＋GitHub
  */
 
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { rmSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,23 +98,38 @@ const run = (cmd, cmdArgs) => {
   return r.status ?? 1;
 };
 
-/** git 需要讀輸出 → 用檔案重導，不能接管 stdio */
-const git = (gitArgs) => {
-  const tmp = path.join(ROOT, '.tmp-git-out');
-  const r = spawnSync(
-    process.env.ComSpec || 'cmd.exe',
-    ['/d', '/s', '/c', `"${GIT}" -C "${ROOT}" ${gitArgs.join(' ')} > "${tmp}" 2>&1`],
-    { cwd: ROOT, stdio: 'inherit' }
-  );
-  let out = '';
+/**
+ * git 的**同步**查詢／推送。
+ *
+ * ⚠️ 這裡用 `execFileSync` ＋ **明確的 `stdio: ['ignore','pipe','pipe']`**。
+ *
+ * 【為什麼不是 spawnSync】
+ *   沙箱內 `spawnSync` 一律回 `EBUSY`（見上面 `run` 的說明）。
+ * 【為什麼不是「cmd.exe 重導到檔案」】
+ *   原本的寫法是
+ *     `cmd.exe /d /s /c "git" -C "..." push origin main > .tmp-git-out 2>&1`
+ *   它**讀得到輸出**，但 `git push` 實際上**沒有推送成功**
+ *   （2026-10-04 實測：跑完 ship-all 之後 `git status -sb` 仍是 `ahead 1`，
+ *     手動 push 才成功）。推測是 push 需要 GCM 憑證時，
+ *   在重導的環境下拿不到互動介面而失敗 —— 而且結束碼被 `cmd.exe` 吃掉，
+ *   呼叫端看不出來。
+ *   → 改成直接 `execFileSync`，結束碼與 stderr 都拿得到，
+ *     失敗時呼叫端會看到真正的錯誤訊息。
+ *
+ * ⚠️ 教訓：**驗證「有推送成功」要看 `origin/main`，不要只看結束碼。**
+ *    （本腳本第 3 步就是這樣做的 —— 那是對的，錯的是推送本身沒生效。）
+ */
+function git(gitArgs) {
   try {
-    out = readFileSync(tmp, 'utf8');
-    rmSync(tmp, { force: true });
-  } catch {
-    /* 沒有輸出檔也没關係 */
+    const stdout = execFileSync(GIT, ['-C', ROOT, ...gitArgs], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { status: 0, stdout, stderr: '' };
+  } catch (e) {
+    return { status: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
   }
-  return { status: r.status ?? 1, stdout: out, stderr: '' };
-};
+}
 
 // ────────────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(64));
