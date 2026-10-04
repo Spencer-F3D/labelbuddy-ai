@@ -24,6 +24,15 @@ Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Sp
 工作區乾淨 → 跑檢查 → `vite build` → `git push` → `wrangler deploy` → 出 APK →
 **`check-consistency.ts` 驗證線上／GitHub／APK 三者一致**（沒過就以非零結束碼失敗）。
 ⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。
+★★★ **一律用「結果」驗證，不要用「結束碼」**（2026-10-05，已吃兩次虧、方向相反）：
+  ① 結束碼 0 但**沒推上去**；② 結束碼**非零但已推成功**。
+  → 推送判準已改為 **`origin/main` 是否等於 HEAD**。**永遠不要相信 git 的結束碼。**
+★★ **APK 守衛比的是「內容指紋」，不是檔案時間**（2026-10-05 修）：
+  gradle 對「資產沒變」會合理判 `packageRelease` UP-TO-DATE → APK 時間比 `dist` 舊
+  → 舊的「比時間」寫法**每次都會誤報** → 狼來了。現在讀 APK 內
+  `assets/public/index.html` 的指紋，**只比 `+` 後的內容雜湊（不比 commit）**。
+  → 共用實作在 **`scripts/lib/zip.mjs`**（`readZipEntry`／`readBuildIdFromHtml`）。
+  ⚠️ **不要在任何第二個檔案裡再寫一份 ZIP 解析或指紋解析**（本專案已吃過「兩套檢查」的虧）。
 ★ **判定「一致」的方式**：建置時把指紋寫進 `dist/index.html` 的 `<meta name="x-build-id">`
   （＝ `<commit>[-dirty]+<原始碼內容雜湊>`，見 `scripts/build-stamp.mjs`）；`cap sync` 會把它一起帶進 APK。
   三者比對**指紋 ＋ bundle 的 sha256**。**不比檔名**（同名可能不同內容）、**不比時間**（複製／checkout 會改時間）。
