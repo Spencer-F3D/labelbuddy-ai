@@ -40,7 +40,37 @@ import { createWorker, type Worker } from 'tesseract.js';
  *   都讀得出來；加上 eng 不但沒有提升準確率，還會讓 tesseract.js
  *   額外嘗試載入一個亂碼語言檔並在 console 洗出錯誤訊息。
  */
-const OCR_LANGS = 'chi_tra';
+/**
+ * ★★ 2026-10-04 實測後改為「兩組語言模型，兩輪各用一組」。
+ *
+ * 【為什麼不是固定用 chi_tra+eng】
+ *   用一張**模擬實拍**（大面積彩色圖案＋表格只佔畫面一半＋模糊＋低對比＋
+ *   JPEG 壓縮）的標籤實測，兩組的結果是：
+ *
+ *   英文標籤          只有 chi_tra         chi_tra+eng
+ *     Protein         `Protean 250g` ❌   `Protein 2.509` ✅
+ *     Carbohydrate    `680g` ❌           `6.80g` ✅
+ *     Sugar           `100g9` ❌          `1.009` ✅
+ *     Percentage      `Percenmtage` ❌    `Percentage` ✅
+ *     → 小數點在 chi_tra 下**全部消失**，加 eng 後全部保留
+ *
+ *   中文標籤          只有 chi_tra         chi_tra+eng
+ *     大卡            `大卡` ✅           `x +` ❌
+ *     公克            `公克` ✅           `2%`／`公交` ❌
+ *     耗時            1526ms              2593ms（+70%）
+ *     → 加 eng 之後，中文的「公克」會被誤讀成「公交」，
+ *        而解譯器正是靠「公克」這類關鍵字在抓數值。
+ *
+ * 【結論】兩邊各有勝場，**沒有一個設定是全贏的**。
+ *   → 第一輪用 `chi_tra+eng`（涵蓋英文／中英混排的包裝，這是實拍最常見的情況）
+ *     第二輪用 `chi_tra`（純中文標籤的救援，中文關鍵字才抓得準）
+ *   這樣兩邊的優點都拿得到，代價只是第二輪才多花一次時間。
+ */
+export const OCR_LANGS_PRIMARY = 'chi_tra+eng';
+export const OCR_LANGS_FALLBACK = 'chi_tra';
+
+/** 相容舊用法（未指定時用第一輪的設定） */
+const OCR_LANGS = OCR_LANGS_PRIMARY;
 
 /** 靜態資源路徑。Vite 會把 public/ 服務在根路徑下。 */
 const ASSET_PATHS = {
@@ -121,6 +151,13 @@ export interface BrowserOcrResult {
   errorKind?: 'engine' | 'image';
 }
 
+/**
+ * 已建立的 worker，**以語言組合為鍵**（見 getWorker 的說明）。
+ * 兩輪會各建一個：`chi_tra+eng` 與 `chi_tra`。
+ */
+const workerPromises = new Map<string, Promise<Worker>>();
+
+/** 最近一次使用／建立的 worker（僅供水準判斷與除錯顯示） */
 let workerPromise: Promise<Worker> | null = null;
 /** 序列化任務，避免同一時間有兩個 recognize 搶同一個 worker */
 let taskQueue: Promise<unknown> = Promise.resolve();
@@ -137,22 +174,34 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
  * worker 的建立要下載並初始化 WASM 引擎，實測需要數秒，
  * 因此只建立一次並重複使用 —— 同一場使用中的第二次掃描會快很多。
  */
-function getWorker(): Promise<Worker> {
-  if (!workerPromise) {
-    workerPromise = createWorker(OCR_LANGS, 1, {
-      ...ASSET_PATHS,
-      // traineddata 是未壓縮的原始檔，必須關閉 gzip 期待
-      gzip: false,
-      logger: () => {
-        /* 關閉進度輸出；載入畫面已有自己的進度提示 */
-      },
-    }).catch((err) => {
-      // 建立失敗就把 promise 清掉，下次掃描可以重試
-      workerPromise = null;
-      throw err;
-    });
-  }
-  return workerPromise;
+function getWorker(langs: string = OCR_LANGS): Promise<Worker> {
+  /**
+   * ⚠️ 用 **Map 以語言組合為鍵**，而不是單一個全域 promise。
+   *
+   * 【為什麼】兩輪用不同的語言模型（chi_tra+eng / chi_tra）。
+   *   若只有一個 promise，第二輪會沿用第一輪的 worker ——
+   *   也就是**語言模型根本沒換**，第二輪等於白跑一次，
+   *   而且不會有任何錯誤訊息。
+   */
+  const existing = workerPromises.get(langs);
+  if (existing) return existing;
+
+  const created = createWorker(langs, 1, {
+    ...ASSET_PATHS,
+    // traineddata 是未壓縮的原始檔，必須關閉 gzip 期待
+    gzip: false,
+    logger: () => {
+      /* 關閉進度輸出；載入畫面已有自己的進度提示 */
+    },
+  }).catch((err) => {
+    // 建立失敗就把這一筆清掉，下次掃描可以重試
+    workerPromises.delete(langs);
+    throw err;
+  });
+  workerPromises.set(langs, created);
+  /** 向後相容：`isBrowserOcrReady()` 與除錯訊息仍看這個 */
+  workerPromise = created;
+  return created;
 }
 
 /**
@@ -161,7 +210,9 @@ function getWorker(): Promise<Worker> {
  * @param imageDataUrl 圖片的 data URL（`data:image/jpeg;base64,...`）
  */
 export async function recognizeLabelTextInBrowser(
-  imageDataUrl: string
+  imageDataUrl: string,
+  /** 語言模型組合（省略時用第一輪的 chi_tra+eng） */
+  langsOverride?: string
 ): Promise<BrowserOcrResult> {
   if (!imageDataUrl) {
     return { ok: false, text: '', error: '沒有圖片', errorKind: 'image' };
@@ -170,7 +221,7 @@ export async function recognizeLabelTextInBrowser(
   const startedAt = Date.now();
   try {
     const text = await enqueue(async () => {
-      const worker = await getWorker();
+      const worker = await getWorker(langsOverride);
       // 瀏覽器端的 recognize 直接接受 data URL，不需要先轉成 Buffer
       const { data } = await worker.recognize(imageDataUrl);
       return data.text || '';

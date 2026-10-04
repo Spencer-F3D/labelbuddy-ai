@@ -23,19 +23,37 @@
  */
 
 import React, { useState } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Languages } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
-import { getTtsSettings, setTtsVolume } from '../utils/ttsSettings';
-import { speakText, canSpeak, isNativeTts } from '../utils/tts';
+import { getTtsSettings, setTtsVolume, setTtsVoiceLang, resolveVoiceLang } from '../utils/ttsSettings';
+import { speakText, canSpeak, isNativeTts, type TTSLanguage } from '../utils/tts';
+
+/** 朗讀語言的三個選項（2026-10-04 使用者指定） */
+const VOICE_LANGS: TTSLanguage[] = ['cantonese', 'mandarin', 'english'];
 
 export const TtsSettingsSection: React.FC = () => {
   const { t, language } = useI18n();
   const [volume, setVolume] = useState(() => getTtsSettings().volume);
   const [played, setPlayed] = useState(false);
+  /** 目前生效的朗讀語言（使用者選過的優先，否則跟隨介面語言） */
+  const [voiceLang, setVoiceLang] = useState<TTSLanguage>(() => resolveVoiceLang(language));
 
   const deviceCanSpeak = canSpeak();
   const percent = Math.round(volume * 100);
   const isOn = volume > 0;
+
+  const pickVoiceLang = (next: TTSLanguage) => {
+    setVoiceLang(next);
+    setTtsVoiceLang(next);
+    /**
+     * 選完立刻唸一句 —— 語言這種東西**非聽不可**，
+     * 只看「粵語／普通話」四個字，使用者無法確認差別。
+     * ⚠️ 音量為 0 時不唸（使用者就是要安靜）。
+     */
+    if (volume > 0) {
+      speakText(t('settings.sound.sample'), { rate: 0.88, volume, preferLanguage: next });
+    }
+  };
 
   const changeVolume = (v: number) => {
     setVolume(v);
@@ -49,7 +67,7 @@ export const TtsSettingsSection: React.FC = () => {
     speakText(t('settings.sound.sample'), {
       rate: 0.88,
       volume,
-      preferLanguage: language === 'en' ? 'english' : 'cantonese',
+      preferLanguage: voiceLang,
     });
   };
 
@@ -83,6 +101,41 @@ export const TtsSettingsSection: React.FC = () => {
             {isOn ? t('settings.sound.hint') : t('settings.sound.mutedHint')}
           </span>
         </span>
+      </div>
+
+      {/* ── 朗讀語言（2026-10-04 使用者指定：粵語／普通話／英文）──
+          ★ 三個選項都是「發音語言」，與介面文字語言無關。
+            （介面語言在上方的語言按鈕切換，兩者是不同的東西 ——
+              英文介面也可以選粵語發音。） */}
+      <div className="flex flex-col gap-[8px]">
+        <span className="flex items-center gap-[6px] text-[18px] font-black text-slate-900">
+          <Languages className="w-[22px] h-[22px] shrink-0 text-slate-700" aria-hidden="true" />
+          {t('settings.sound.voiceLang')}
+        </span>
+        {/* ⚠️ 用 flex-wrap 讓按鈕整顆換行，不要用 overflow-x-auto 水平捲動 ——
+            長者看不到「右邊還有東西」，會以為只有這兩個選項。 */}
+        <div className="flex flex-wrap gap-[8px]" role="group" aria-label={t('settings.sound.voiceLang')}>
+          {VOICE_LANGS.map((lang) => {
+            const active = voiceLang === lang;
+            return (
+              <button
+                key={lang}
+                type="button"
+                id={`tts-lang-${lang}`}
+                aria-pressed={active}
+                disabled={!deviceCanSpeak}
+                onClick={() => pickVoiceLang(lang)}
+                className={`min-h-[52px] px-[16px] rounded-xl border-2 text-[17px] font-black cursor-pointer transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  active
+                    ? 'bg-blue-800 border-blue-900 text-white'
+                    : 'bg-white border-slate-300 text-slate-800'
+                }`}
+              >
+                {t(lang === 'cantonese' ? 'settings.sound.langCantonese' : lang === 'mandarin' ? 'settings.sound.langMandarin' : 'settings.sound.langEnglish')}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── 音量（唯一的控制項）── */}

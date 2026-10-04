@@ -282,6 +282,10 @@ const zhTW = {
   'settings.sound.muted': '目前沒有聲音',
   'settings.sound.hint': '放開滑桿就會念一句讓您聽聽看。',
   'settings.sound.mutedHint': '把滑桿往右拉就會有聲音。',
+  'settings.sound.voiceLang': '朗讀語言',
+  'settings.sound.langCantonese': '粵語',
+  'settings.sound.langMandarin': '普通話',
+  'settings.sound.langEnglish': 'English',
   'settings.sound.volume': '音量',
   'settings.sound.sample': '您好，這是語音朗讀的示範。',
   'settings.sound.unsupported':
@@ -957,6 +961,10 @@ const en: Record<TranslationKey, string> = {
   'settings.sound.muted': 'No sound right now',
   'settings.sound.hint': 'Let go of the slider and it will read a line to you.',
   'settings.sound.mutedHint': 'Drag the slider to the right to enable sound.',
+  'settings.sound.voiceLang': 'Voice language',
+  'settings.sound.langCantonese': 'Cantonese',
+  'settings.sound.langMandarin': 'Mandarin',
+  'settings.sound.langEnglish': 'English',
   'settings.sound.volume': 'Volume',
   'settings.sound.sample': 'Hello, this is a sample of voice reading.',
   'settings.sound.unsupported':

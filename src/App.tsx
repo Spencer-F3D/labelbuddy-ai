@@ -71,6 +71,8 @@ import {
   recognizeLabelTextInBrowser,
   warmUpBrowserOcr,
   preprocessDataUrlForOcr,
+  OCR_LANGS_PRIMARY,
+  OCR_LANGS_FALLBACK,
 } from './ocr/ocrBrowser';
 // 雙語介面（2026-09-28）：競賽章程要求「未使用英文」可不予評審。
 import { useI18n } from './i18n/I18nContext';
@@ -1131,7 +1133,22 @@ export default function App() {
     if (!file) return null;
     const compressed = await compressImage(file, IMAGE_MAX_DIM_OCR, 0.9);
     const input = attempt === 1 ? await preprocessDataUrlForOcr(compressed.base64) : compressed.base64;
-    return recognizeLabelTextInBrowser(input);
+
+    /**
+     * ★★ 兩輪**同時換語言模型**（2026-10-04 實測後加入）。
+     *
+     * 實測（模擬實拍的英文標籤）：
+     *   只有 chi_tra    → `Protein` 讀成 `Protean`、小數點全部消失（6.80 → 680）
+     *   chi_tra+eng     → 英文字與小數點都正確
+     * 實測（模擬實拍的**中文**標籤）：
+     *   只有 chi_tra    → `大卡`、`公克` 正確
+     *   chi_tra+eng     → `大卡` 變 `x +`、`公克` 變 `公交`（解譯器靠這些關鍵字抓數值！）
+     *
+     * → 沒有一個設定全贏。所以第一輪用涵蓋中英混排的組合，
+     *   第二輪換成純中文的組合 —— 讓兩輪各自有「非重複」的價值。
+     */
+    const langs = attempt === 1 ? OCR_LANGS_PRIMARY : OCR_LANGS_FALLBACK;
+    return recognizeLabelTextInBrowser(input, langs);
   };
 
   /**

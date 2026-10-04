@@ -40,7 +40,16 @@ export type { OcrRecognitionResult } from './labelParser';
  *   若日後真的需要英文模型，設環境變數 `TESSERACT_LANG=chi_tra+eng` 即可，
  *   `server/tessdata/eng.traineddata` 已經準備好。
  * ------------------------------------------------------------------------- */
-const OCR_LANGS = (process.env.TESSERACT_LANG || 'chi_tra').trim();
+/**
+ * ★ 2026-10-04：預設改為 `chi_tra+eng`。
+ *   實測（模擬實拍的英文標籤）純 chi_tra 會把 `Protein` 讀成 `Protean`、
+ *   並**弄丟所有小數點**（6.80 → 680）；加上 eng 之後兩者都正確。
+ *   中文標籤則相反（`公克` 會被讀成 `公交`），
+ *   所以前端是兩輪各用一種組合；這裡的伺服器路徑是後備用途，
+ *   取涵蓋面較廣的那一組。
+ *   仍可用環境變數 TESSERACT_LANG 覆寫。
+ */
+const OCR_LANGS = (process.env.TESSERACT_LANG || 'chi_tra+eng').trim();
 
 /* ---------------------------------------------------------------------------
  * 1. tessdata 位置解析

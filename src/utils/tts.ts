@@ -41,7 +41,7 @@
 
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
-import { getTtsVolume, isTtsEnabled } from './ttsSettings';
+import { getTtsVolume, isTtsEnabled, resolveVoiceLang } from './ttsSettings';
 
 export interface TTSOptions {
   rate?: number;       // 語速，預設 0.88 (慢速清晰)
@@ -62,17 +62,15 @@ export interface TTSOptions {
  * 注意：這只影響「挑哪個語音」，不會改變朗讀的文字內容。
  */
 /**
- * ★ 2026-10-03 使用者指定：**鎖定粵語，移除普通話**。
+ * ★ 2026-10-04 使用者指定：**在設定中加入粵語／普通話／英文的語言選擇**。
  *
- * 原本有 'mandarin' 這個選項，但全站沒有任何地方在用它
- * （`ttsLanguageFor()` 一直只回傳 cantonese 或 english）——
- * 留著只會讓人以為「可以選普通話」，實際上根本沒有入口。
- * 對澳門的使用者來說，中文就該是粵語；留一個沒人用的選項是誤導。
+ * （先前（10-03）曾要求「鎖定粵語、移除普通話」，所以這裡拿掉過；
+ *   現在改為三選一，把選擇權交回使用者。）
  *
- * ⚠️ 'english' **必須保留**：英文介面若用中文語音念英文，
+ * ⚠️ 'english' 一定要有：英文介面若用中文語音念英文，
  *    決賽的英文 Demo 影片會很難聽（比賽要求英文材料）。
  */
-export type TTSLanguage = 'cantonese' | 'english';
+export type TTSLanguage = 'cantonese' | 'mandarin' | 'english';
 
 /**
  * 依「介面語言」決定該挑哪個語音 —— **全站唯一來源**。
@@ -90,7 +88,15 @@ export type TTSLanguage = 'cantonese' | 'english';
  * ⚠️ 英文模式必須換英文語音，否則會用中文腔念英文（決賽 Demo 影片會很難聽）。
  */
 export function ttsLanguageFor(language: 'zh-TW' | 'en'): TTSLanguage {
-  return language === 'en' ? 'english' : 'cantonese';
+  /**
+   * ★ 2026-10-04：改為「使用者選過的優先，沒選過才依介面語言推導」。
+   *
+   * 【為什麼改這裡就夠了】
+   *   全站 12 個朗讀呼叫點都經過這個函式 —— 改它就能一次套用到全部，
+   *   不需要（也不可能記得）一個一個改。
+   *   本專案已經踩過「改了 A 沒改 B」五次以上，這正是當初把它集中的理由。
+   */
+  return resolveVoiceLang(language);
 }
 
 /** 是否為原生（APK）環境 —— 決定走哪一條發聲管道 */
@@ -105,11 +111,14 @@ export function isNativeTts(): boolean {
 /**
  * 轉成 BCP-47 語言標籤（原生引擎與 Web Speech 都吃這個）。
  *
- * ★ 2026-10-03：中文**一律 zh-HK（粵語）**，不再有 zh-TW / zh-CN 的分支。
- *   ⚠️ 設成 zh-TW 會讓 Android TTS 用**國語**朗讀 —— 那正是使用者要移除的東西。
+ * ⚠️ 粵語是 `zh-HK`、普通話是 `zh-TW` —— **這兩個一定要分開**：
+ *    對澳門使用者而言，選「普通話」卻送 zh-HK 會唸成粵語，
+ *    而兩者聽起來差很多，使用者會以為設定壞了。
  */
 function bcp47(preferLang: TTSLanguage): string {
-  return preferLang === 'english' ? 'en-US' : 'zh-HK';
+  if (preferLang === 'english') return 'en-US';
+  if (preferLang === 'mandarin') return 'zh-TW';
+  return 'zh-HK';
 }
 
 /**
@@ -144,6 +153,23 @@ export function findBestVoice(preferLang: TTSLanguage = 'cantonese'): SpeechSynt
         v.name.includes('廣東')
     );
     if (cantoneseVoice) return cantoneseVoice;
+    // 找不到粵語時若直接回 null，裝置會自行挑一個 —— 但可能挑到國語。
+    // 使用者明確選了粵語，所以這裡刻意**不做任何降級**（見下方說明）。
+    return null;
+  }
+
+  if (preferLang === 'mandarin') {
+    // 普通話：優先台灣／通用中文，其次任何 zh（但**排除**粵語）
+    const mandarinVoice = voices.find(
+      (v) =>
+        (v.lang === 'zh-TW' || v.lang === 'zh-CN' || v.lang === 'zh-Hans') &&
+        !v.lang.toLowerCase().includes('yue')
+    );
+    if (mandarinVoice) return mandarinVoice;
+    const anyNonYue = voices.find(
+      (v) => v.lang.startsWith('zh') && !v.lang.toLowerCase().includes('yue')
+    );
+    return anyNonYue ?? null;
   }
 
   /**

@@ -27,6 +27,7 @@
  */
 
 import type { LearnerProfileId } from '../types';
+import type { TTSLanguage } from './tts';
 
 const STORAGE_KEY = 'labelbuddy_tts_v1';
 
@@ -36,8 +37,20 @@ export const DEFAULT_TTS_VOLUME = 0.8;
 export interface TtsSettings {
   /** 音量 0～1。**0 就代表關閉**（見檔頭說明）。 */
   volume: number;
-  /** 使用者是否手動調過（決定要不要跟著身分重算預設值） */
+  /** 使用者是否手動調過音量（決定要不要跟著身分重算預設值） */
   touched: boolean;
+  /**
+   * 朗讀語言。`null` = 跟隨介面語言（使用者沒選過）。
+   *
+   * ★ 2026-10-04 使用者要求「在設定中加入粵語／普通話／英文的語言選擇」。
+   *
+   * 【為什麼預設是 null 而不是 'cantonese'】
+   *   原本的行為是「介面語言是英文就唸英文，中文就唸粵語」——
+   *   那對英文介面是對的（決賽 Demo 影片要英文）。
+   *   若預設寫死 'cantonese'，切成英文介面卻唸粵語，等於偷偷改掉既有行為。
+   *   → `null` 代表「沿用原本的推導」，使用者主動選了才固定。
+   */
+  voiceLang: TTSLanguage | null;
 }
 
 /**
@@ -51,6 +64,7 @@ export function defaultTtsSettings(profileId: LearnerProfileId): TtsSettings {
   return {
     volume: profileId === 'senior' ? DEFAULT_TTS_VOLUME : 0,
     touched: false,
+    voiceLang: null,
   };
 }
 
@@ -73,6 +87,13 @@ function readStorage(): TtsSettings | null {
      *    他的選擇就白做了（而且不會有任何提示）。
      *   舊的 enabled:false 等同於新版的 volume 0。
      */
+    const voiceLang =
+      parsed?.voiceLang === 'cantonese' ||
+      parsed?.voiceLang === 'mandarin' ||
+      parsed?.voiceLang === 'english'
+        ? (parsed.voiceLang as TTSLanguage)
+        : null;
+
     if (typeof parsed?.enabled === 'boolean') {
       return {
         volume: parsed.enabled
@@ -81,6 +102,7 @@ function readStorage(): TtsSettings | null {
             : DEFAULT_TTS_VOLUME
           : 0,
         touched: parsed.touched === true,
+        voiceLang,
       };
     }
 
@@ -88,6 +110,7 @@ function readStorage(): TtsSettings | null {
     return {
       volume: Math.min(1, Math.max(0, parsed.volume)),
       touched: parsed.touched === true,
+      voiceLang,
     };
   } catch {
     return null;
@@ -124,7 +147,9 @@ export function getTtsSettings(profileId?: LearnerProfileId): TtsSettings {
     return { ...stored, volume: defaultTtsSettings(pid).volume };
   }
 
-  const fresh = pid ? defaultTtsSettings(pid) : { volume: 0, touched: false };
+  const fresh = pid
+    ? defaultTtsSettings(pid)
+    : { volume: 0, touched: false, voiceLang: null as TTSLanguage | null };
   cache = fresh;
   return fresh;
 }
@@ -132,6 +157,7 @@ export function getTtsSettings(profileId?: LearnerProfileId): TtsSettings {
 /** 設定音量（0 = 關閉）。呼叫這個就視為「使用者手動調過」。 */
 export function setTtsVolume(volume: number): TtsSettings {
   const next: TtsSettings = {
+    ...getTtsSettings(),
     volume: Math.min(1, Math.max(0, volume)),
     // ⚠️ 即使調到 0 也算「手動調過」—— 使用者就是要它安靜，
     //    不能因為之後換了身分又被自動打開。
@@ -139,6 +165,28 @@ export function setTtsVolume(volume: number): TtsSettings {
   };
   writeStorage(next);
   return next;
+}
+
+/**
+ * 設定朗讀語言（2026-10-04 使用者要求）。
+ * 傳入 null 可以改回「跟隨介面語言」。
+ */
+export function setTtsVoiceLang(voiceLang: TTSLanguage | null): TtsSettings {
+  const next: TtsSettings = { ...getTtsSettings(), voiceLang };
+  writeStorage(next);
+  return next;
+}
+
+/**
+ * 實際要用哪個語言朗讀 —— **全站唯一來源**。
+ *
+ * @param uiLanguage 目前介面語言
+ * @returns 使用者選過的語言；沒選過就跟隨介面語言（英文介面唸英文，其餘唸粵語）
+ */
+export function resolveVoiceLang(uiLanguage: 'zh-TW' | 'en'): TTSLanguage {
+  const chosen = getTtsSettings().voiceLang;
+  if (chosen) return chosen;
+  return uiLanguage === 'en' ? 'english' : 'cantonese';
 }
 
 /** 供 `speakText` 使用的輕量查詢 */
