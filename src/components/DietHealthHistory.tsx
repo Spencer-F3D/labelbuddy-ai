@@ -292,7 +292,6 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
       setIsSpeakingSummary(true);
       speakText(weeklyVoiceScript, {
         rate: 0.88,
-        volume: 1.0,
         preferLanguage: ttsLang,
         onEnd: () => setIsSpeakingSummary(false),
         onError: () => setIsSpeakingSummary(false),
@@ -311,7 +310,6 @@ export const DietHealthHistory: React.FC<DietHealthHistoryProps> = ({
       const textToSpeak = `${record.foodName}。${record.warning_title}。${record.plain_summary}`;
       speakText(textToSpeak, {
         rate: 0.88,
-        volume: 1.0,
         preferLanguage: ttsLang,
         onEnd: () => setActiveSpeakingRecordId(null),
         onError: () => setActiveSpeakingRecordId(null),

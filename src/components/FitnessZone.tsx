@@ -172,6 +172,8 @@ interface FitnessReportData {
  *    先前踩過的是同一類 bug。
  *    → `local_only` 時**不提供**這個按鈕（改為說明要切換模式），
  *      並在送出的請求帶上 `localOnly` 當第二道防線。
+ *    ⚠️ 按鈕與 `generateReport()` 都在 `LogTab` 裡 —— 這裡只負責把
+ *      `localOnly` 推導出來並傳下去（單一來源，不要在子元件各自再算一次）。
  */
 export const FitnessZone: React.FC<{ analysisMode: AnalysisMode }> = ({ analysisMode }) => {
   const { t, language } = useI18n();
@@ -245,7 +247,14 @@ export const FitnessZone: React.FC<{ analysisMode: AnalysisMode }> = ({ analysis
         <PlanTab state={state} update={update} plan={plan} lang={lang} t={t} />
       )}
       {tab === 'log' && (
-        <LogTab state={state} update={update} lang={lang} t={t} macros={macros} />
+        <LogTab
+          state={state}
+          update={update}
+          lang={lang}
+          t={t}
+          macros={macros}
+          localOnly={localOnly}
+        />
       )}
       {tab === 'nutrition' && (
         <NutritionTab state={state} update={update} macros={macros} lang={lang} t={t} />
@@ -376,7 +385,14 @@ const LogTab: React.FC<{
   t: (k: TranslationKey, v?: Record<string, string | number>) => string;
   /** 每日目標（AI 週報要拿來和使用者的實際攝取比較） */
   macros: ReturnType<typeof calcMacros> | null;
-}> = ({ state, update, lang, t, macros }) => {
+  /**
+   * 分析模式是否為「只在本機」（由 `FitnessZone` 依 `analysisMode` 推導後傳入）。
+   *
+   * ⚠️ AI 週報的同意閘門就在這個分頁 —— 為 `true` 時**不渲染產生按鈕**，
+   *    且 `generateReport()` 連請求都不發。見 `FitnessZone` 的說明。
+   */
+  localOnly: boolean;
+}> = ({ state, update, lang, t, macros, localOnly }) => {
   const [form, setForm] = useState({
     sessionName: '',
     exerciseName: '',

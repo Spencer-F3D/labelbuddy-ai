@@ -7,7 +7,7 @@
  * ============================================================================
  * 【為什麼不把 educationContent.ts 翻成兩份】
  *   與 bilingualContent.ts 的理由相同：那一份是**單一資料來源**，
- *   而且 `relatedCardId`、`correctIndex`、`topic`、`forProfiles` 這些欄位
+ *   而且 `correctIndex`、`topic`、`forProfiles` 這些欄位
  *   與語言無關。複製成兩份只會讓日後改題目時兩邊不同步。
  *   → 維持「原文 + 對照表 + localizeXxx() 取值函式」的既有模式。
  *
@@ -919,7 +919,7 @@ export const QUIZ_QUESTIONS_EN: Record<string, QuizQuestionText> = {
 /**
  * 把知識卡換成指定語言。
  *
- * ⚠️ 只換「可翻譯欄位」，`id`／`topic`／`forProfiles`／`relatedCardId` 原封不動 ——
+ * ⚠️ 只換「可翻譯欄位」，`id`／`topic`／`forProfiles`／`correctIndex` 原封不動 ——
  *    那些是程式邏輯在用的，翻了會壞。
  * ⚠️ 查不到英文時**整張退回中文原文**，不會出現半英半中。
  */

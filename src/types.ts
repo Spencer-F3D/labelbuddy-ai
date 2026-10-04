@@ -394,8 +394,6 @@ export interface QuizQuestion {
   correctIndex: number;
   /** 答題後的詳解 */
   explanation: string;
-  /** 對應的知識卡 ID，方便答錯時引導回去複習 */
-  relatedCardId: string;
 }
 
 /** 使用者在某次測驗的作答紀錄 */

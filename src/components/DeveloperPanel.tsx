@@ -52,7 +52,8 @@ interface AiStatus {
     lastLatencyMs?: number;
   }>;
   models?: string[];
-  nvidia?: { configured: boolean; models: string[]; purpose: string };
+  /** NIM 的補充資訊。⚠️ NIM 已在輪替鏈上（見 providers）—— 這裡只是模型清單。 */
+  nvidia?: { configured: boolean; models: string[] };
   cacheEntries?: number;
   openrouterQuota?: { remaining?: number; limit?: number } | null;
   message?: string;

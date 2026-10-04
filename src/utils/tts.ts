@@ -46,7 +46,14 @@ import { getTtsVolume, isTtsEnabled, resolveVoiceLang } from './ttsSettings';
 export interface TTSOptions {
   rate?: number;       // 語速，預設 0.88 (慢速清晰)
   pitch?: number;      // 音調，預設 1.0
-  /** 音量覆寫（0～1）。不給就用使用者在設定裡選的音量。 */
+  /**
+   * 音量覆寫（0～1）。不給就用使用者在設定裡選的音量。
+   *
+   * ⚠️ **一般呼叫端不要傳這個欄位。** 傳了就會蓋掉使用者在「設定 → 朗讀音量」
+   *    選的值 —— 使用者把音量調小是刻意的（安靜環境、長者聽力），
+   *    硬寫死 1.0 等於讓那個設定形同虛設，而且**不會有任何錯誤訊息**。
+   *    2026-10-04 修掉的就是這種情況：有 5 處呼叫硬傳 `volume: 1.0`。
+   */
   volume?: number;
   preferLanguage?: TTSLanguage; // 偏好語言（⚠️ 僅為偏好，實際由文字字集決定）
   /** 目前介面語言，用來在使用者選了英文語音卻要唸中文時決定替代語言 */

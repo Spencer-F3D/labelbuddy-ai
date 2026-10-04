@@ -944,8 +944,6 @@ export default function App() {
    *    引導頁會明確問過，那才是有效的選擇。
    */
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(loadAnalysisMode);
-  /** 是否允許呼叫雲端（`local_only` 之外都允許） */
-  const cloudAllowed = analysisMode !== 'local_only';
   /** 是否已走完引導頁。false 時覆蓋整個畫面。 */
   const [onboarded, setOnboarded] = useState<boolean>(() => {
     try {
@@ -1532,7 +1530,6 @@ export default function App() {
         if (data.plain_summary) {
           speakText(data.plain_summary, {
             rate: 0.88,
-            volume: 1.0,
             preferLanguage: ttsLang,
           });
         }
@@ -1693,7 +1690,6 @@ export default function App() {
           setIsSpeaking(true);
           speakText(data.plain_summary, {
             rate: 0.88,
-            volume: 1.0,
             preferLanguage: ttsLang,
             onEnd: () => setIsSpeaking(false),
             onError: () => setIsSpeaking(false),
@@ -1747,7 +1743,6 @@ export default function App() {
       setIsSpeaking(true);
       speakText(analysisResult.plain_summary, {
         rate: 0.88,
-        volume: 1.0,
         preferLanguage: ttsLang,
         onEnd: () => setIsSpeaking(false),
         onError: () => setIsSpeaking(false),

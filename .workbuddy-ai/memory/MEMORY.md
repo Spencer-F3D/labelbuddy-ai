@@ -93,6 +93,15 @@ Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Sp
 ★ 判斷模式看**欄位是否存在**（OCR 失敗送 `ocrText: ''` 仍是文字模式 → 回「請重拍」）。
 ★ **任何「會呼叫雲端」的功能都要有同意閘門**（`/api/analyze-label`、`/api/ask-health-question`、
   `/api/fitness-report`）—— 新增雲端端點時，前端要傳 `localOnly`、後端要真的檢查。
+  ★ 2026-10-04 補上的就是漏掉的第三個：`/api/fitness-report`（健身專區 AI 週報）。
+    **前端元件原本連 `analysisMode` 都沒接收**，所以「只在本機」照樣上傳。
+    → 修法：`FitnessZone` 收 `analysisMode` → 推導 `localOnly` → 傳給 `LogTab`
+      （按鈕與 `generateReport()` 都在 `LogTab`，**不要在子元件各自再算一次**）；
+      `local_only` 時**不渲染按鈕**、改顯示「要切換模式才能用」；後端 `localOnly === true`
+      → 直接回本機版、不呼叫 NIM（第二道防線）。
+    ★ 使用者明確要求：報告**要繼續真的用 AI**，不可以靜默降級成本機版。
+★ **送 API 的欄位名不能猜**：是 `conditions`（不是 `conditionNames`）、`localOnly`
+  （不是 `analysisMode`）。送錯欄位不會報錯，只會讓測試得到「看起來很合理」的錯誤結論（踩過 4 次）。
 
 ## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
 引擎 = 瀏覽器端 tesseract.js，要下載 **約 6.4 MB**（`chi_tra.traineddata` 2.37MB＋WASM 約 4MB＋worker）。
@@ -119,18 +128,25 @@ Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Sp
 ⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。
 ★ **改供應商清單時要同步改 `/api/ai-status` 的 providers 迴圈**（漏了不會報錯，面板只會與事實不符）。
 ★ NIM 金鑰 = Worker secret `NVIDIA_API_KEY`（本機測試放 `.dev.vars`）；
-  Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。模型鏈以**實測**決定（不要照抄技能結論）：
-  `openai/gpt-oss-20b` **0.76s 主力**｜`z-ai/glm-5.3-flash` 13.5s（**`content` 是 null，答案在 `reasoning_content`**）｜
-  `nvidia/nemotron-3.5-lightning-30b-a3b` **40s 逾時，不列入**（會逾時的模型比沒有備援更糟）。
+  Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。加速關鍵：`reasoning_effort: 'low'`。
+  現役 `NVIDIA_MODEL_CHAIN` **只有 `openai/gpt-oss-20b`**（實測 0.76s）。
+  ★ 曾測但**已移除**：`z-ai/glm-5.3-flash`（13～33s 太慢，且 `content` 是 null、
+    答案在 `reasoning_content`）、`nvidia/nemotron-3.5-lightning-30b-a3b`（40s 逾時）。
+    **會逾時的模型比沒有備援更糟。**
 ★ `/api/fitness-report` 只送**彙總數字**、不送逐筆紀錄；AI 失敗回**離線規則版**。
 
 ## ⛔ Gemini 區域封鎖（已定案，不必重查）
 Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回 `400 FAILED_PRECONDITION`
 → **換帳號無用**。用 VPN 或謊報地區繞過屬服務條款問題，**不做**。
 
-## 🎓 7 身分（`LearnerProfileId`，2026-10-02 起）
+## 🎓 8 身分（`LearnerProfileId`；10-02 起 7 個，10-04 加孕婦）
 `senior` 長者／`child` 兒童／`teen` 青少年／`fitness` 健身人士／`young` 青年／`middle` 中年／
-`student` 學生。定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**。
+`student` 學生／`pregnant` 孕婦（**2026-10-04 新增**）。定義集中 `src/data/learnerProfiles.ts`，
+**前後端共用** → 必須**純資料**。
+★★ **孕婦與其他七個性質不同**：別人是「數字低一點」，孕婦多了「**成分絕對不能有**」——
+  酒精 0.5 公克不會讓任何數字超標，但對胎兒就是風險，靠營養上限永遠抓不到。
+  → `PREGNANCY_HAZARDS` 成分層級把關（酒精／生食未殺菌／高汞魚＝紅燈；咖啡因＝至少黃燈）。
+  ⚠️ 尚未做孕期專屬教學卡與題庫；咖啡因只靠**成分關鍵字**抓（解析器沒有咖啡因欄位）。
 ★ 名稱不得含評價性字眼（「長者三高」→**長者**）；身分卡片不得顯示說明文字。
   ⚠️ `bilingual.ts` 的 `PROFILE_NAME_EN` 曾漏改，長者英文名寫成 "Senior with hypertension…"
   （＝把三高貼在長者身上，**只有英文介面看得到**）。

@@ -850,17 +850,22 @@ export async function handleAiStatus(body: any, headers: Headers, deps: CoreDeps
     providers,
     models: getModelChain(),
     /**
-     * NVIDIA NIM（2026-10-03 新增到狀態回報）。
+     * NVIDIA NIM 的補充狀態（模型清單）。
      *
-     * ⚠️ 刻意**不放進 providers 陣列** —— 那一組是「標籤辨識的輪替鏈」，
-     *    NIM 不在鏈上（見 core.ts 的說明）。混進去會讓開發者面板
-     *    顯示成「有三家在輪替」，與事實不符。
-     *    它是獨立的一條路，只服務健身週報，所以在這裡單獨回報。
+     * ⚠️ NIM **已經在輪替鏈上** —— 見上方第 826 行的 providers 迴圈，
+     *    以及 `core.ts` 的 `orderedProviders`（順序 nvidia → gemini → openrouter）。
+     *    這個區塊**不是**「它不在鏈上」的意思，只是把它的模型清單另外回報一份，
+     *    讓開發者面板不必從 providers 裡再撈一次。
+     *
+     * ★ 2026-10-04 更正：這裡原本寫著「刻意不放進 providers 陣列／NIM 不在鏈上／
+     *   只服務健身週報」——那是 2026-10-03 把它加入輪替**之前**的舊說法，
+     *   三句話都與同一個檔案裡第 826 行的程式碼**完全相反**。
+     *   這種註解比沒有註解更糟：讀的人會以為自己看懂了，其實被誤導。
+     * ★ 含圖片的請求會跳過 NIM（它是純文字模型），見 `orderedProviders`。
      */
     nvidia: {
       configured: isValidKey(process.env.NVIDIA_API_KEY || ''),
       models: NVIDIA_MODEL_CHAIN_FOR_STATUS,
-      purpose: 'fitness-report',
     },
     cacheEntries: analysisCache.size,
     openrouterQuota: await getOpenRouterQuota(),

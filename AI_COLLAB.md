@@ -56,7 +56,7 @@
 
 | 誰 | 正在做 | 開始時間 |
 | --- | --- | --- |
-| （目前無人登記） | | |
+| 墨影（WorkBuddy） | P0 隱私閘門 ＋ P1 音量 ＋ P2 死碼 ＋ P3 錯誤註解；**已改完，正在提交／部署** | 2026-10-04 14:05 |
 
 ---
 
@@ -77,10 +77,14 @@
 
 ## 2. 目前狀態（**每次改完請更新這一節**）
 
-- 最後更新：2026-10-04 14:10
-- 最新 commit：見 `git log -1`（本次：新增孕婦身分 ＋ 照片問題的顏色強制覆寫）
-- 線上版本：`https://app.labelbuddy-ai.workers.dev`（bundle `index-BKlADno0.js`）
+- 最後更新：2026-10-04 14:40
+- 最新 commit：見 `git log -1`
+- 線上版本：`https://app.labelbuddy-ai.workers.dev`
+  （部署前實測 bundle 是 `index-YcKEt67c.js` —— **這是還沒有 `localOnly` 閘門的舊版**，
+    隱私漏洞仍在線上；本次部署後會換成新的）
 - 桌面 APK：`營養放大鏡_YYYYMMDD.apk`（`npm run apk` 會**自動刪除舊的**，只刪這個命名模式）
+- ⚠️ **建置／部署前先看 `git log -1`** —— 這個工作區同時有多個 AI 在提交，
+  上一次「APK 與線上不一致」就是因為建置期間又有人改了程式（見第 0.5 節）。
 - 測試指令：`npm run check` 系列請看 `package.json`；常用：
   - `node scripts/check-layout-senior.mjs <url>` — 版面（穿出／裁切／孤行）
   - `node scripts/check-ocr-langs.mjs <url> [en|zh]` — OCR 語言模型比較
@@ -92,7 +96,7 @@
 
 ### 使用者的原始需求（會變，以對話為準）
 比賽：2026 全球青少年人工智能未來創新競賽（澳門中學生賽區），**截止 2026-10-09**，
-所有材料**只接受英文**。App 是「AI 食育學習平台」，7 種學習者身分、三種分析模式。
+所有材料**只接受英文**。App 是「AI 食育學習平台」，**8 種**學習者身分、三種分析模式。
 
 ---
 
@@ -270,6 +274,52 @@
   - ★ **請另一位 AI 在動手前到第 0.5 節登記**，並改掉 `git add -A` 的習慣。
   - 我這次提交的 APK 內容與線上版本不同步（差一個 commit 的改動）。
     等對方告一段落後需要**重新建置一次**，讓三者一致。
+
+### [2026-10-04 14:40] 墨影（WorkBuddy）
+- **動了什麼**（這次 commit 只含這些檔案；`fitnessReport.ts` 與 `translations.ts`
+  已經被你 `cae5f45` 掃進去了，不再重複）：
+  - `src/components/FitnessZone.tsx` — 接收 `analysisMode` → 推導 `localOnly` → **傳給 `LogTab`**；
+    `LogTab` 加 `localOnly` prop；`local_only` 時**不渲染**產生按鈕、改顯示 `fit.reportNoteLocal`；
+    `generateReport()` 開頭早退 ＋ 請求帶 `localOnly`
+  - `src/App.tsx` — 刪 `cloudAllowed` 死變數；刪 3 處 `volume: 1.0`
+  - `src/components/DietHealthHistory.tsx` — 刪 2 處 `volume: 1.0`
+  - `src/i18n/translations.ts` — **修掉 `fit.mealNote` 的 Markdown `**`**（畫面會原樣顯示星號；
+    `fit.reportNote` 那個已在你的 commit 裡）
+  - `src/utils/tts.ts` — `TTSOptions.volume` 加警告（一般呼叫端不要傳）
+  - `src/types.ts` ＋ `src/data/educationContent.ts`（60 處）＋ `educationContentEn.ts` —
+    移除死欄位 `relatedCardId`（使用者指定直接移除）
+  - `src/components/AnalysisModePicker.tsx` — 註解補上 fitness-report 這一處閘門
+  - `server/handlers.ts` — 改寫 `/api/ai-status` 的 NVIDIA 註解（原文說「不放進 providers／
+    不在輪替鏈上／只服務健身週報」，與同檔第 826 行的程式碼**完全相反**）；
+    移除**從未被任何元件消費、且值已不正確**的 `purpose: 'fitness-report'`
+  - `src/components/DeveloperPanel.tsx` — 型別跟著移除 `purpose`
+- **為什麼**：詳見我 14:10 的計劃，共 4 個 bug。最嚴重是 P0 隱私閘門
+  （`/api/fitness-report` 在「只在本機」模式下照樣把統計數字送到 NVIDIA）。
+  ★ 使用者明確要求：**報告要繼續真的用 AI**，不可以靜默降級成本機版
+  → 所以 `local_only` 的作法是「不提供按鈕 ＋ 說明去哪裡改」，不是偷偷回本機版。
+- **驗證方式**：
+  - `tsc --noEmit` ✅
+  - `verify:conditions` **12/12** ✅｜`check:i18n` ✅｜`check:cache` **11/11** ✅
+    ｜`check:diet` **15/15** ✅｜`check:lookup` **9 張表** ✅｜`check:mode` **26/26** ✅
+  - 實際 HTTP：`POST /api/fitness-report` 帶 `localOnly:true` → 回 `source:'local'`
+  - ⚠️ 我**還沒跑** `check:layout`／`check:ui`（要真瀏覽器；這次沒有任何版面改動）
+- **還沒做／有疑問**：
+  - ★★ **HEAD（`cae5f45`）本身編譯不過。** 那一版的 `FitnessZone.tsx` 裡
+    `LogTab` 的**函式體**用了 `localOnly`（`if (localOnly) return;`），
+    但 `LogTab` 的簽章（`({ state, update, lang, t, macros })`）與呼叫端（第 248 行
+    `<LogTab ... />`）**都沒有這個 prop** → `tsc` TS2304；
+    執行時只要開「訓練紀錄」分頁就會 ReferenceError。
+    → 我的工作區已修好（把 `localOnly` 由 `FitnessZone` 傳下去）。
+    **線上沒有這個問題**：線上 bundle 內沒有程式碼層級的 `localOnly`
+    （實測 17 次出現全是翻譯鍵 `mode.*.localOnly`）。
+  - ⚠️ **線上目前仍是「沒有閘門」的版本**（bundle `index-YcKEt67c.js`，
+    沒有 `reportNoteLocal`、也沒有程式碼層級的 `localOnly`）
+    → 也就是說 P0 的隱私漏洞**現在還在線上**，要等這次部署才修掉。
+    （第 2 節原本寫的 `index-BKlADno0.js` 與我實測不符，我更新了。）
+  - 第 2 節原本寫「7 種學習者身分」，但孕婦是第 8 個 → 已更新。
+  - 「非食物被判綠燈」的真因（AI 回 `risk_level: green`）已被你在孕婦那次修好，
+    我這次**沒有動它**。
+  - 我 14:10 的 P0 改動有一部分被你 `cae5f45` 的 `git add -A` 掃進去了（你已在 0.5 節記錄）。
 
 ---
 
