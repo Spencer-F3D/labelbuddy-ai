@@ -115,12 +115,6 @@ const git = (gitArgs) => {
   return { status: r.status ?? 1, stdout: out, stderr: '' };
 };
 
-/** 從 dist/index.html 取出 bundle 檔名 */
-function distBundle() {
-  const html = readFileSync(path.join(ROOT, 'dist', 'index.html'), 'utf8');
-  return html.match(/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? null;
-}
-
 // ────────────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(64));
 console.log('  三管道一致性部署（線上 / GitHub / APK）');
@@ -180,15 +174,25 @@ if (!SKIP_CHECKS) {
 
 /* ── 步驟 2：建置 ─────────────────────────────────────────── */
 step(2, '建置 dist/');
-{
-  const r = run(NODE, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build']);
-  const out = (r.stdout ?? '') + (r.stderr ?? '');
-  if (r.status === 0 && /built in/.test(out)) ok(out.match(/✓ built in [^\n]*/)?.[0] ?? 'built');
-  else bad('建置失敗\n' + out.slice(-600));
-}
-const expected = distBundle();
-if (expected) ok(`本機 bundle：${expected}`);
-else bad('找不到 dist/index.html 的 bundle 檔名');
+run(NODE, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build']) === 0
+  ? ok('建置完成')
+  : bad('建置失敗（輸出在上面）');
+
+/**
+ * 直接**讀檔**驗證建置產物 —— 不解析子程序輸出（見 run() 的說明）。
+ * 這樣順便多檢查一件事：建置指紋是否存在。
+ */
+const distHtml = (() => {
+  try {
+    return readFileSync(path.join(ROOT, 'dist', 'index.html'), 'utf8');
+  } catch {
+    return '';
+  }
+})();
+const distBundleName = distHtml.match(/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? null;
+const distStamp = distHtml.match(/x-build-id" content="([^"]*)"/)?.[1] ?? null;
+distBundleName ? ok(`本機 bundle：${distBundleName}`) : bad('找不到 dist 的 bundle 檔名');
+distStamp ? ok(`本機建置指紋：${distStamp}`) : bad('dist 沒有建置指紋（x-build-id）');
 
 /* ── 步驟 3：GitHub ───────────────────────────────────────── */
 step(3, '推送到 GitHub');
@@ -202,23 +206,27 @@ after === headBefore ? ok(`GitHub = ${after.slice(0, 7)}`) : bad('GitHub 的 HEA
 
 /* ── 步驟 4：線上 ─────────────────────────────────────────── */
 step(4, '部署到 Cloudflare Workers');
-{
-  const r = run(NODE, [path.join(ROOT, 'node_modules/wrangler/bin/wrangler.js'), 'deploy']);
-  const out = (r.stdout ?? '') + (r.stderr ?? '');
-  const url = out.match(/https:\/\/[^\s]+\.workers\.dev/)?.[0];
-  r.status === 0 ? ok(`已部署 ${url ?? ''}`) : bad('部署失敗\n' + out.slice(-600));
-}
+run(NODE, [path.join(ROOT, 'node_modules/wrangler/bin/wrangler.js'), 'deploy']) === 0
+  ? ok(`已部署 ${SITE}`)
+  : bad('部署失敗（輸出在上面）');
 
 /* ── 步驟 5：APK ──────────────────────────────────────────── */
 if (!NO_APK) {
   step(5, '建置 APK（會自動刪除舊的）');
-  const r = run(NODE, [path.join(ROOT, 'scripts/build-apk.mjs')], {
+  /**
+   * ⚠️ `run()` 回傳的是**數字**（結束碼），不是物件。
+   *   這裡一度留著舊寫法 `r.status === 0`（把數字當物件用）→
+   *   永遠是 `undefined === 0` → **明明建置成功卻每次都報失敗**。
+   *   ★「腳本自己說謊」比檢查失敗更糟 —— 會讓人開始不信任輸出。
+   *     所以這裡用 spawnSync 直接取 `.status`，寫法明確。
+   */
+  const apkCode = spawnSync(NODE, [path.join(ROOT, 'scripts/build-apk.mjs')], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: false,
     env: { ...process.env, CODEBUDDY_SAFE_DELETE_ENABLED: '0' },
-  });
-  const out = (r.stdout ?? '') + (r.stderr ?? '');
-  r.status === 0 && /✅ 完成/.test(out)
-    ? ok(out.match(/✅ C:\\[^\n]*\.apk/)?.[0] ?? 'APK 完成')
-    : bad('APK 建置失敗\n' + out.slice(-800));
+  }).status;
+  apkCode === 0 ? ok('APK 完成') : bad('APK 建置失敗（輸出在上面）');
 } else {
   warn('已跳過 APK（--no-apk）');
 }
