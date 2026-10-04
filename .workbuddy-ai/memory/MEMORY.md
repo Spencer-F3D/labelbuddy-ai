@@ -16,7 +16,7 @@ Countries，且須說明與 SDG 的關係。
 **四份交付物**：`ProjectIntroduction`(≤2頁)／`ResearchReport`(6–12頁)／`Poster`(0.8×1.1m 直向)／
 `DemoVideo`(≤5分)；檔名 `X_ProjectName.pdf`／`.mp4`，每檔 ≤50MB。三人均須參與答辯。
 使用者＝**參賽學生本人**｜**不花錢**（只用免費模型）｜團隊 3 人，他負責 App 全部技術。
-章程重點列點 → `Desktop/LabelBuddyAI_競賽章程重點_20261004.{typ,pdf}`。
+提交物 → `Desktop/{ProjectIntroduction,ResearchReport,Poster}_LabelBuddyAI.pdf`（來源 `.typ` 在 `Desktop/LabelBuddyAI_競賽提交_來源/`）。
 排程：09-28~10-02 已完成（雙語／中性化／三模式／APK）→ 10-03~05 四份英文文件 →
 10-06~08 Poster＋影片 → **10-09 提交**。
 
@@ -192,7 +192,7 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 
 ## 📄 關鍵文件位置
 章程 PDF（掃描版，要渲染成圖）→ `C:\Users\Spencer\Downloads\labelbuddy-ai\`；
-章程重點列點 → `Desktop/LabelBuddyAI_競賽章程重點_20261004.{typ,pdf}`；
+競賽提交物（3 份 PDF）→ `Desktop/*_LabelBuddyAI.pdf`；來源 `.typ` 在 `Desktop/LabelBuddyAI_競賽提交_來源/`；
 UI 規則 → `.workbuddy-ai/memory/UI_RULES.md`；**架構細節（不注入，可任意長）** →
 `.workbuddy-ai/memory/ARCHITECTURE.md`；逐日誌 → `.workbuddy-ai/memory/YYYY-MM-DD.md`；
 專案交接文件 → `docs/專案交接文件.md`（＋ .pdf）；跨 AI 溝通板 → `AI_COLLAB.md`。
