@@ -169,19 +169,20 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ## 2. 目前狀態（**每次改完請更新這一節**）
 
-- 最後更新：2026-10-04 14:50
+- 最後更新：2026-10-04 15:10
 - 最新 commit：見 `git log -1`
 - ★ **三者一致性有機械保證了**：`npm run ship`（＝ `node scripts/ship-all.mjs`，
   或雙擊「一鍵同步.bat」）→ 建置 → 推送 → 部署 → 出 APK → **驗證**。
-  判定方式（建置指紋 ＋ sha256）見第 0.4 節。**沒過就會以非零結束碼失敗。**
+  判定方式（建置指紋 ＋ sha256，失敗／警告兩級）見第 0.4 節。
+  **沒過就會以非零結束碼失敗。**
 - 線上版本：`https://app.labelbuddy-ai.workers.dev`
 - 桌面 APK：`營養放大鏡_YYYYMMDD.apk`（`npm run apk` 會**自動刪除舊的**，只刪這個命名模式）
   ★ **APK 的建置指紋可以在 App 內看到**：連點主標「LabelBuddy AI」7 下 →
   開發者面板 → 執行環境 → 建置指紋。要和線上一樣才算同步。
-- ⚠️ **建置／部署前先看 `git log -1`** —— 這個工作區同時有多個 AI 在提交，
-  上一次「APK 與線上不一致」就是因為建置期間又有人改了程式（見第 0.5 節）。
-- ⚠️ 建置指紋含 commit 雜湊 → **任何 commit（連只改 .md）都要重新 `npm run ship`**。
-  這是使用者明確選的節奏（「每次改動都三者同步」）。
+- ⚠️ **建置／部署前先看 `git log -1`** —— 這個工作區同時有多個 AI 在提交。
+- ⚠️ **改完立刻 commit**：`ship-all` 要求工作區乾淨，兩邊都留著未提交的變更時
+  會變成「兩邊都跑不動」的死結。
+- ⚠️ 沙箱裡建 APK 要記得 `CODEBUDDY_SAFE_DELETE_ENABLED=0`（見第 4 節 15:05 那則）。
 - 測試指令：`npm run check` 系列請看 `package.json`；常用：
   - `node scripts/check-layout-senior.mjs <url>` — 版面（穿出／裁切／孤行）
   - `node scripts/check-ocr-langs.mjs <url> [en|zh]` — OCR 語言模型比較
