@@ -47,6 +47,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { rmSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -220,13 +222,47 @@ if (!NO_APK) {
    *   ★「腳本自己說謊」比檢查失敗更糟 —— 會讓人開始不信任輸出。
    *     所以這裡用 spawnSync 直接取 `.status`，寫法明確。
    */
+  /**
+   * ★ 記錄建置前的 APK 時間 —— 用來在事後確認「檔案真的被換掉了」。
+   *   實際踩過：結束碼是 0、畫面也有輸出，但**桌面上那個 APK 的時間沒變**
+   *   （也就是根本沒有產出新檔）。只看結束碼是抓不到的。
+   */
+  const desktopDir = path.join(homedir(), 'Desktop');
+  const apkBefore = (() => {
+    try {
+      const f = readdirSync(desktopDir).filter((n) => /^營養放大鏡_.*\.apk$/i.test(n)).sort().pop();
+      return f ? statSync(path.join(desktopDir, f)).mtimeMs : 0;
+    } catch {
+      return 0;
+    }
+  })();
+
   const apkCode = spawnSync(NODE, [path.join(ROOT, 'scripts/build-apk.mjs')], {
     cwd: ROOT,
     stdio: 'inherit',
     shell: false,
     env: { ...process.env, CODEBUDDY_SAFE_DELETE_ENABLED: '0' },
   }).status;
-  apkCode === 0 ? ok('APK 完成') : bad('APK 建置失敗（輸出在上面）');
+
+  /**
+   * ★★ 結束碼為 0 **不代表檔案真的更新了**。
+   *   實測發生過：結束碼 0、輸出看起來正常，但桌面 APK 的 mtime 沒變 ——
+   *   也就是舊檔還在，而腳本會回報「成功」。
+   *   這種「靜默地什麼都沒做」是最難發現的失敗，所以要在這裡擋下來。
+   */
+  const apkAfter = (() => {
+    try {
+      const f = readdirSync(desktopDir).filter((n) => /^營養放大鏡_.*\.apk$/i.test(n)).sort().pop();
+      return f ? statSync(path.join(desktopDir, f)).mtimeMs : 0;
+    } catch {
+      return 0;
+    }
+  })();
+
+  if (apkCode !== 0) bad('APK 建置失敗（輸出在上面）');
+  else if (apkAfter <= apkBefore) {
+    bad('APK 建置回報成功，但桌面上的檔案時間沒有變 —— 舊檔可能還在，請手動確認');
+  } else ok(`APK 完成（${((apkAfter - apkBefore) / 1000).toFixed(0)}s 前更新）`);
 } else {
   warn('已跳過 APK（--no-apk）');
 }
