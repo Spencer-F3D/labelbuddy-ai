@@ -214,6 +214,10 @@ const zhTW = {
    * 每一句都必須與後端實際行為一致（見 server/handlers.ts 的 localOnly 判斷）。 */
   'mode.title': '要用哪一種 AI？',
   'mode.body': '三種都可以隨時切換，差別在「什麼會離開這台手機」：',
+  /* ── 右上角模式標籤（2026-10-04）：四個字以內，塞得進窄標籤 */
+  'mode.chip.cloudImage': '雲端辨識',
+  'mode.chip.cloudText': '只送文字',
+  'mode.chip.localOnly': '只在本機',
   'mode.cloudImage': '雲端',
   'mode.cloudImageNote': '最準：AI 直接看照片，連標籤排版都看得到。',
   'mode.cloudImageData': '上傳：照片與病史',
@@ -899,6 +903,10 @@ const en: Record<TranslationKey, string> = {
   /* ── The three analysis modes (2026-09-30) ───────────────────── */
   'mode.title': 'Which kind of AI?',
   'mode.body': 'You can switch any time. The difference is what leaves your phone:',
+  /* ── Mode chip in the header (2026-10-04): short enough for the narrow pill ── */
+  'mode.chip.cloudImage': 'Cloud',
+  'mode.chip.cloudText': 'Text only',
+  'mode.chip.localOnly': 'On-device',
   'mode.cloudImage': 'Cloud',
   'mode.cloudImageNote': 'Most accurate: the AI reads the photo itself, layout and all.',
   'mode.cloudImageData': 'Uploads: photo + health info',

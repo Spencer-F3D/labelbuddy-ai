@@ -91,6 +91,7 @@ import { detectLabelLanguage as detectLabelLanguageImpl } from './utils/labelLan
 import {
   ANALYSIS_MODES,
   MODE_LABEL_KEY,
+  MODE_CHIP_KEY,
   MODE_NOTE_KEY,
   MODE_DATA_KEY,
 } from './data/analysisModes';
@@ -1904,16 +1905,40 @@ export default function App() {
             </p>
           )}
 
-          {/* 雲端 AI 服務狀態小標籤（不綁死模型名稱，避免模型更換後文案過期）
+          {/* 目前分析模式的小標籤（右上角）
               ⚠️ 360px 寬（16:9 手機）下這裡極容易折行，故字級與內距都收斂並強制不換行
               ⚠️ 字級地板 16px：此處已是全站最小，不可再往下
               ⚠️ 2026-10-02：文案由「雲端 AI 已連線」縮成「雲端 AI」。
                  長者字級下標題需要 159px，原本的標籤要 147px，
                  兩者加起來 370px > 可用的 328px → 一定溢出。
-                 縮短標籤後總寬 316px，留 12px 餘裕。 */}
+                 縮短標籤後總寬 316px，留 12px 餘裕。
+
+              ★★ 2026-10-04 使用者回報：這個標籤**永遠顯示「雲端 AI」**，
+                 不管選了哪個模式。使用者是對的 —— 原本顯示的是
+                 `geminiConnected`（連線狀態），**與分析模式完全無關**：
+                   `{geminiConnected ? t('app.statusCloud') : t('app.statusLocal')}`
+                 只要連得到伺服器就永遠寫「雲端 AI」，
+                 連選「只在本機」也照樣顯示 —— 這對一個**隱私指示器**來說
+                 是最糟的錯誤（使用者會以為照片被上傳了，或反之）。
+
+              → 改為顯示**目前的模式**（`MODE_CHIP_KEY[analysisMode]`）。
+                 ⚠️ 另外定義 `MODE_CHIP_KEY` 而不是重用 `MODE_LABEL_KEY`：
+                    後者的 cloudText 是「本機圖像識別」（7 字），
+                    塞不進這個只有約 9 字餘裕的標籤，會直接把標題列撐爆。
+                 ⚠️ 圓點顏色改為反映**這個模式的隱私行為**：
+                    只在本機＝綠、其餘＝藍；雲端模式若連不上則轉灰
+                    （保留原本「離線」的訊號，但不再用它決定文字）。 */}
           <div className="flex items-center gap-[4px] px-[8px] py-[3px] rounded-full bg-slate-100 border border-slate-300 text-[16px] font-extrabold text-slate-700 whitespace-nowrap shrink-0">
-            <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${geminiConnected ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`} />
-            <span>{geminiConnected ? t('app.statusCloud') : t('app.statusLocal')}</span>
+            <span
+              className={`w-[7px] h-[7px] rounded-full shrink-0 ${
+                analysisMode === 'local_only'
+                  ? 'bg-emerald-500'
+                  : geminiConnected
+                    ? 'bg-blue-500 animate-pulse'
+                    : 'bg-slate-400'
+              }`}
+            />
+            <span>{t(MODE_CHIP_KEY[analysisMode])}</span>
           </div>
         </div>
           <p className="text-[16px] font-extrabold text-blue-900 flex items-center justify-center gap-1.5 mt-0.5">
@@ -1975,15 +2000,32 @@ export default function App() {
               (item) => item.tab !== 'fitness' || learnerProfileId === 'fitness'
             )
               /**
-               * ★ 2026-10-03 使用者指定：**健身專區置於第一欄**。
+               * ★ 2026-10-04 使用者指定：**健身專區放在「飲食紀錄」下面**。
                *
-               * 【為什麼是「排到最前」而不是改 MENU_ITEMS 的順序】
-               *   那個常數同時定義了其他分頁的順序，直接搬動會影響
-               *   全部身分的選單；而且它看不到 state（見上面的說明）。
-               *   這裡只把 fitness 拉到最前，其他項目的相對順序完全不動 ——
-               *   對非健身身分而言，因為根本沒有 fitness 這一項，結果一模一樣。
+               * （10-03 一度要求放到第一欄，10-04 改為緊接在飲食紀錄之後。
+               *   這兩個版本都只改這裡、不動 MENU_ITEMS —— 因為那個常數
+               *   看不到 state，且會影響所有身分的選單。）
+               *
+               * ★ 用「明確的位置表」而不是把 fitness 拉到最前：
+               *   寫成 sort((a,b) => a.tab==='fitness' ? -1 : ...) 只能表達
+               *   「放最前面」，表達不了「放在某一項之後」。
+               *   位置表還額外帶來一個好處：**沒列到的項目自動留在原位**，
+               *   日後新增分頁不需要回來改這裡。
                */
-              .sort((a, b) => (a.tab === 'fitness' ? -1 : b.tab === 'fitness' ? 1 : 0))
+              .sort((a, b) => {
+                const ORDER: Partial<Record<NavigationTab, number>> = {
+                  home: 0,
+                  scan: 1,
+                  history: 2,
+                  fitness: 3, // ← 緊接在飲食紀錄（history）之後
+                  classroom: 4,
+                  qa: 5,
+                  conditions: 6,
+                };
+                const ai = ORDER[a.tab] ?? 99;
+                const bi = ORDER[b.tab] ?? 99;
+                return ai - bi;
+              })
               .map(({ tab, labelKey, hintKey, Icon }) => {
               const isActive = activeTab === tab;
               return (

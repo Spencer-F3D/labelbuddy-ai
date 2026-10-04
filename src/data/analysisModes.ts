@@ -29,6 +29,25 @@ export const MODE_LABEL_KEY: Record<AnalysisMode, TranslationKey> = {
   local_only: 'mode.localOnly',
 };
 
+/**
+ * 右上角窄標籤用的**短**文案（2026-10-04 新增）。
+ *
+ * 【為什麼不重用 MODE_LABEL_KEY】
+ *   標題列的可用寬度很緊（長者字級下標題要 159px，標籤只剩約 9 個全形字的餘裕），
+ *   而 `MODE_LABEL_KEY.cloudText` 是「本機圖像識別」7 個字 ——
+ *   加上內距與圓點就會把標題列撐爆（本專案已經因為這個標籤溢出修過一次）。
+ *   → 另外定義一組**四個字以內**的短標籤，語意維持一致。
+ *
+ * ★ 選字刻意對齊「隱私行為」而不是「技術名稱」：
+ *   `只送文字` 直接說明照片留在本機；`只在本機` 說明完全不連網。
+ *   使用者看這個標籤是在確認「我的照片有沒有被傳出去」。
+ */
+export const MODE_CHIP_KEY: Record<AnalysisMode, TranslationKey> = {
+  cloud_image: 'mode.chip.cloudImage',
+  cloud_text: 'mode.chip.cloudText',
+  local_only: 'mode.chip.localOnly',
+};
+
 /** 一句話說明這個模式怎麼運作 */
 export const MODE_NOTE_KEY: Record<AnalysisMode, TranslationKey> = {
   cloud_image: 'mode.cloudImageNote',
