@@ -77,11 +77,14 @@
 
 ## 2. 目前狀態（**每次改完請更新這一節**）
 
-- 最後更新：2026-10-04 14:40
-- 最新 commit：見 `git log -1`
-- 線上版本：`https://app.labelbuddy-ai.workers.dev`
-  （部署前實測 bundle 是 `index-YcKEt67c.js` —— **這是還沒有 `localOnly` 閘門的舊版**，
-    隱私漏洞仍在線上；本次部署後會換成新的）
+- 最後更新：2026-10-04 14:45
+- 最新 commit：見 `git log -1`（本次：`fix(privacy)` — fitness-report 補上 `localOnly` 閘門 ＋ 音量／死碼／註解）
+- 線上版本：`https://app.labelbuddy-ai.workers.dev`（bundle **`index-9t5DLi1e.js`**，
+  2026-10-04 14:14 部署；已驗證線上首頁引用的檔名 = `dist/assets/` 的檔名 ✅）
+  ★ 上一個線上版本是 `index-YcKEt67c.js` —— **它沒有 `localOnly` 閘門**，
+    也就是說「只在本機」模式下 AI 週報仍會上傳的隱私漏洞**曾在線上存在**，
+    現已修掉。判斷舊版的方法：bundle 內**沒有**程式碼層級的 `localOnly`
+    （只有 `mode.*.localOnly` 這些翻譯鍵）。
 - 桌面 APK：`營養放大鏡_YYYYMMDD.apk`（`npm run apk` 會**自動刪除舊的**，只刪這個命名模式）
 - ⚠️ **建置／部署前先看 `git log -1`** —— 這個工作區同時有多個 AI 在提交，
   上一次「APK 與線上不一致」就是因為建置期間又有人改了程式（見第 0.5 節）。
@@ -300,8 +303,15 @@
 - **驗證方式**：
   - `tsc --noEmit` ✅
   - `verify:conditions` **12/12** ✅｜`check:i18n` ✅｜`check:cache` **11/11** ✅
-    ｜`check:diet` **15/15** ✅｜`check:lookup` **9 張表** ✅｜`check:mode` **26/26** ✅
-  - 實際 HTTP：`POST /api/fitness-report` 帶 `localOnly:true` → 回 `source:'local'`
+    ｜`check:diet` **15/15** ✅｜`check:lookup` **9 張表** ✅｜`check:mode` **28/28** ✅
+    （我把 fitness-report 的閘門**加進 `check:mode` 變成可回歸斷言**，所以是 26 → 28）
+  - **實際 HTTP（線上，2026-10-04 14:15）**：
+    - `POST /api/fitness-report` 帶 `localOnly:true` → `source:'local'`，**耗時 0.185s**
+    - 同一份 body **不帶** `localOnly`（對照組）→ 也回 `source:'local'`，但**耗時 12.14s**
+      （＝真的去呼叫了 NIM 並逾時才退回本機版）
+    - → 65 倍的時間差就是「閘門有沒有生效」的證據。**只比對 `source` 是驗不出來的**
+      （NIM 失敗時兩邊都回 `local`），這一點我寫進 `check:mode` 的註解了。
+  - 部署後線上 bundle = `dist/assets/index-9t5DLi1e.js`（兩邊檔名一致 ✅）
   - ⚠️ 我**還沒跑** `check:layout`／`check:ui`（要真瀏覽器；這次沒有任何版面改動）
 - **還沒做／有疑問**：
   - ★★ **HEAD（`cae5f45`）本身編譯不過。** 那一版的 `FitnessZone.tsx` 裡
@@ -320,6 +330,13 @@
   - 「非食物被判綠燈」的真因（AI 回 `risk_level: green`）已被你在孕婦那次修好，
     我這次**沒有動它**。
   - 我 14:10 的 P0 改動有一部分被你 `cae5f45` 的 `git add -A` 掃進去了（你已在 0.5 節記錄）。
+  - ⚠️ **發現一個觀測盲點（這次沒修）**：`server/core.ts` 的 `callNvidiaNim()`
+    **完全不更新 `providerState`**（更新的是 `callAiModel()` 那條鏈）。
+    所以健身週報走過的 NIM 呼叫，在開發者面板的 `usedToday`／`lastLatencyMs` 上
+    **看不到** —— 面板會低估 NIM 的使用量。
+    修法很小（在 `callNvidiaNim` 的成功／失敗分支補 `providerState.nvidia`），
+    而且能順便讓 `check:mode` 用「計數器有沒有動」取代現在的時間判準。
+    ★ 但這會動到輪替排序（`usedToday / dailyQuota`），我不想在別人在線時動它 → 留給你決定。
 
 ---
 

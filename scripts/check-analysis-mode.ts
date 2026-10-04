@@ -16,9 +16,11 @@
  *   而且它不是前端忘記帶旗標就會出現，是後端根本沒有檢查。
  *
  * 【這一支怎麼驗】
- *   直接啟動真的伺服器，用 `localOnly: true` 打三個端點，
+ *   直接啟動真的伺服器，用 `localOnly: true` 打**四個**端點
+ *   （analyze-indicators／ask-health-question／analyze-label／fitness-report），
  *   斷言回應裡的 `analysis_mode` / `source` 必須是**本機**的標記。
- *   本機路徑完全離線，所以這支測試**不消耗任何 API 額度**。
+ *   本機路徑完全離線，所以這支測試**不消耗任何 API 額度**
+ *   （fitness-report 那項另外用「耗時」證明它沒去碰雲端，理由見該段註解）。
  *
  * 用法：npx tsx scripts/check-analysis-mode.ts
  */
@@ -49,6 +51,13 @@ async function post(pathname: string, body: unknown): Promise<any> {
     body: JSON.stringify(body),
   });
   return res.json();
+}
+
+/** 同 `post`，但一併回傳耗時（毫秒）。用來判斷「有沒有真的去碰雲端」（見健身週報那段）。 */
+async function postTimed(pathname: string, body: unknown): Promise<{ json: any; ms: number }> {
+  const t0 = Date.now();
+  const json = await post(pathname, body);
+  return { json, ms: Date.now() - t0 };
 }
 
 const INDICATORS = {
@@ -96,7 +105,7 @@ try {
   if (!ready) throw new Error('伺服器沒有在時限內啟動');
   console.log('伺服器就緒\n');
 
-  console.log('── 1. localOnly: true 時，三個端點都不得呼叫雲端 ──');
+  console.log('── 1. localOnly: true 時，四個端點都不得呼叫雲端 ──');
 
   const vitals = await post('/api/analyze-indicators', {
     indicators: INDICATORS,
@@ -140,6 +149,45 @@ try {
     `→ ${label?.data?.analysis_mode}`
   );
   check('標籤分析：data_handling 標為 local_only', label?.data?.data_handling === 'local_only');
+
+  // ── 健身週報的同意閘門（2026-10-04 補上）──────────────────────────────
+  // ⚠️ 這裡為什麼用「耗時」當判準，而不是用回應內容：
+  //    `server/fitnessReport.ts` 的 `generateFitnessReport()` 在 `localOnly === true`
+  //    時會**在呼叫 `callNvidiaNim()` 之前**就 return，所以它不該有任何網路往返。
+  //    但「回應是 source:'local'」**不能**當證據 —— NIM 失敗時（沒金鑰、逾時、
+  //    冷啟動）AI 路徑也會退回 `buildLocalFitnessReport()`，一樣回 'local'。
+  //    而 `callNvidiaNim()` **不更新** `providerState`（那是 `callAiModel` 才做的），
+  //    所以 `/api/ai-status` 的 usedToday／lastLatencyMs 也看不出差別。
+  //    → 唯一能分辨「沒去碰雲端」與「碰了但失敗」的訊號就是**耗時**。
+  //    實測（2026-10-04 線上）：有閘門 0.185s／無閘門 12.1s（NIM 逾時）。
+  //    閘門路徑是純 CPU 的本機報告，本機伺服器下遠低於 50ms；
+  //    而任何一次真的 NIM 呼叫最快也要 0.76s（實測）。
+  //    ⚠️ 這是**時間**判準，不是狀態判準。若日後在慢機器上看到它不穩，
+  //       正解是讓 `callNvidiaNim()` 也更新 `providerState`，再改判那個計數器。
+  const fitBody = {
+    language: 'zh-TW',
+    goal: 'muscle',
+    daysPerWeek: 3,
+    trainedDays: 3,
+    totalVolume: 1200,
+    exercises: ['深蹲'],
+    avgKcal: 2000,
+    avgProteinG: 90,
+    targetKcal: 2400,
+    targetProteinG: 120,
+    daysInWindow: 7,
+  };
+  const fit = await postTimed('/api/fitness-report', { ...fitBody, localOnly: true });
+  check(
+    '健身週報：★ localOnly: true 時在碰雲端「之前」就返回（< 500ms）',
+    fit.ms < 500,
+    `→ ${fit.ms}ms（真的呼叫 NIM 最快也要 0.76s，逾時則是 12s）`
+  );
+  check(
+    '健身週報：走本機版（source = local）',
+    fit.json?.data?.source === 'local',
+    `→ ${fit.json?.data?.source}`
+  );
 
   console.log('\n── 2. /api/privacy 必須誠實描述三模式 ──');
   const privacy = await (await fetch(`${BASE}/api/privacy`)).json();
