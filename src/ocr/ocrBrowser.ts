@@ -66,6 +66,29 @@ import { createWorker, type Worker } from 'tesseract.js';
  *     第二輪用 `chi_tra`（純中文標籤的救援，中文關鍵字才抓得準）
  *   這樣兩邊的優點都拿得到，代價只是第二輪才多花一次時間。
  */
+/**
+ * ★★ 2026-10-04：**不要改用 `tessdata_best` 的模型**（已實測，結論是退步）
+ *
+ * 使用者要求「換成 tesseract 的 best 模型」，我下載實測後**不採用**，
+ * 理由如下（同一張模擬實拍的標籤）：
+ *
+ *   | 測試         | fast（現用）      | best                |
+ *   | ------------ | ----------------- | ------------------- |
+ *   | 英文輸出     | Protein 2.509 …   | **逐字相同**（連錯字 Dally 也一樣）|
+ *   | 中文欄位數   | **5**             | 4（較差）           |
+ *   | 中文耗時     | 1526ms            | **3580ms（2.35×）** |
+ *   | 模型大小     | 6.2 MB            | **27 MB（4.4×）**   |
+ *
+ * ⚠️ 還有一個更硬的問題：best 模型在我們的核心上**直接崩潰** ——
+ *   `RuntimeError: Aborted(missing function: _ZN9tesseract13DotProductSSE...)`
+ *   （best 是全精度浮點，需要 SSE 路徑；fast 是整數量化，不需要）。
+ *   必須把 `corePath` 從目錄改成**指定 SIMD 那個檔案**才跑得起來 ——
+ *   但那等於放棄 tesseract.js 的「執行時自動挑核心」，
+ *   **不支援 SIMD 的舊手機將完全無法使用本機 OCR**。
+ *
+ * → 大小 4.4 倍、速度 2.35 倍慢、精度沒有提升、還會犧牲舊裝置相容性。
+ *   維持 `fast`。若日後真的要再試，`scripts/check-ocr-langs.mjs` 可直接量測。
+ */
 export const OCR_LANGS_PRIMARY = 'chi_tra+eng';
 export const OCR_LANGS_FALLBACK = 'chi_tra';
 

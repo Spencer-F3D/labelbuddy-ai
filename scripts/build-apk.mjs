@@ -24,7 +24,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, statSync, readdirSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -222,6 +222,55 @@ if (apkMtime < distMtime) {
 const sizeMb = (statSync(apkPath).size / 1024 / 1024).toFixed(1);
 ok(`app-release.apk（${sizeMb} MB，比網頁新 ✅）`);
 
+/**
+ * 刪除「舊的」APK（2026-10-04 使用者要求自動化）。
+ *
+ * 【為什麼要自動】
+ *   每建置一次就多一個檔在桌面，使用者要自己比對日期才知道哪個是新的。
+ *
+ * ★★ 安全性：**只刪這個腳本自己產生過的命名模式**
+ *      `營養放大鏡_*.apk`（2026-10-02 起的命名）
+ *      `LabelBuddyAI_*.apk`（更早的命名，同一條建置流程的產物）
+ *    ⚠️ 刻意**不用** `*.apk` 萬用字元 ——
+ *       桌面可能有使用者自己下載或收藏的 APK，那不該被建置腳本清掉。
+ *    ⚠️ 同名的 `.pdf` / `.typ`（例如 LabelBuddyAI_計劃_20261002.pdf）
+ *       完全不受影響，因為這裡只比對 `.apk` 結尾。
+ *    ⚠️ 本次剛複製出去的那一個一定保留（用絕對路徑比對，不是用檔名猜）。
+ *
+ * 【為什麼直接刪除，而不是移到資源回收筒】
+ *   這是**建置腳本的產物**、每次都能重新產生，且使用者明確要求自動清理。
+ *   為了移回收筒而多一層外部程序呼叫，會讓建置變慢且更容易失敗。
+ *   → 每一筆刪除都會列印出來，使用者看得到刪了什麼。
+ */
+function cleanOldApks(dir, keepPath) {
+  const PATTERNS = [/^營養放大鏡_.*\.apk$/i, /^LabelBuddyAI_.*\.apk$/i];
+  const keep = path.resolve(keepPath);
+  let removed = 0;
+
+  let entries = [];
+  try {
+    entries = readdirSync(dir);
+  } catch (e) {
+    info(`無法列出桌面檔案，略過清理（${e.message}）`);
+    return;
+  }
+
+  for (const name of entries) {
+    if (!PATTERNS.some((re) => re.test(name))) continue;
+    const full = path.join(dir, name);
+    if (path.resolve(full) === keep) continue; // 剛產出的那一個
+    try {
+      unlinkSync(full);
+      info(`已刪除舊 APK：${name}`);
+      removed += 1;
+    } catch (e) {
+      info(`刪不掉舊 APK（${name}）：${e.message}`);
+    }
+  }
+
+  if (removed === 0) info('沒有需要清理的舊 APK');
+}
+
 /* 步驟 4：複製到桌面（好找的地方） */
 step(4, '複製到桌面');
 const desktop = path.join(homedir(), 'Desktop');
@@ -245,6 +294,7 @@ const outPath = path.join(outDir, outName);
 try {
   copyFileSync(apkPath, outPath);
   ok(outPath);
+  cleanOldApks(outDir, outPath);
 } catch (e) {
   info(`複製到桌面失敗（${e.message}），APK 仍在：${apkPath}`);
 }

@@ -149,7 +149,16 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
           </button>
         </div>
 
-        <div className="flex flex-col gap-[16px] p-[14px]">
+        {/* ★★ 2026-10-04：容器層級加 `overflow-wrap: anywhere`。
+            【為什麼不是一個一個元素補】
+              使用者回報「OpenRouter quota API 下一行仍然穿出框框」——
+              我上一輪是「看到哪個元素會溢出就補 break-all」，
+              結果漏了 openrouterQuota 那一行。這種補法天生會漏。
+            ★ `overflow-wrap: anywhere` 是**繼承屬性**，設在最外層容器上，
+              底下所有文字自動生效；而且它與 `break-word` 不同：
+              **會影響 min-content 尺寸**，所以 flex 子項也算得對。
+            → 之後面板再加任何欄位，都不需要記得補斷行。 */}
+        <div className="flex flex-col gap-[16px] p-[14px] [overflow-wrap:anywhere]">
           {/* ── 1. AI 用量 ─────────────────────────────────── */}
           <section className="flex flex-col gap-[8px]">
             <h3 className="flex items-center gap-[6px] text-[17px] font-black text-slate-900">
@@ -207,7 +216,7 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
                     />
                   </div>
                   {p.lastError && (
-                    <p className="text-[15px] font-bold text-rose-800 break-words">{t('dev.lastError')}: {p.lastError}</p>
+                    <p className="text-[15px] font-bold text-rose-800 break-all">{t('dev.lastError')}: {p.lastError}</p>
                   )}
                   {p.coolingDownUntil && (
                     <p className="text-[15px] font-bold text-amber-800">
@@ -219,7 +228,7 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
             })}
 
             {status?.openrouterQuota && (
-              <p className="text-[15px] font-bold text-slate-600">
+              <p className="text-[15px] font-bold text-slate-600 break-all">
                 OpenRouter quota API: {JSON.stringify(status.openrouterQuota)}
               </p>
             )}

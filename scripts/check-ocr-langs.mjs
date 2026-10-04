@@ -151,6 +151,10 @@ try {
         len: (r.text || '').length,
         matched: parsed ? parsed.matchedFields : -1,
         sodium: parsed && parsed.profile ? parsed.profile.sodiumMg : null,
+        // ★ 一定要回報這個 —— 沒有它，引擎失敗與「讀不到字」看起來一樣
+        ocrOk: r.ok,
+        error: r.error ?? null,
+        errorKind: r.errorKind ?? null,
       };
     })()
   `;
@@ -162,6 +166,8 @@ try {
   } else {
     console.log(`=== ${WHICH === 'en' ? '英文' : '中文'}標籤（模擬實拍）===`);
     console.log(`耗時 ${out.ms}ms｜字數 ${out.len}｜欄位 ${out.matched}｜鈉 ${out.sodium}`);
+    console.log(`OCR 成功=${out.ocrOk}  錯誤種類=${out.errorKind ?? '—'}`);
+    if (out.error) console.log(`錯誤訊息: ${out.error}`);
     console.log('--- OCR 原文 ---');
     console.log(out.text || '(空)');
   }

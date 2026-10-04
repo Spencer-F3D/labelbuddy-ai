@@ -30,6 +30,7 @@ import {
   Camera,
   Cloud,
   Volume2,
+  Languages as LanguagesIcon,
   VolumeX,
   RefreshCw,
   AlertCircle,
@@ -124,7 +125,10 @@ import { LearnerProfilePicker } from './components/LearnerProfilePicker';
 import { LegalNotice } from './components/LegalNotice';
 import { ClearAllDataSection } from './components/ClearAllDataSection';
 import { AnalysisModePicker } from './components/AnalysisModePicker';
-import { TtsSettingsSection } from './components/TtsSettingsSection';
+import {
+  TtsVolumeSection,
+  TtsVoiceLangSection,
+} from './components/TtsSettingsSection';
 import { DeveloperPanel } from './components/DeveloperPanel';
 import { NutrientFactBars } from './components/NutrientFactBars';
 import {
@@ -3140,19 +3144,40 @@ export default function App() {
             {/* 語音朗讀（2026-10-03 新增）
                 ⚠️ 收合時的摘要必須顯示「開／關 ＋ 音量」——
                    語音有沒有聲音，是使用者最需要一眼確認的事。 */}
+            {/* 朗讀語言與音量（2026-10-04 使用者指定：兩者分開、各自有標題）
+                ★ 原本兩者擠在同一個「語音朗讀」區塊，只剩一個標題 ——
+                  要調音量的人得先看懂「朗讀語言」那三個按鈕與自己無關。
+                ★ 它們其實是**不同的問題**：
+                    朗讀語言 ＝ 用什麼語言發音（與介面文字語言無關）
+                    音量     ＝ 要不要出聲、多大聲
+                  並排在同一區會讓人以為「選了粵語就等於開啟語音」。 */}
+            <SettingsSection
+              id="settings-voice-lang"
+              icon={<LanguagesIcon className="w-[26px] h-[26px]" />}
+              title={t('settings.sound.voiceLang')}
+              summary={t(
+                ttsSettings.voiceLang === 'mandarin'
+                  ? 'settings.sound.langMandarin'
+                  : ttsSettings.voiceLang === 'english'
+                    ? 'settings.sound.langEnglish'
+                    : 'settings.sound.langCantonese'
+              )}
+            >
+              <TtsVoiceLangSection key={`lang-${ttsSettings.voiceLang ?? 'auto'}`} />
+            </SettingsSection>
+
             <SettingsSection
               id="settings-sound"
               icon={<Volume2 className="w-[26px] h-[26px]" />}
-              title={t('settings.sound.title')}
+              title={t('settings.sound.volume')}
               summary={
                 ttsSettings.volume > 0
                   ? t('settings.sound.summaryOn', { n: Math.round(ttsSettings.volume * 100) })
                   : t('settings.sound.summaryOff')
               }
             >
-              {/* key 讓區塊在設定變動後重建，內部 state 才會跟著更新 */}
               {/* key 帶音量：使用者在滑桿放手後，區塊會以新值重建 */}
-              <TtsSettingsSection key={ttsSettings.volume} />
+              <TtsVolumeSection key={ttsSettings.volume} />
             </SettingsSection>
 
             {/* 第二部分原本是「日常生理指標量測」（血壓／心跳／血糖／尿酸／血脂
