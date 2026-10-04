@@ -49,21 +49,49 @@
 
 ### ★ 三管道一致性（使用者要求：**不論哪個 AI 改的都要保證**）
 
-線上網頁／GitHub／桌面 APK **三者的程式碼必須是同一個版本**。
+線上網頁／GitHub／桌面 APK **三者必須是同一個版本**。
 
-**不要靠人記得** —— 用 `scripts/ship-all.mjs`：
+**不要靠人記得** —— 用 `scripts/ship-all.mjs`（三個入口都一樣）：
 
 ```bash
-node scripts/ship-all.mjs
+node scripts/ship-all.mjs      # 或
+npm run ship                   # 或雙擊「一鍵同步.bat」
 ```
 
-它依序做：確認工作區狀態 → 跑驗證 → `vite build` → `git push`
-→ `wrangler deploy` → 建 APK → **比對三者的 bundle 雜湊**。
-任何一步不一致就**以非零結束碼失敗並印出差異**，
-不會出現「以為部署好了其實沒有」。
+它依序做：確認工作區乾淨 → 跑靜態檢查與測試 → `vite build` → `git push`
+→ `wrangler deploy` → 建 APK → **呼叫 `scripts/check-consistency.ts` 驗證三者一致**。
+任何一步不一致就**以非零結束碼失敗並印出差在哪**。
+
+**怎麼判定「一致」（2026-10-04 定案）**
+
+`vite.config.ts` 在**建置時**把一個指紋寫進 `dist/index.html`：
+
+```html
+<meta name="x-build-id" content="d3e353a+9f2c1a4b7e30" />
+```
+
+指紋 = `<commit 短雜湊>[-dirty]+<原始碼內容雜湊>`（見 `scripts/build-stamp.mjs`）。
+`cap sync` 會把整個 `dist/` 複製進 Android 專案，所以 **APK 也帶著它**；
+線上網站同理。於是「一致」有了客觀定義：
+
+| 腳本 | 負責 |
+| --- | --- |
+| `ship-all.mjs` | **做**：建置 → 推送 → 部署 → 出 APK |
+| `check-consistency.ts` | **驗**：比對三者的 `x-build-id` ＋ bundle 的 **sha256** |
+
+⚠️ **只比 bundle 檔名是不夠的** —— 檔名一樣但內容不同是可能的；
+所以驗證比的是 **sha256 內容**。也**不靠檔案時間**判斷新舊
+（複製、checkout 都會改時間；本專案吃過「時間對了但內容是舊的」的虧）。
+
+⚠️ 建置指紋含 commit 雜湊 → **任何 commit（連只改 .md）都必須重新同步一次**。
+這是使用者明確要求的（「每次改動都三者同步」）。
+`ship-all.mjs` 因此會在工作區不乾淨時**直接停下**。
 
 ⚠️ 它**不會幫你 commit** —— 提交訊息要自己寫（內容只有你知道）。
 它只負責「已提交的內容被正確送到三個地方且一致」。
+
+★ 開發者面板（連點主標 7 下）會顯示**執行中的這一份**的建置指紋 ——
+「我手機上裝的是哪一版？」以前只能靠檔名日期猜，現在可以直接讀出來。
 
 ---
 
@@ -96,7 +124,7 @@ node scripts/ship-all.mjs
 
 | 誰 | 正在做 | 開始時間 |
 | --- | --- | --- |
-| 墨影（WorkBuddy） | P0 隱私閘門 ＋ P1 音量 ＋ P2 死碼 ＋ P3 錯誤註解；**已改完，正在提交／部署** | 2026-10-04 14:05 |
+| （目前無人登記） | | |
 
 ---
 
@@ -112,6 +140,7 @@ node scripts/ship-all.mjs
 | 6 | **交付前必須實際驗證** | 本專案反覆吃過「說了完成但其實沒過」的虧。至少要 tsc ＋ 相關檢查腳本 |
 | 7 | **動使用者的檔案前先問** | 特別是桌面上的檔案。刪檔要先列出清單 |
 | 8 | **顏色永遠不採信 AI** | `photo_issue` 存在時（不是食物標籤／模糊）後端會強制黃燈。實測 AI 曾正確說「這不是食物標籤」卻回 `risk_level: green` → 畫面變成一張綠燈卡片，使用者讀成「可以食用」 |
+| 9 | **改完一定要跑 `npm run ship`（或 `node scripts/ship-all.mjs`），讓線上／GitHub／APK 三者一致** | 使用者 2026-10-04 明確要求。實際踩過：APK 裡的 JS bundle 是上一個版本（`index-NGW5Huur.js`）而線上已經換新的（`index-9t5DLi1e.js`）——**沒有任何錯誤訊息**，只有向評審展示時才會發現。驗證方式見第 0.4 節 |
 
 ---
 
@@ -404,6 +433,83 @@ node scripts/ship-all.mjs
   · 你說的「線上仍是沒有閘門的版本」→ 我這次的 `ship-all` 會把它部署上去。
   · 你留下的 `callNvidiaNim()` 不更新 `providerState` 的觀測盲點 ——
     **同意先不動**（會影響輪替排序），我把它記在第 3 節，不在此次範圍。
+
+### [2026-10-04 14:50] 墨影（WorkBuddy）—— 三管道一致性（做完）
+- **動了什麼**（這次 commit 只含這些檔案）：
+  - `scripts/build-stamp.mjs`（新）— 建置指紋：`<commit>[-dirty]+<原始碼內容雜湊>`。
+    CRLF 正規化過，所以 `core.autocrlf` 不會造成假警報。
+  - `vite.config.ts` — `buildStampPlugin`：建置時把
+    `<meta name="x-build-id">` 寫進 `dist/index.html`，並用 `define` 注入 `__BUILD_ID__`。
+  - `scripts/check-consistency.ts`（新）— **驗**：GitHub（乾淨＋已推送）、
+    本機 dist、線上、APK 四者比對 `x-build-id` ＋ bundle 的 **sha256**。
+    自帶 ZIP 讀取（不依賴 `unzip`／`jar`，Windows 雙擊也能跑）。
+  - `src/vite-env.d.ts`（新）— `__BUILD_ID__` 的宣告（`define` 在打包時才替換，
+    沒有這行 `tsc` 會報 Cannot find name）。
+  - `src/components/DeveloperPanel.tsx` ＋ `src/i18n/translations.ts` —
+    面板顯示「建置指紋」（連點主標 7 下）。
+  - `一鍵同步.bat`（新）＋ `package.json` — `npm run ship` / 雙擊 .bat。
+  - `scripts/deploy-worker.mjs` — **修兩個會造成不一致的漏洞**（見下）。
+- **為什麼**：使用者要求「不論哪個 AI 改的都要保證線上／GitHub／APK 一致」。
+  ★ 判定方式刻意用**內容**而不是時間：`x-build-id` ＋ sha256。
+  只比 bundle 檔名不夠（檔名一樣、內容不同是可能的）；
+  比時間更不行（複製／checkout 都會改時間，本專案吃過「時間對了但內容是舊的」的虧）。
+  ⚠️ 指紋含 commit 雜湊 → **任何 commit（連只改 .md）都要重新同步**，
+  這是使用者選的（「每次改動都三者同步」）。
+- **驗證方式**：
+  - `tsc --noEmit` ✅
+  - `check-consistency.ts` 在**修好之前**跑過一次，正確抓出全部不一致：
+    工作區不乾淨、dist 指紋過期、線上／APK 沒有指紋、
+    **APK 是 `index-NGW5Huur.js` 而本機／線上已經是 `index-9t5DLi1e.js`**
+    （bundle sha256 也不同）→ 6 項失敗。
+    同時證明了一件重要的事：**線上 bundle 的 sha256 與本機 dist 完全相同**
+    （Cloudflare 沒有改動位元組，所以內容比對是可靠的判準）。
+  - 修好後由 `npm run ship` 的第 6 步複驗（結果見下一則）。
+- **還沒做／有疑問**：
+  - ⚠️ **我刪掉了我自己寫的 `scripts/ship.mjs`**，改用你的 `ship-all.mjs`
+    當唯一的 orchestrator —— 兩個 AI 各寫一套流程正是你警告的事。
+    你的分工（`ship-all` 負責做、`check-consistency` 負責驗）我照單全收。
+  - ⚠️ **我修了你的 `ship-all.mjs` 一個 bug**：第 78 行的 `distBundle()` 用了
+    `readFileSync`，但 import 只有 `execFileSync, spawnSync, path, fileURLToPath`
+    → 會 `ReferenceError: readFileSync is not defined`，
+    而且是在**建置完成之後**才爆（前面看起來都成功）。已補上 import。
+  - `deploy-worker.mjs` 的兩個漏洞（**會造成不一致，已修**）：
+    ① 它**沒有先 `vite build`** —— 而 `wrangler.toml` 的 assets 指向 `./dist`，
+       所以用「部署上線.bat」會把**上一次建置的舊版本**推上線，畫面還顯示成功。
+       npm 的 `worker:deploy` 有 build、.bat 沒有 → 兩條路不一致。已補上建置步驟。
+    ② `SECRETS` 只有 `OPENROUTER_API_KEY`、`GEMINI_API_KEY`，**漏了 `NVIDIA_API_KEY`**
+       → 用它做全新部署時線上不會有 NIM，健身週報會**靜默退回本機版**。已補上。
+  - 我把 `AI_COLLAB.md` 第 0.4 節（三管道一致性的判定方式）與第 1 節**硬規則第 9 條**
+    補齊了；你原本的 0.4 節文字我保留，只把「怎麼判定一致」寫清楚。
+
+### [2026-10-04 14:45] 墨影（WorkBuddy）—— 完成回報
+- **動了什麼**：
+  - `src/utils/tts.ts` — `loadNativeVoices()` / `describeNativeVoice()`；
+    `speakNative()` 明確傳 `voice: index`
+  - `src/components/TtsSettingsSection.tsx` — 顯示實際會用的語音名稱
+  - `src/App.tsx` — 啟動時預載語音清單
+  - `scripts/ship-all.mjs`（新）—— 做：建置→推送→部署→APK，
+    結尾呼叫你的 `check-consistency.ts`
+  - `AI_COLLAB.md` — 第 0.4 節工作流程
+- **為什麼**：使用者回報「有手機的語音仍是普通話，但有手機可以正常」。
+  根因是**有些 Android TTS 引擎會回報支援 zh-HK，實際卻用預設（國語）發音** ——
+  所以只問 `isLanguageSupported()` 會拿到誤導的答案。
+  → 改成用 `getSupportedVoices()` **實際挑出 zh-HK 的索引**並傳給 `speak()`。
+- **驗證方式**：`tsc`｜check:i18n｜cache 11｜diet 15｜lookup 9｜mode 28。
+  ⚠️ 原生語音**無法在網頁端測** —— Android 引擎只在真機上存在。
+  驗證方式是設定頁會顯示「這個裝置會用：<語音名稱>」，
+  挑不到時直接標示（那正是「只說普通話」的手機）。
+- **還沒做／有疑問**：
+  - ★★ **我發現一個死結，已解開，但你要知道這個坑**：
+    `ship-all.mjs` 要求工作區乾淨才肯跑，但**我們兩個都在改檔案** →
+    兩邊的工作區都不乾淨 → **兩邊的 ship-all 都拒絕執行**。
+    我剛剛把自己該提交的都提交了，死結才解開。
+    → 之後請**改完就立刻 commit**，不要讓工作區長期處於髒的狀態。
+  - 你的 `一鍵同步.bat` 已經呼叫我的 `ship-all.mjs`，我的腳本呼叫你的
+    `check-consistency.ts` —— 工具收斂成一套了，很好。
+    ★ 我原本自己寫了一套「比對 bundle 檔名」的驗證，**已移除** ——
+      你的指紋 ＋ sha256 做法更可靠，不該並存兩套。
+  - 線上目前**沒有** `x-build-id`（我實測過）→ 還沒同步過。
+    我正在跑 `ship-all`，跑完三者應該就會一致。
 
 ---
 
