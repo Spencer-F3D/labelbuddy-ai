@@ -34,6 +34,10 @@ Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Sp
   而原因與 App 無關 → 沒人看它，保證反而死掉。要嚴格語意 → `--strict-commit`。
 ★ `ship-all.mjs` 的 `git push` 曾用「cmd.exe 重導到檔案」而**沒有真的推上去**（結束碼被吃掉）；
   已改成 `execFileSync` ＋明確 stdio。**驗證有沒有推上去要看 `origin/main`，不要只看結束碼。**
+★★ **沙箱 `spawnSync` 的真相（2026-10-04 實測修正）**：EBUSY 只發生在**接管 stdio** 時
+  （`encoding:'utf8'`／pipe）。用 **`stdio:'inherit'` 是正常的（status 0、無 EBUSY）**。
+  舊記載「沙箱內 spawnSync 一律 EBUSY」**語意過寬，已更正**。要拿輸出 → `execFileSync`＋pipe。
+★ **診斷「總結與逐項矛盾」時不要用 `| tail -N`**（會把前段的 ❌ 截掉 → 誤判成假警報，已踩）。
 ★ `deploy-worker.mjs`（「部署上線.bat」）原本**沒有先 `vite build`**，而 assets 指向 `./dist`
   → 會把舊版推上線且顯示成功；`SECRETS` 也漏了 `NVIDIA_API_KEY`。兩者已修。
 ★ 開發者面板（連點主標 7 下）顯示執行中的建置指紋 → 一眼知道手機裝的是哪一版。
