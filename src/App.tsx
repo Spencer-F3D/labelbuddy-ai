@@ -3590,7 +3590,9 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === 'fitness' && learnerProfileId === 'fitness' && (
           <div className="flex flex-col space-y-5">
-            <FitnessZone />
+            {/* ⚠️ 必須傳 analysisMode —— 健身專區的「AI 週報」是會呼叫雲端的，
+                沒有這個 prop 就無法在「只在本機」模式下擋住上傳。 */}
+            <FitnessZone analysisMode={analysisMode} />
           </div>
         )}
 

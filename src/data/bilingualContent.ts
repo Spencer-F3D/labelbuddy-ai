@@ -53,6 +53,10 @@ export const PROFILE_UI_EN: Record<string, { name: string }> = {
   young: { name: 'Young adult' },
   middle: { name: 'Middle-aged' },
   student: { name: 'Student' },
+  // ★ 用 'Pregnancy' 而不是 'Pregnant woman'：
+  //   後者把焦點放在「人」，前者放在「階段」。名稱是用來選身分的，
+  //   描述狀態比描述人更中性（專案既有規則：名稱不得含評價性字眼）。
+  pregnant: { name: 'Pregnancy' },
 };
 
 /** 取身分名稱（畫面用）。找不到時退回中文原名。 */

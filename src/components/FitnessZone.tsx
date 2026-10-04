@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
 import type { TranslationKey } from '../i18n/translations';
+import type { AnalysisMode } from '../types';
 import { apiUrl } from '../utils/apiBase';
 import {
   FITNESS_GOALS,
@@ -161,9 +162,21 @@ interface FitnessReportData {
  * 主元件
  * ------------------------------------------------------------------------- */
 
-export const FitnessZone: React.FC = () => {
+/**
+ * @param analysisMode 目前的分析模式。
+ *
+ * ⚠️ 這個 prop 是**同意閘門**用的，不是拿來改顯示風格（2026-10-04 補上）。
+ *    這個元件原本沒有接收任何 prop，所以「AI 週報」按鈕在「只在本機」模式下
+ *    照樣會把統計數字送到雲端 —— 使用者選了「不上傳任何資料」卻被上傳，
+ *    而畫面完全沒有異狀。這與 `analyze-indicators`／`ask-health-question`
+ *    先前踩過的是同一類 bug。
+ *    → `local_only` 時**不提供**這個按鈕（改為說明要切換模式），
+ *      並在送出的請求帶上 `localOnly` 當第二道防線。
+ */
+export const FitnessZone: React.FC<{ analysisMode: AnalysisMode }> = ({ analysisMode }) => {
   const { t, language } = useI18n();
   const lang: 'zh-TW' | 'en' = language === 'en' ? 'en' : 'zh-TW';
+  const localOnly = analysisMode === 'local_only';
   const [state, setState] = useState<FitnessState>(() => loadFitnessState());
   const [tab, setTab] = useState<ZoneTab>('plan');
 
@@ -403,6 +416,9 @@ const LogTab: React.FC<{
   const [reportError, setReportError] = useState(false);
 
   const generateReport = async () => {
+    // ★ 同意閘門：選「只在本機」時，這裡連請求都不該發出去。
+    //   按鈕在 local_only 下不會被渲染，這一行是防止日後有人改動 UI 時漏掉。
+    if (localOnly) return;
     setReportLoading(true);
     setReportError(false);
     setReport(null);
@@ -435,6 +451,8 @@ const LogTab: React.FC<{
           targetKcal: macros?.target ?? 0,
           targetProteinG: macros?.proteinG ?? 0,
           daysInWindow,
+          // ★ 由 analysisMode 推導（呼叫端不能自己傳）—— 與 analyze-label 同一條原則
+          localOnly,
         }),
       });
       const json = await res.json();
@@ -595,37 +613,44 @@ const LogTab: React.FC<{
         )}
       </section>
 
-      {/* ── AI 週報（2026-10-02）──────────────────────────────
+      {/* ── AI 週報（2026-10-02；同意閘門 2026-10-04）──────────
           ⚠️ 隱私：健身紀錄平常完全留在裝置上（專區介紹頁也這樣寫）。
              所以這顆按鈕**必須自己講清楚**它會送出什麼 ——
              與標籤辨識的同意閘門是同一條原則：
-             「不可以在使用者不知道的情況下上傳」。 */}
+             「不可以在使用者不知道的情況下上傳」。
+          ★ 2026-10-04：「只在本機」模式下**不渲染這顆按鈕**，改為說明要切換模式。
+             報告本身仍然是真的用 AI 產生（不是降級成本機版）——
+             使用者要的是「不上傳」，不是「拿掉 AI」。 */}
       <section className="bg-white rounded-2xl p-[16px] border-2 border-indigo-700 flex flex-col gap-[10px]">
         <h2 className="text-[19px] font-black text-indigo-950 flex items-center gap-[6px]">
           <Sparkles className="w-[22px] h-[22px] shrink-0 text-indigo-700" aria-hidden="true" />
           {t('fit.reportTitle')}
         </h2>
-        <p className="text-[16px] font-bold text-slate-700 leading-snug">{t('fit.reportNote')}</p>
+        <p className="text-[16px] font-bold text-slate-700 leading-snug">
+          {localOnly ? t('fit.reportNoteLocal') : t('fit.reportNote')}
+        </p>
 
-        <button
-          type="button"
-          id="fit-generate-report"
-          onClick={generateReport}
-          disabled={reportLoading || state.logs.length === 0}
-          className="w-full min-h-[60px] rounded-2xl bg-indigo-800 hover:bg-indigo-900 disabled:opacity-50 text-white text-[19px] font-black flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 border-2 border-indigo-950"
-        >
-          {reportLoading ? (
-            <>
-              <Loader2 className="w-[22px] h-[22px] shrink-0 animate-spin" aria-hidden="true" />
-              {t('fit.reportLoading')}
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-[22px] h-[22px] shrink-0" aria-hidden="true" />
-              {t('fit.reportButton')}
-            </>
-          )}
-        </button>
+        {!localOnly && (
+          <button
+            type="button"
+            id="fit-generate-report"
+            onClick={generateReport}
+            disabled={reportLoading || state.logs.length === 0}
+            className="w-full min-h-[60px] rounded-2xl bg-indigo-800 hover:bg-indigo-900 disabled:opacity-50 text-white text-[19px] font-black flex items-center justify-center gap-[8px] cursor-pointer active:scale-95 border-2 border-indigo-950"
+          >
+            {reportLoading ? (
+              <>
+                <Loader2 className="w-[22px] h-[22px] shrink-0 animate-spin" aria-hidden="true" />
+                {t('fit.reportLoading')}
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-[22px] h-[22px] shrink-0" aria-hidden="true" />
+                {t('fit.reportButton')}
+              </>
+            )}
+          </button>
+        )}
 
         {reportError && (
           <p className="text-[16px] font-bold text-rose-800 bg-rose-50 border-2 border-rose-300 rounded-xl px-[12px] py-[10px] leading-snug">

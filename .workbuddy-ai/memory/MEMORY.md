@@ -1,367 +1,249 @@
 # LabelBuddy AI — 專案長期筆記
 
 > 逐日細節 `memory/YYYY-MM-DD.md`｜UI 規則 `UI_RULES.md`｜架構與踩坑 `ARCHITECTURE.md`。
-> **本檔是「規則與指標」，實作細節一律放 `ARCHITECTURE.md`** —— 超過注入上限會被截斷。
-> **最後整理：2026-09-30**
+> **本檔只放「規則與指標」；實作細節一律放 `ARCHITECTURE.md`** —— 超過注入上限會被截斷。
+> **最後整理：2026-10-04**
 
-## 品牌名稱（2026-10-02 使用者指定）
-主標 **LabelBuddy AI**（英文維持不變）＋ 中文副標 **營養放大鏡**（`app.nameZh`）。
-★ **英文模式的 `app.nameZh` 刻意留空** —— 使用者指定「英文維持 LabelBuddy AI」，
-  另外取英文名會變成「一個 App 兩個英文名」。畫面必須用 `{t(...) && ...}` 守衛。
-★ 副標用 **flex-col 疊在主標下方**，不是並排（並排會撐爆標題列寬度）。
-★ **不加在語言閘門**：那是唯一「使用者可能看不懂當前語言」的畫面，
-  品牌區必須保持語言中立。
+## 品牌與介面原則
+主標 **LabelBuddy AI** ＋ 中文副標 **營養放大鏡**（`app.nameZh`）。
+★ 英文模式的 `app.nameZh` **刻意留空**（否則「一個 App 兩個英文名」）→ 畫面用 `{t(...) && ...}` 守衛。
+★ 副標 **flex-col 疊在主標下方**（並排會撐爆標題列）。**不加進語言閘門**（品牌區須語言中立）。
+★ **為普通人而寫**：「不要在頁面上有不用給用戶看的字」→ 不出現 OCR／規則引擎／快取／模型名稱／
+  備援／技術狀態。按鈕用「拍／看」，不用「辨識／掃描」。
+★ **翻譯字串是純文字，不要寫 Markdown**（`**粗體**` 會原樣顯示星號）。
+
+## 🏆 比賽（最高優先）
+2026 全球青少年人工智能未來創新競賽（澳門中學生賽區）｜**截止 2026-10-09**｜複評 11-01~11-16｜
+決賽 11-26 澳門線下。主題 **AI for Education**，定位「AI 食育學習平台」，SDG 3/4/12。
+評審比重：教育 20%／創意 20%／**AI 技術 25%**／原型 20%／英文 10%／倫理私隱 5%。
+**四條致命規則**：① **所有材料只接受英文**（App 雙語不可省）② **雲端真實 AI 必須是主角**
+③ 報告須列明 AI 工具名稱／版本／用途／學生分工（隱瞞**取消資格**）④ 不得提交學生不能理解的系統。
+**四份交付物**：`ProjectIntroduction`(≤2頁)／`ResearchReport`(6–12頁)／`Poster`(0.8×1.1m 直向)／
+`DemoVideo`(≤5分)。使用者＝**參賽學生本人**｜**不花錢**（只用免費模型）｜團隊 3 人，他負責 App 全部技術。
+**排程**：09-28 雙語 ✅｜09-29 中性化＋條款 ✅｜09-30 三模式＋引導頁 ✅｜10-01~02 APK ✅ →
+10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**。
+
+## 🚀 部署（09-28 上線；每次任務完成**自動**執行）
+正式網址 `https://app.labelbuddy-ai.workers.dev`（Worker 名 = `wrangler.toml` 的 `name`；
+**唯一可靠來源是 `wrangler deploy` 最後一行**）。帳號 `kanhf28@gmail.com`，
+Account ID `4ffa5d1a862bdbeaef2782f9b9774034`，憑證在 `%APPDATA%\xdg.config\.wrangler\config\default.toml`。
+Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Spencer-F3D/labelbuddy-ai`（Private）。
+⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。每次任務完成自動跑：
+`git push origin main` → `vite build` → `wrangler deploy` → **驗證**線上首頁引用的
+`assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名。
 
 ## 📦 APK 建置（`npm run apk` / 建立APK.bat）
-應用名稱與桌面輸出檔名都是 **營養放大鏡**（2026-10-03 使用者指定）。
-★★ **`gradlew.bat` 不能直接 `spawnSync`** —— Node 18.20.2+ 為修 CVE-2024-27980
-  會回 `EINVAL`（`errno:-4071`），訊息**看起來像找不到檔案或權限問題**。
-  症狀易誤判：vite build 與 cap sync 都成功，只有 gradle 那步失敗 → 像「gradle 壞了」。
-  → 批次檔一律走 `cmd.exe /d /s /c`；**不要用 `shell: true`**（那正是 CVE 的成因）。
-★ 檔名日期用**本機時區**（曾用 UTC → 每天 16:00 後寫成「昨天」）。
-★ 驗章要用 `apksigner verify`，**不要**用「META-INF 有沒有 .RSA」判斷
-  ——v2/v3 簽章在 APK Signing Block，後者會給假警報。
-★ 沙箱的「防大量刪除」是**累計**計算（門檻 50 檔/回合）：
-  一個回合內連續做大檔案刪除會把額度用完，導致後面的 `vite build` 清 dist 被擋。
+應用名稱與桌面檔名都是 **營養放大鏡**。JDK 21 在 `D://Java//jdk-21.0.12.1+1`（⚠️ Capacitor 8.x
+要 **21**，17 會 `invalid source release: 21`）；Android SDK 在 `D://Android//Sdk`；簽章
+`android/labelbuddy-release.jks`＋`keystore.properties`（**兩者都不可進版控**）。
+★ **打包網頁進 APK**（不用 `server.url`）→ WebView origin 是 `https://localhost` →
+  API 一律走 `src/utils/apiBase.ts` 的 `apiUrl()`。
+★★ **`gradlew.bat` 不能直接 `spawnSync`**（Node 18.20.2+ 修 CVE-2024-27980 會回
+  `EINVAL errno:-4071`，訊息**像找不到檔案或權限問題**）→ 走 `cmd.exe /d /s /c`，
+  **不要用 `shell: true`**（那正是 CVE 的成因）。
+★ 檔名日期用**本機時區**（曾用 UTC → 16:00 後寫成「昨天」）。
+★ 驗章用 `apksigner verify`，**不要**看「META-INF 有沒有 .RSA」（v2/v3 在 Signing Block → 假警報）。
+★ 沙箱「防大量刪除」是**累計**（50 檔/回合）→ 同回合連刪大檔會害後面的 `vite build` 清 dist 被擋。
 
-## 🔊 語音朗讀（TTS）— 2026-10-03 大改
-★★ **APK 是 Capacitor 的 Android WebView，而它不實作 Web Speech 合成 API**
-  （`window.speechSynthesis` 只有 Chrome 瀏覽器有）。
-  舊版只有 Web Speech → `speakText()` 每次靜默 `return false`：
-  **不拋錯、不記錄、畫面無異狀** → 使用者只會說「完全沒聲音」。
-  → 原生走 `@capacitor-community/text-to-speech`，瀏覽器仍走 Web Speech。
-★★ **只裝 npm 套件不算生效，要驗三件事**：
-  ① `android/app/capacitor.build.gradle` 有 `implementation project(':capacitor-community-text-to-speech')`
-  ② APK 內 `assets/capacitor.plugins.json` 有 `...tts.TextToSpeechPlugin`
-  ③ **合併後的 AndroidManifest 有 `<queries><intent><action TTS_SERVICE>`**
-     （Android 11+ 套件可見性；少了它引擎找不到**且不會報錯**）
-  → 驗法：`aapt2 dump xmltree --file AndroidManifest.xml <apk>`
-★ `getVoices()` 是**非同步**的 → 要監聽 `voiceschanged`，否則第一次朗讀挑不到語音。
-★ 澳門要用 `zh-HK`（粵語），不是 `zh-TW`。
-★ 設定存 `labelbuddy_tts_v1`；**長者預設開、其他身分預設關**。
-  有 `touched` 旗標：手動改過就永遠以使用者為準（否則改身分時設定會被覆蓋）。
-★ 「關閉」要在 `speakText` 最前面擋掉，**不是** volume 設 0。
+## 🔊 語音朗讀（TTS）
+★★ **APK 是 Capacitor Android WebView，不實作 Web Speech 合成 API**（`window.speechSynthesis`
+  只有 Chrome 有）→ 舊版 `speakText()` 每次靜默 `return false`（**不拋錯、不記錄、畫面無異狀**）。
+  → 原生走 `@capacitor-community/text-to-speech`，瀏覽器走 Web Speech。
+★★ **只裝 npm 套件不算生效，要驗三件事**：① `android/app/capacitor.build.gradle` 有
+  `implementation project(':capacitor-community-text-to-speech')` ② APK 內
+  `assets/capacitor.plugins.json` 有 `...tts.TextToSpeechPlugin` ③ **合併後的 AndroidManifest
+  有 `<queries><intent><action TTS_SERVICE>`**（Android 11+ 套件可見性；少了它引擎找不到**且不報錯**）
+  → 驗法 `aapt2 dump xmltree --file AndroidManifest.xml <apk>`。
+★ `getVoices()` **非同步** → 要監聽 `voiceschanged`，否則第一次朗讀挑不到語音。
+★ 澳門用 `zh-HK`（粵語），不是 `zh-TW`。
+★ 設定存 `labelbuddy_tts_v1`（`volume`／`touched`／`voiceLang`）；**長者預設開、其他身分預設關**；
+  有 `touched` 旗標，手動改過就永遠以使用者為準（否則改身分時會被覆蓋）。
+★ 「關閉」在 `speakText` 最前面擋掉，**不是** volume 設 0（會被當無效參數 → 反而變大聲）。
+★ **音量一律由 `getTtsVolume()` 決定 —— 呼叫端不要傳 `volume`**，傳了會覆寫使用者的設定。
 
 ## 🛠️ 開發者面板（隱藏）
 連點主標「LabelBuddy AI」**7 下**進入。計數用 **ref 不用 state**（state 會全樹重繪），
-且必須有**時間窗**（2 秒），否則分幾天點也會開。
-內容：供應商用量／上限、冷卻、上次錯誤、模型鏈、快取、NVIDIA 狀態、執行環境。
-★ NVIDIA **不混進 providers**（那是標籤辨識的輪替鏈，NIM 不在鏈上）。
+且必須有**時間窗**（2 秒），否則分幾天點也會開。內容：供應商用量／上限、冷卻、上次錯誤、
+模型鏈、快取、NVIDIA 狀態、執行環境。★ 供應商清單以 `orderedProviders` 為準
+（現為 `nvidia → gemini → openrouter`，**NIM 在輪替鏈上**，含圖請求會跳過它）。
 
 ## 🧮 本機規則引擎（`smartNutritionAnalyzer.ts`）
-★★ **2026-10-03 修掉一個安全漏洞：12 項評分原本全部綁在 `selectedConditions` 上**
-  （`if (hasHypertension) { if (sodiumMg >= 1200) ... }`）。
-  沒勾任何慢性病 → riskScore 恆為 0 → **永遠綠燈**：
-  鈉 2350 毫克（每日上限 118%）也會說「✅ 很適合您」——
-  而同一份回應的 `nutrient_facts` 卻寫著 118%（紅條），**自己打自己**。
-  → 修法：任一項 >= 每日上限 → **至少黃燈**（使用者選的，非直接紅燈），
-    並在說明寫出是哪一項超標。
-  ⚠️ 未勾慢性病時的黃燈文案**不能沿用原本那句** ——
-    `matchedConditions` 是空的，會變成「對您的身體（）還是稍微有點油鹽糖」。
-★ 改動這裡時：`nutrientFacts` 只算一次共用（判定與顯示用同一份），
-  否則會出現「判定用 A、顯示用 B」的分歧。
+★★ **12 項評分不能只綁 `selectedConditions`**：沒勾慢性病 → riskScore 恆 0 → **永遠綠燈**
+  （鈉 2350mg／每日上限 118% 也說「很適合您」，卻同時在 `nutrient_facts` 顯示紅條，**自己打自己**）。
+  → 修法：任一項 >= 每日上限 → **至少黃燈**，並寫出是哪一項超標。未勾慢性病時的黃燈文案
+  **不可沿用原本那句**（`matchedConditions` 是空的 → 出現「對您的身體（）」）。★ `nutrientFacts` 只算一次共用。
 ★ 顏色一律以規則引擎為準，AI 只提供文字。
 
-## 🏆 比賽（最高優先）
-
-| 項目 | 內容 |
-| --- | --- |
-| 賽事 | 2026 全球青少年人工智能未來創新競賽（澳門中學生賽區） |
-| **截止** | **2026-10-09**｜複評 11-01~11-16｜決賽 11-26 澳門線下 |
-| **語言** | **所有材料只接受英文**（App、海報、影片字幕、簡報、答辯） |
-| 主題 | AI 與教育｜**AI for Education**；定位「AI 食育學習平台」，SDG 3/4/12 |
-| 使用者 | **本人就是參賽學生**｜**不花錢**（只用免費模型）｜**團隊 3 人**，
-  報告須列明各自完成的部分；使用者負責 App 全部技術 |
-
-**評審比重**：教育價值 20%｜創意 20%｜**AI 技術應用 25%**｜原型成效 20%｜英文 10%｜倫理私隱 5%
-
-**四條致命規則**：① 未用英文可不予評審（App 雙語不可省）② **雲端真實 AI 必須是主角**
-③ 報告須列明 AI 工具名稱／版本／用途／學生分工，隱瞞**直接取消資格**
-④ 不得提交學生不能理解的系統（評審可即場提問程式細節）
-
-**四份必交交付物**（不能為了功能而壓縮）：`ProjectIntroduction`（≤2頁）／
-`ResearchReport`（6–12頁）／`Poster`（0.8×1.1m 直向）／`DemoVideo`（≤5分鐘）。
-
-✅ **APK 已完成**（2026-10-02）：`npm run apk` 一鍵建置（`建立APK.bat`）。
-- JDK 21 在 `D://Java//jdk-21.0.12.1+1`（⚠️ Capacitor 8.x 要 **21**，JDK 17 會
-  `invalid source release: 21`；winget 裝 21 需管理員權限 → 用免安裝 ZIP）
-- Android SDK 在 `D://Android//Sdk`（platforms;android-34 + build-tools;34.0.0）
-- 簽章 `android/labelbuddy-release.jks`＋`keystore.properties`（**兩者都不可進版控**）
-- ★ **打包網頁進 APK**（不用 `server.url`）—— 否則「只在本機」的承諾不成立。
-  代價：WebView origin 是 `https://localhost`，所以 API 走 `src/utils/apiBase.ts`
-  的 `apiUrl()`（Capacitor 環境回傳絕對網址）。
-
-**排程**：09-28 雙語 ✅｜09-29 中性化＋稱謂＋條款 ✅｜09-30 三模式＋引導頁 ✅ →
-**10-01~10-02 APK 打包（硬期限）** → 10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**
-
-## 🚀 部署（09-28 上線，每次任務完成自動執行）
-
-
-**正式網址：`https://app.labelbuddy-ai.workers.dev`**
-- Worker 名稱 = `wrangler.toml` 的 `name`（`app`）｜**唯一可靠來源是 `wrangler deploy` 最後一行**
-- 帳號 `kanhf28@gmail.com`｜Account ID `4ffa5d1a862bdbeaef2782f9b9774034`
-- 憑證 `C:\Users\Spencer\AppData\Roaming\xdg.config\.wrangler\config\default.toml`
-- Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`
-- 版控 GitHub `Spencer-F3D/labelbuddy-ai`（Private）｜手機測試 `連線到手機.bat`（Tunnel，網址每次不同）
-
-⚠️⚠️ **`git commit` 只是本機動作 —— 不上 GitHub、更不上線。** 每次任務完成**自動**跑：
-`git push origin main` → `vite build` → `wrangler deploy` →
-**驗證**線上首頁引用的 `assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名。
-
-## 🔒 隱私架構與 AI 模式（三模式）
-`cloud_image` 照片上傳／`cloud_text` 只送 OCR 文字／`local_only` 完全不連網
-（表格與資料流見 `ARCHITECTURE.md`）。
-★ **「照片永遠不離開裝置」已不是通則** → 文案一律**逐模式陳述**。
-★ **前端 OCR 從必經之路變成後備方案**。
-★ **同意閘門**：`analyze-indicators`／`ask-health-question` 先前**無條件呼叫雲端**
-  （選 `local_only` 照樣上傳血壓與提問）→ 已加 `localOnly` 檢查。
-  **這是「不會報錯、只會偷偷違背承諾」的 bug**
-★ `localOnly` **一律由 `analysisMode` 推導**，呼叫端不能自己傳。
-★ `cloud_image` 失敗 → 前端自己 OCR 改用文字重送＋顯示降級通知。
-★ 舊鍵遷移 `true`→`cloud_text`／`false`→`local_only`；**不可蓋成新預設值**。
-★ 判斷模式看**欄位是否存在**：OCR 失敗送 `ocrText: ''` 仍是文字模式 → 回「請重拍」。
-
 ## 🛡️ 安全鐵則（違反會害到人）
-★ **顏色一律以規則引擎為準，AI 只提供文字。**
-  實測血壓 158/96 ＋ 空腹血糖 8.4（兩項都超紅燈門檻）：規則判 red、雲端 AI 判 yellow。
-  「該紅卻報黃」比誤報更危險 → **可預測的安全訊號交給規則，細膩的解釋交給模型。**
-★ **性別絕不可影響紅黃綠**（`check-honorific.ts` 有斷言）。
-★ **五類「不會報錯」的 bug**（都踩過）：
-  ① **對照表鍵對不上** —— 中文句子當鍵，一字之差就失效、靜默回中文（踩 4 次）
-  ② **插值變數漏翻** ③ **快取鍵用錯內容來源**（前端 OCR 下 `imageBase64` 是空字串
-  → 所有商品共用一個鍵；燕麥片之後掃泡麵回「非常適合長者食用」）
-  ④ **改了映射函式沒改呼叫端** ⑤ **後端沒產生某個值，前端卻為它寫了分支**
-  （`factTone` 的 `target` 分支從未執行過）
-  ★ 通則：**UI 有 if/else 的值，都要確認每個值真的有生產者。**
+★ **顏色一律以規則引擎為準，AI 只提供文字**（實測 158/96＋血糖 8.4：規則 red、雲端 AI yellow；
+  「該紅卻報黃」比誤報危險）。**性別絕不可影響紅黃綠**（`check-honorific.ts` 已隨性別機制刪除，
+  現由 `ADDRESS_RULE` 與程式審查守住）。
+★ **五類「不會報錯」的 bug**（都踩過）：① **對照表鍵對不上**（中文句子當鍵，一字之差靜默回中文，踩 4 次）
+  ② **插值變數漏翻** ③ **快取鍵用錯內容來源**（前端 OCR 下 `imageBase64` 是空字串 → 所有商品共用一鍵）
+  ④ **改了映射函式沒改呼叫端** ⑤ **後端沒產生某個值，前端卻為它寫了分支**。
+★ 通則：**UI 有 if/else 的值，都要確認每個值真的有生產者。**
 
-## 📋 飲食紀錄（DietRecord）
-★ **紀錄跟隨「標籤本身的語言」**，與介面語言無關（09-29 定案：「照片是什麼語言，
-紀錄就是什麼語言」）。`lang` 在建立時固定；介面語言 ≠ 標籤語言時用**本機引擎就地重新產生**
-（純函式、離線、不花額度）。品名用 `extractFoodName`（**標籤原文品名**）。詳見 `ARCHITECTURE.md`。
+## 🔒 隱私架構與 AI 三模式
+`cloud_image` 照片上傳／`cloud_text` 只送 OCR 文字／`local_only` 完全不連網（詳見 `ARCHITECTURE.md`）。
+★ 文案一律**逐模式陳述**（「照片永遠不離開裝置」已不是通則）。★ 前端 OCR 從必經之路變成**後備方案**。
+★★ **同意閘門**：`analyze-indicators`／`ask-health-question` 曾**無條件呼叫雲端**（選 `local_only`
+  照樣上傳血壓與提問）→ 已加 `localOnly` 檢查。**這是「不會報錯、只會偷偷違背承諾」的 bug。**
+★ `localOnly` **一律由 `analysisMode` 推導**，呼叫端不能自己傳。
+★ 舊鍵遷移 `true`→`cloud_text`／`false`→`local_only`，**不可蓋成新預設值**。
+★ 判斷模式看**欄位是否存在**（OCR 失敗送 `ocrText: ''` 仍是文字模式 → 回「請重拍」）。
+★ **任何「會呼叫雲端」的功能都要有同意閘門**（`/api/analyze-label`、`/api/ask-health-question`、
+  `/api/fitness-report`）—— 新增雲端端點時，前端要傳 `localOnly`、後端要真的檢查。
+
+## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
+引擎 = 瀏覽器端 tesseract.js，要下載 **約 6.4 MB**（`chi_tra.traineddata` 2.37MB＋WASM 約 4MB＋worker）。
+★★ **`warmUpBrowserOcr()` 曾長期是死匯入**（存在但沒人呼叫）→ 6.4MB 在按下快門那一刻才開始下載
+  → 超市弱訊號下失敗 → App 卻說「請重拍」→ **使用者一直重拍而照片從來沒問題**。
+  現已在完成引導頁後呼叫。
+★ **診斷鐵則：要測 App 真正在跑的那份程式碼**（探針頁載 tesseract.js 的 **UMD 版**會繞過 App 的
+  ESM 路徑 →「探針說可以、使用者說不行」）。正確做法：跑 Vite dev server，在頁面裡
+  `await import('/src/ocr/ocrBrowser.ts')` 再呼叫它。
+★ 失敗要分「引擎」與「照片」（`errorKind`）；引擎失敗**不要叫使用者重拍**。
+★ 資產快取標頭在 `public/_headers`（Workers Assets 預設 `max-age=0` → 每次重驗）。
+★ 工具：`scripts/check-ocr-pipeline.mjs`（標籤佔畫面 100%→25% 逐級測）、
+  `scripts/check-local-ocr.mjs`（**唯一走瀏覽器 OCR 的檢查**）、`scripts/make-ocr-test-photos.py`
+  —— 三支都記錄了我自己量錯的方式，**先讀檔頭再用**。
+
+## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）
+輪替鏈 `orderedProviders(hasClientKey, hasImage)` = **nvidia → gemini → openrouter**
+（排序＝使用率低者優先；`DAILY_QUOTA.nvidia = 100000` 是**輪替權重**，讓沒有上限的它先吃請求）。
+`DEFAULT_MODEL_CHAIN` **上限 3 個**。
+★ **NIM 是文字模型、收不下圖片** → 含圖請求必須跳過它（不跳過會把失敗計數推高 →
+  最後讓這個「沒有上限」的供應商被冷卻 → 反而失去省額度的意義）。
+★ **免費模型會變動** → 失敗時先查 `GET /api/v1/models` 過濾 `pricing.prompt == 0` 且
+  `input_modalities` 含 `image`。★ 額度四層：輪替｜健康冷卻｜**回應快取**（最有效）｜額度預檢。
+⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。
+★ **改供應商清單時要同步改 `/api/ai-status` 的 providers 迴圈**（漏了不會報錯，面板只會與事實不符）。
+★ NIM 金鑰 = Worker secret `NVIDIA_API_KEY`（本機測試放 `.dev.vars`）；
+  Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。模型鏈以**實測**決定（不要照抄技能結論）：
+  `openai/gpt-oss-20b` **0.76s 主力**｜`z-ai/glm-5.3-flash` 13.5s（**`content` 是 null，答案在 `reasoning_content`**）｜
+  `nvidia/nemotron-3.5-lightning-30b-a3b` **40s 逾時，不列入**（會逾時的模型比沒有備援更糟）。
+★ `/api/fitness-report` 只送**彙總數字**、不送逐筆紀錄；AI 失敗回**離線規則版**。
 
 ## ⛔ Gemini 區域封鎖（已定案，不必重查）
 Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回 `400 FAILED_PRECONDITION`
-→ **換帳號無用**。用 VPN 或謊報地區繞過屬服務條款問題，**不做**。（詳見 `ARCHITECTURE.md`）
-
-## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
-★ **診斷鐵則：要測 App 真正在跑的那份程式碼。**
-  用探針頁載入 tesseract.js 的 **UMD 版**會繞過 App 的 ESM 路徑
-  →「探針說可以、使用者說不行」。正確做法：跑 Vite dev server，
-  在頁面裡 `await import('/src/ocr/ocrBrowser.ts')` 再呼叫它。
-  工具：`scripts/check-ocr-pipeline.mjs`（標籤佔畫面 100%→25% 逐級測完整流水線）。
-★ 2026-10-03 實測結論：**完整流水線（OCR＋規則引擎）在電腦瀏覽器上全部通過**
-  （連標籤只佔 25% 也讀到 鈉2350／糖8.5／碳水62），前處理四種情境也全過。
-  → 使用者手機上的失敗**仍未重現**，已改為在開發者面板顯示 `OcrDiagnostics`
-    （結局／字數／原始錯誤／耗時），請使用者回報那一行。
-★ 本機讀不到時有「改用直接雲端」按鈕（明示同意，會記住設定）。
-★ Capacitor 的 MIME 沒問題：`.js`→application/javascript、`.wasm`→application/wasm。
-
-## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）
-現役主力 **OpenRouter**（Gemini 冷卻中）。`DEFAULT_MODEL_CHAIN` **上限 3 個**。
-★ **免費模型會變動** → 失敗時先查 `GET /api/v1/models` 過濾 `pricing.prompt == 0`
-  且 `input_modalities` 含 `image`（三個現役模型都支援圖片）。
-★ 額度四層：雙供應商輪替｜健康冷卻｜**回應快取**（最有效）｜額度預檢。
-⚠️ 多開金鑰／帳號**無效**（capacity 是全域治理，違反條款）。詳見 `ARCHITECTURE.md`。
-
-### NVIDIA NIM（2026-10-03 **已加入三供應商輪替**）
-★ **NIM 是文字模型，收不下圖片** → 含圖片的請求（cloud_image）必須跳過它。
-  不跳過的話不只浪費往返，還會把失敗計數推高，最後讓這個「沒有上限」的
-  供應商被冷卻 → 反而失去省額度的意義。
-  → `orderedProviders(hasClientKey, hasImage)`。
-★ `DAILY_QUOTA.nvidia = 100000` 是**輪替權重**（排序＝使用率低者優先）→
-  讓沒有上限的它優先吃掉請求，Gemini／OpenRouter 的免費額度留著。
-★ 實測：第 2、3 次請求由 `openai/gpt-oss-20b` 處理 ✅
-★ **改供應商清單時要同步改 `/api/ai-status` 的 providers 迴圈** ——
-  漏了不會報錯，面板只會顯示「少一家在輪替」而與事實不符。
-
-### 舊說明：NIM 原本只給健身週報
-金鑰 = Worker secret `NVIDIA_API_KEY`（`wrangler secret put`，**不進版控**；
-本機測試放 `.dev.vars`）。Base URL `https://integrate.api.nvidia.com/v1`，無每日上限。
-★ **刻意不接進 `callAiModel` 的輪替鏈** —— 那條鏈服務標籤辨識（需要視覺、
-  時間預算緊），而 NIM 可用的都是文字模型、冷啟動可達 156 秒。
-  用獨立 `callNvidiaNim()`（`server/core.ts`）。
-★ 模型鏈以**這把金鑰實測**決定（不要照抄技能結論）：
-  `openai/gpt-oss-20b` **0.76s ✅ 主力**｜`z-ai/glm-5.3-flash` 13.5s
-  （**`content` 是 `null`，答案在 `reasoning_content`**）｜
-  `nvidia/nemotron-3.5-lightning-30b-a3b` **40 秒逾時，不列入**
-  （每個失敗要吃掉 25 秒逾時預算 → 放一個會逾時的模型比沒有備援更糟）。
-★ `/api/fitness-report` 只送**彙總數字**，不送逐筆紀錄；AI 失敗回**離線規則版**。
-
-## 📷 本機 OCR（`cloud_text` / `local_only` 的命脈）
-引擎 = 瀏覽器端 tesseract.js，要下載 **約 6.4 MB**
-（`chi_tra.traineddata` 2.37 MB ＋ WASM 約 4 MB ＋ worker）。
-★★ **`warmUpBrowserOcr()` 曾長期是死匯入**（存在但沒人呼叫）→ 6.4 MB 在按下快門
-  那一刻才開始下載 → 超市弱訊號下失敗 → App 卻說「請重拍」→
-  **使用者一直重拍而照片從來沒問題**。現已在完成引導頁後呼叫。
-★ 資產快取標頭在 `public/_headers`（Workers Assets 預設 `max-age=0` → 每次重驗）。
-★ 失敗要分「引擎」與「照片」：`errorKind`，引擎失敗**不要叫使用者重拍**。
-★ 診斷工具：`scripts/check-local-ocr.mjs`（**唯一會走瀏覽器 OCR 的檢查**）、
-  `scripts/make-ocr-test-photos.py`（逐步劣化測試圖）。
-  ⚠️ 兩支都記錄了我自己量錯的方式，**先讀檔頭再用**。
+→ **換帳號無用**。用 VPN 或謊報地區繞過屬服務條款問題，**不做**。
 
 ## 🎓 7 身分（`LearnerProfileId`，2026-10-02 起）
-`senior` 長者／`child` 兒童／`teen` 青少年／`fitness` 健身人士／
-`young` 青年／`middle` 中年／`student` 學生。
-定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**。
+`senior` 長者／`child` 兒童／`teen` 青少年／`fitness` 健身人士／`young` 青年／`middle` 中年／
+`student` 學生。定義集中 `src/data/learnerProfiles.ts`，**前後端共用** → 必須**純資料**。
 ★ 名稱不得含評價性字眼（「長者三高」→**長者**）；身分卡片不得顯示說明文字。
-  ⚠️ `bilingual.ts` 的 `PROFILE_NAME_EN` 曾漏改，長者英文名寫成
-  "Senior with hypertension…"（＝把三高貼在長者身上，**只有英文介面看得到**）。
-★ **改 id 一定要同時寫遷移**：`takeout` → `young` 時若沒有
-  `LEGACY_PROFILE_IDS`，舊裝置的值會被判無效而**靜默退回長者**
+  ⚠️ `bilingual.ts` 的 `PROFILE_NAME_EN` 曾漏改，長者英文名寫成 "Senior with hypertension…"
+  （＝把三高貼在長者身上，**只有英文介面看得到**）。
+★ **改 id 一定要同時寫遷移**（`LEGACY_PROFILE_IDS`）：否則舊裝置的值被判無效而**靜默退回長者**
   （鈉上限 2000→1500、字級放大），使用者不會知道為什麼。
-★ 「中年」＝**一般成人上限**，重點放在三高**長期累積**（不併入長者＝不用讓
-  未確診的人過度緊張；不併入青年＝保留「預防」這個判讀角度）。
+★ 「中年」＝**一般成人上限**，重點放在三高**長期累積**（不併入長者＝不讓未確診的人過度緊張；
+  不併入青年＝保留「預防」這個判讀角度）。
 ⚠️ 兒童／青少年鈉糖上限明顯低於成人；**快取鍵必須含身分**；
-`targets[].target` 是給人看的字串，**不能做數學運算**。
+  `targets[].target` 是給人看的字串，**不能做數學運算**。
 
 ## 🗣️ 稱謂與性別（**2026-10-02 已整套移除**）
-`GenderPicker`／引導頁性別步驟／`gender` state／`buildAddressRule`／
-`applyHonorific*`／`LABEL_TEXT_FIELDS`／`check-honorific.ts` **全部刪除**。
-★★ **但有一條規則絕對不能跟著刪**：已保留為 core.ts 的 `ADDRESS_RULE` ——
-  「不可用阿公／阿伯／爺爺／奶奶等長輩稱呼」＋「你一律寫成您」。
-  原本這兩條綁在性別分支裡，整段刪掉的話模型會開始叫 13 歲使用者「阿公」，
+`GenderPicker`／引導頁性別步驟／`gender` state／`buildAddressRule`／`applyHonorific*`／
+`LABEL_TEXT_FIELDS`／`check-honorific.ts` **全部刪除**。
+★★ **但 `core.ts` 的 `ADDRESS_RULE` 絕對不能跟著刪** ——「不可用阿公／阿伯／爺爺／奶奶等長輩稱呼」
+  ＋「你一律寫成您」。原本這兩條綁在性別分支裡，整段刪掉的話模型會開始叫 13 歲使用者「阿公」，
   **而且要等實際輸出才會發現**。
 ★ 舊鍵 `labelbuddy_gender_v1` 不需特刪（清除用前綴掃描）；程式已不讀它。
-★ 健身專區的 BMR 公式**需要**生理性別參數（生理事實，與稱謂無關）→
-  由使用者在該頁**自己填**，不從全域設定偷偷帶進來。
+★ 健身專區的 BMR 公式**需要**生理性別參數（生理事實，與稱謂無關）→ 由使用者在該頁**自己填**，
+  不從全域設定偷偷帶進來。
 
 ## 🏋️ 健身專區（2026-10-02 新增）
-只在身分＝`fitness` 時出現在側邊選單（過濾寫在 **render** 裡，不是 `MENU_ITEMS`
-常數 —— 常數是模組層、看不到 state，寫在那裡切換身分不會更新且**不會報錯**）。
+只在身分＝`fitness` 時出現在側邊選單（過濾寫在 **render** 裡，不是 `MENU_ITEMS` 常數 ——
+常數是模組層、看不到 state，寫在那裡切換身分不會更新且**不會報錯**）。
 三個分頁：課表規劃／訓練紀錄／飲食熱量。儲存鍵 `labelbuddy_fitness_v1`（純本機）。
-★ **課表用確定性規則**（3 目標 × 5 天數＝15 模板，`src/data/fitnessContent.ts`），
-  **不叫 AI**：AI 會每次不一樣、吃掉標籤辨識的額度，还可能生出
-  解剖學上不合理卻看不出來的組合。
-★ 熱量用 Mifflin-St Jeor；蛋白質／脂肪**以每公斤體重**計（寫死公克數對
-  50kg 與 90kg 都是錯的）；畫面必須寫明是**估算值（±10%）**。
-★ 不預填任何示範資料；不做醫療建議。
-★ 圖表只算「有填重量」的動作並註明 —— 自重訓練算進去會讓圖表看起來像
-  「這週沒練」，那是**錯誤的視覺暗示**。
+★ **課表用確定性規則**（3 目標 × 5 天數＝15 模板，`src/data/fitnessContent.ts`），**不叫 AI**
+  （AI 會每次不一樣、吃掉標籤辨識額度，還可能生出解剖學上不合理卻看不出來的組合）。
+★ 熱量用 Mifflin-St Jeor；蛋白質／脂肪**以每公斤體重**計（寫死公克數對 50kg 與 90kg 都是錯的）；
+  畫面必須寫明是**估算值（±10%）**。★ 不預填任何示範資料；不做醫療建議。
+★ 圖表只算「有填重量」的動作並註明 —— 自重訓練算進去會讓圖表看起來像「這週沒練」，
+  那是**錯誤的視覺暗示**。
 
 ## 🚫 過敏選項的用字（2026-10-02 使用者指定）
-**不要寫「絕對不能吃」「會呼吸困難」「吃了會腹瀉」等後果字樣。**
-理由：本 App 是飲食教育工具，不是診斷工具 —— 寫得越肯定責任越大，
-且後果因人而異，統一的說法反而可能誤導。
-→ 過敏原仍靠**紅色 ＋ 三角警示圖示**識別（三重編碼少了文字那一重）。
-→ `ALLERGEN_SEVERITY` 與 `conditions.mildReaction`／`severeReaction` 已刪除。
+**不要寫「絕對不能吃」「會呼吸困難」「吃了會腹瀉」等後果字樣**（本 App 是飲食教育工具，
+不是診斷工具 —— 寫得越肯定責任越大）。→ 過敏原仍靠**紅色＋三角警示圖示**識別。
+`ALLERGEN_SEVERITY` 與 `conditions.mildReaction`／`severeReaction` 已刪除。
 
-## 🎨 字級縮放（**兩個密度模式**，2026-10-02 起）
-`<html data-density>` 由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換，
-`index.css` 精準命中**四種**字級（16/18/19/20；全域只有這 4 種 + 12px 例外）：
-- `compact`（非長者）→ 14／16／17／18
-- `comfortable`（長者）→ **19／22／23／24**（2026-10-02 使用者指定，×1.2）
-⚠️ **新增字級必須兩個模式都補一行**；寫在 `<html>` 而非包 div（fixed 元素蓋不到）。
-★ **唯一例外：12px**（`LegalNotice.tsx`）刻意不受縮放影響 → `UI_RULES.md`。
-⚠️ 長者字放大後版面高約 20% —— 改動後**必須跑 `npm run check:layout`**
-（真實 Chrome、360×640，量「文字穿出框框／被裁切／孤行」）。
-  ★ **一定要加 `--lang=en` 再跑一次**：中文一字一方塊、英文以詞斷行，
-    換行位置完全不同 —— 中文乾淨**不代表**英文乾淨（實測差 26 筆）。
-  ★ **也要加 `--profile=fitness` 再跑一次**：健身專區只在健身身分下才會被渲染，
-    不加這個參數就**整塊沒被看過**，報告全綠（假通過）。
-    該次也順帶發現「非長者（compact）字級」以前從來沒被稽核過。
-  ★ 這支腳本自己踩過「假通過」（估行數 → 0 筆）與「假警報」（量到子元素框
-    → 幾百筆），正確量法與排除清單見 `UI_RULES.md`。**不要憑感覺改回去。**
-★ **`min-w-0` ＋ `whitespace-nowrap` ＝ 保證溢出**（兩個加起來文字無路可走）。
-  要單行的標籤改 **`shrink-0`**，讓「可以折行的鄰居」去縮。
-  實測：標題列「LabelBuddy AI」因此在**全部 24 個畫面**溢出 48px。
-★ **`truncate` 用於「狀態摘要」等於讓該設計失效** —— 那些欄位的唯一用途
-  就是讓長者不展開也知道自己設了什麼。要折行，不要截斷。
-★ **孤行的常見成因是「flex 兄弟搶寬度」**：圖示／勾勾／間距都會吃掉同一行。
-  實測：模式卡片的「上傳：…」（最重要的一句）被選中勾勾擠到只剩 128px，
-  一行只放得下 6 個字。**把最重要的那行移出 flex 列、改獨立一行取全寬**
-  比縮文案更治本。
+## 🎨 字級縮放（**兩個密度模式**）
+`<html data-density>` 由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換，`index.css` 命中
+**四種**字級（16/18/19/20）：`compact`（非長者）14/16/17/18；`comfortable`（長者）**19/22/23/24**。
+★ **新增字級必須兩個模式都補一行**；寫在 `<html>` 而非包 div（fixed 元素才蓋得到）。
+★ **唯一例外：12px**（`LegalNotice.tsx`）刻意不受縮放影響。
+⚠️ 改動後**必須跑 `npm run check:layout`**，且**一定要加 `--lang=en`**（中文一字一方塊、英文以詞斷行，
+  中文乾淨**不代表**英文乾淨）與 **`--profile=fitness`**（不加就整塊沒被看過 → 報告全綠，**假通過**）。
+★ **`min-w-0` ＋ `whitespace-nowrap` ＝保證溢出** → 要單行的標籤改 **`shrink-0`**。
+★ **`truncate` 用於「狀態摘要」等於讓該設計失效**（那些欄位就是要讓長者不展開也知道設了什麼）→ 要折行。
+★ **孤行的常見成因是「flex 兄弟搶寬度」**（圖示／勾勾／間距都吃同一行）→
+  把最重要的那行**移出 flex 列、改獨立一行取全寬**比縮文案更治本。
 
 ## 📷 選圖入口
 **兩個 hidden input**：一個有 `capture="environment"`（拍照）、一個**沒有**（相簿）。
 ★ 加了 `capture` 就等於拿掉「選相簿」（手機會直接開鏡頭）。
 
 ## 🚪 首次啟動引導頁（09-30 改版；10-02 移除性別步驟）
-**流程**：`語言閘門` → 介紹→身分→**慢性病與過敏**→教學→AI 方式→私隱。
+流程：`語言閘門` → 介紹→身分→**慢性病與過敏**→教學→AI 方式→私隱。
 **頁數依身分**：長者 **8 頁**（教學分 3 頁）／其他 **6 頁**（教學 1 頁）。
-★★ **「不用滾動」指的是語言閘門，不是介紹頁**（2026-10-02 使用者明確區分）。
-  - 語言閘門：**必須一頁看完**，實測 597px / 640px（剩 43px）。
-    它以前從沒被量過 —— `measure-onboarding.mjs` 原本直接按掉才開始量。
-  - 介紹頁：**保留六條功能的說明、接受滾動**（972px / 超出 332px）。
-    ⚠️ 「6 條 ×(標題＋說明)」＝637px，而可用只有約 498px → 物理上塞不下。
-    要改成不滾動就必須砍說明，**兩者不可能同時成立**。
-★ **不顯示步數與進度條**（09-30 使用者指定：數字只增加壓力，且總數依身分變動）。
-★ **語言閘門不屬於編號流程**（用 `languageChosen` 布林值，不是 `buildSteps`）——
-  閘門要**先選再按「確定」**（點一下不生效）；題目**雙語**、選項用**母語名稱**。
-★ 第一頁＝**超市食品標籤辨識 App**：kicker＋標題＋六條功能清單
-  （拍標籤看結論／白話說明／飲食紀錄／食育學堂／健康問答／健康設定）。
-  ⚠️ 原本的「模擬標籤 → 綠燈」圖解已於 09-30 依使用者要求移除。
-  ★ **10-02：六條功能的「說明行」已移除**（只留標題）。
-    量出來的預算：640px 畫面扣掉內距與底部按鈕 68px，**只有約 498px 給內容**，
-    而「6 條 × (標題＋說明)」實測就要 637px —— 物理上塞不下。
-    第 1 頁 1010 → **626px（剩 14px）**。
-    ⚠️ 要把說明加回來，就必須同時接受「這一頁要滾動」——兩者不可能同時成立。
-  ★ 內距／間距用**明確 px**（`p-[14px]`）：`:root{font-size:20px}` 讓 `p-4`
-    `gap-4` 實際是 **20px**，不是 16px。
-★ 用 `StepId` 陣列而不是數字；回頭改身分**必須對 step 夾取**；
-  `selectedConditions` 的 state **必須宣告在 `handleOnboardingComplete` 之前**。
+★ **「不用滾動」指的是語言閘門，不是介紹頁**（閘門實測 597/640px；介紹頁保留六條功能、接受滾動）。
+★ **不顯示步數與進度條**（09-30 使用者指定：數字只增加壓力）。
+★ **語言閘門不屬於編號流程**（用 `languageChosen` 布林，不是 `buildSteps`）——
+  閘門要**先選再按「確定」**；題目**雙語**、選項用**母語名稱**。
+★ 第一頁＝kicker＋標題＋六條功能清單（**說明行 10-02 已移除**：640px 扣內距與底部按鈕只剩約 498px）。
+★ 內距／間距用**明確 px**（`:root{font-size:20px}` 讓 `p-4`／`gap-4` 實際是 20px）。
+★ 用 `StepId` 陣列而不是數字；回頭改身分**必須對 step 夾取**。
 
 ## 🔤 難字簡化（09-30 使用者指定）
 鈉→**鹽分**、膳食纖維→**纖維**、飽和脂肪→**動物油**、添加糖→**糖**（碳水化合物不變）。
-★ **單一對照表**（`src/data/bilingual.ts`）+ **進出邊界轉換**：提示詞用簡化名稱；
-  內部鍵保持 **canonical**；`nutrient_facts.name` 輸出 canonical → 前端依語言顯示。
-  ★ 若在後端寫死簡化名稱，**英文介面會露出中文**。
-★★ **改映射函式時必須 grep 所有消費者** —— `NutrientFactBars` 直接渲染 `fact.name`
-  與 `fact.unit`，改了函式沒改呼叫端 → 畫面照樣顯示「鈉」「毫克」，**不會報錯**。
-★ 後處理 `simplifyNutrientWording()` 只換**片語**，**不碰單一個「鈉」字** ——
-  **L-麩酸鈉（味精）／苯甲酸鈉／碳酸鈉** 也是「鈉」結尾。★ **寧可漏換，不要錯換。**
-  ⚠️ 不套用到 `ingredients_detected`（標籤原文）。
+★ **單一對照表**（`src/data/bilingual.ts`）＋**進出邊界轉換**：提示詞用簡化名稱；內部鍵保持
+  **canonical**；`nutrient_facts.name` 輸出 canonical → 前端依語言顯示
+  （後端寫死簡化名 → **英文介面會露出中文**）。
+★★ **改映射函式時必須 grep 所有消費者**（`NutrientFactBars` 直接渲染 `fact.name` 與 `fact.unit`，
+  改了函式沒改呼叫端 → 畫面照樣顯示「鈉」「毫克」，**不會報錯**）。
+★ `simplifyNutrientWording()` 只換**片語**、**不碰單一個「鈉」字**
+  （**L-麩酸鈉／苯甲酸鈉／碳酸鈉** 也是「鈉」結尾）—— **寧可漏換，不要錯換**；
+  **不套用到 `ingredients_detected`**（標籤原文）。
 ★★ **方向（上限 vs 目標）**：後端正規化**必須**帶 `getNutrientDirections(profileId)`，
   否則纖維／蛋白質被講成「每天上限」；排序也要「上限類優先」。
 ⚠️ **1mg 鈉 ≈ 2.5mg 鹽**；**改中文文案必須同步改 `localEngineEn.ts` 的鍵**（已踩 4 次）。
 
-## 🙋 介面原則：為普通人而寫（09-30 使用者指定）
-★ 原話：「**這個 App 是為了普通人而開發的，不要在頁面上有不用給用戶看的字。**」
-★ **不要出現**：OCR／規則引擎／快取／模型名稱／備援引擎／技術狀態／開發者註解式文案。
-★ 按鈕一律「拍／看」，不用「辨識／掃描」。
-★ 引導頁第一頁的任務只有一個：**3 秒內讓人知道這個 App 是做什麼的**
-  （先講結果，再用「拍這個 → 得到這個」的視覺對照）。
-⚠️ 改 UI 文案要**順手檢查 `check-ui-cjk.mjs`**（它用寫死的按鈕文字導覽）。
-★ **翻譯字串是純文字，不要寫 Markdown** —— `**粗體**` 會原樣顯示星號（踩過）。
-  這跟 Typst 的 `**` 是同一種誤用。
-
 ## 💾 儲存鍵與「清除所有資料」
-全部以 `labelbuddy` 開頭（語言／身分／性別／**分析模式**／慢性病／指標／紀錄／同意／引導頁／學習進度）。
-★ 清除用**前綴掃描**（`k.startsWith('labelbuddy')`），不是寫死清單；
-清完用 `location.reload()` 而非逐一重設 state（逐一重設會漏且不報錯）。
-詳見 `ARCHITECTURE.md`。
+全部以 `labelbuddy` 開頭（語言／身分／分析模式／慢性病／指標／紀錄／同意／引導頁／學習進度／健身）。
+★ 清除用**前綴掃描**（`k.startsWith('labelbuddy')`），不是寫死清單；清完 `location.reload()`
+  （逐一重設 state 會漏且不報錯）。詳見 `ARCHITECTURE.md`。
 
 ## 📊 後端數值與文字處理
 ★ **鐵則：模型只讀出「含量」，百分比一律由後端重算**（`normalizeNutrientFacts`），
-  而且**三條路徑都要套用**：雲端成功／**快取命中**／本機備援（漏掉快取會回傳舊格式）。
+  **三條路徑都要套用**：雲端成功／**快取命中**／本機備援（漏掉快取會回傳舊格式）。
 ⚠️ **limit 與 target 方向相反**（鈉 120% 是壞事、蛋白質 120% 是好事）。
 ⚠️ 簡繁表只收「一對一無歧義」的字（后/後、干/乾、里/裡、面/麵、只/隻、發/髮 不列）。
-  看到簡體字先查是不是新字不在表內，**別急著換模型**。細節見 `ARCHITECTURE.md`。
+  看到簡體字先查是不是新字不在表內，**別急著換模型**。
 
-## 🧪 驗證機制（**改動翻譯／稱謂／快取／模式／引導頁後必跑**）
-`check:i18n`（引擎輸出掃 CJK）｜`check:cache`（11）
-｜`check:diet`（15）｜`check:mode`（**閘門＋用字＋方向 26，會啟動伺服器**）
-｜`check:lookup`（**對照表孤兒鍵 9 張**）｜`check:ui`（真實 Chrome **17 畫面**）
-｜`check:layout`（**溢出／孤行；要跑中英 × 長者/健身 四種組合**）
-｜`measure:onboarding`（引導頁逐頁高度＋**第 1 頁高度組成**）
-｜`verify:all`（全部）
+## 📋 飲食紀錄（DietRecord）
+★ **紀錄跟隨「標籤本身的語言」**，與介面語言無關（「照片是什麼語言，紀錄就是什麼語言」）。
+  `lang` 在建立時固定；介面語言 ≠ 標籤語言時用**本機引擎就地重新產生**（純函式、離線、不花額度）。
+  品名用 `extractFoodName`（**標籤原文品名**）。
 
-★★★ **「假通過」比紅燈危險。** 三種形狀：① 腳本寫死頁數（引導頁 3→9 頁後偵測不到，
-  15 畫面全拍到引導頁卻全綠）② **不確定性**（UI 檢查只走雲端，模型不一定回傳
-  `nutrient_facts` → 長條圖不渲染 → 掃不到 → 通過但沒驗到，單位翻譯 bug 因此躲過）
-  ③ 改按鈕文字但腳本還在找舊字。
-  → 對策：**頁數用 `\d+`；要有確定性來源；要斷言「東西真的出現了」**。
-★★★ **檢查腳本的錨點一律用穩定 id，不要用文案**（已踩三次）。
-  現況：`id="onboarding-flow"`、`id="onboarding-language-gate"`。
-★ 靜態掃描（grep）只能找線索，**不能當驗收**。最終一定要用瀏覽器實際渲染。
+## 🧪 驗證機制（改動翻譯／稱謂／快取／模式／引導頁後必跑）
+`check:i18n`（引擎輸出掃 CJK）｜`check:cache`（11）｜`check:diet`（15）
+｜`check:mode`（**閘門＋用字＋方向 26，會啟動伺服器**）｜`check:lookup`（**對照表孤兒鍵 9 張**）
+｜`check:ui`（真實 Chrome **17 畫面**）｜`check:layout`（**中英 × 長者/健身 四組合**）
+｜`measure:onboarding`（逐頁高度）｜`verify:all`（全部）。
+★★★ **「假通過」比紅燈危險**：① 腳本寫死頁數 ② **不確定性**（只走雲端，模型不一定回傳
+  `nutrient_facts` → 長條圖不渲染 → 掃不到 → 通過但沒驗到）③ 改按鈕文字但腳本還在找舊字。
+  → **頁數用 `\d+`；要有確定性來源；要斷言「東西真的出現了」**。
+★★★ **檢查腳本的錨點一律用穩定 id，不要用文案**（已踩三次；現有 `id="onboarding-flow"`、
+  `id="onboarding-language-gate"`）。★ 靜態掃描（grep）只能找線索，**不能當驗收**。
 ★ 引導頁段落**必須先勾同意勾選框**才能按「開始使用」。
 ★ **設定 localStorage 要在走完引導頁之後**（引導頁的預設值會覆寫回去）。
 ★ 不要用 `| head` 接 node 腳本（SIGPIPE 殺掉它）。細節見 `ARCHITECTURE.md`。
 
 ## 使用者決策與節奏
-1. **🚀 每次任務完成後自動部署上線（09-29）**
-   原話：「在每一次完成我給你的任務時你也要自動為我上傳線上」→ **不用問、不用等確認**。
+1. **🚀 每次任務完成後自動部署上線（09-29）** → **不用問、不用等確認**。
    ⚠️ 但**破壞性操作仍要先問**（刪檔、改架構、動他的資料）。
-2. **🧹 死檔要刪除或合併（09-29）** → 刪前必須可達性分析 ＋ 字串搜尋雙重證明；刪後 `tsc` ＋ build ＋ 檢查腳本全過。
+2. **🧹 死檔要刪除或合併（09-29）** → 刪前必須可達性分析＋字串搜尋雙重證明；
+   刪後 `tsc`＋build＋檢查腳本全過。
 3. **一律先給計劃、確認後才動檔案**（但第 1、2 點已預先授權）。
 4. 使用者說「**Google**」常指 **Chrome 瀏覽器** → 模糊指涉先問來源。
 5. 每次回覆結束前**明確告訴他下一步要做什麼**。
@@ -375,3 +257,4 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 | 架構細節／踩坑 | `.workbuddy-ai/memory/ARCHITECTURE.md` |
 | 逐日工作日誌 | `.workbuddy-ai/memory/YYYY-MM-DD.md` |
 | 專案交接文件 | `docs/專案交接文件.md`（＋ .pdf） |
+| 跨 AI 溝通板 | `AI_COLLAB.md` |

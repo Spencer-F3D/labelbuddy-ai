@@ -90,6 +90,15 @@ const ACCENT_STYLES: Record<
     text: 'text-purple-900',
     badge: 'bg-purple-700',
   },
+  /* ★ 孕婦（2026-10-04）：用 rose。
+     ⚠️ 刻意**不做粉紅／心形之類的聯想**，只是一個可辨識的色相 ——
+        身分卡片要讓人選得清楚，不是要傳達某種形象。 */
+  pregnant: {
+    ring: 'ring-rose-500 border-rose-600',
+    bg: 'bg-rose-50',
+    text: 'text-rose-900',
+    badge: 'bg-rose-700',
+  },
 };
 
 function ProfileCard({

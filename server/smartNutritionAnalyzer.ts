@@ -9,7 +9,12 @@
  * 並針對長者勾選的各項身體指標進行精確的健康風險評估與白話文朗讀生成。
  */
 
-import { LabelAnalysisResult, RiskLevel, NutrientFact } from '../src/types';
+import {
+  LabelAnalysisResult,
+  RiskLevel,
+  NutrientFact,
+  LearnerProfileId,
+} from '../src/types';
 // 難字簡化（2026-09-30）：查教學點前先把名稱還原成 canonical，
 // 避免日後有人把簡化名稱直接餵進來時靜默查不到（本專案踩過三次同型 bug）。
 import { canonicalNutrientName, nutrientName } from '../src/data/bilingual';
@@ -277,6 +282,73 @@ export function buildEducationFields(
  *
  * @param numericLimits 選填。帶入後會一併產生 nutrient_facts（供前端畫百分比長條圖）
  */
+/**
+ * ★★ 孕期危險成分（2026-10-04 新增「孕婦」身分時加入）。
+ *
+ * 【為什麼需要這一組，而不是靠數字上限】
+ *   其他身分是「某項數字要低一點」；孕婦除此之外還有
+ *   **「某些成分絕對不能出現」**。酒精 0.5 公克不會讓任何數字超標，
+ *   但對胎兒就是風險 —— 用營養數字永遠抓不到這種問題。
+ *   所以這裡是**成分層級**的把關，且直接判紅燈。
+ *
+ * 【分級】
+ *   hard = 紅燈：孕期公認應完全避免（酒精、生食、未殺菌、高汞魚）
+ *   soft = 至少黃燈：需要限量而非禁絕（咖啡因等）
+ *
+ * ⚠️ 關鍵字要避開「同字不同物」的誤判：
+ *    `酒` 必須排除 `酒石酸`（酒石酸是常見的合法食品添加物，無酒精）
+ *    `生` 不能單獨比對（「花生」「生粉」都會誤中）
+ */
+const PREGNANCY_HAZARDS: Array<{
+  kind: 'hard' | 'soft';
+  label: string;
+  pattern: RegExp;
+  advice: string;
+}> = [
+  {
+    kind: 'hard',
+    label: '酒精',
+    // 先排除「酒石酸」再比對酒類字樣
+    pattern:
+      /(?!酒石酸)(酒精|米酒|料理酒|紹興|花雕|酒釀|清酒|葡萄酒|紅酒|白酒|啤酒|高粱|威士忌|白蘭地|蘭姆|伏特加|龍舌蘭|利口酒|酒漬|酒粕|alcohol|ethanol|wine|beer|sake|whisk|vodka|rum|brandy|liqueur|spirit)/i,
+    advice: '含酒精的食品孕期沒有已知的安全劑量，請完全避開。',
+  },
+  {
+    kind: 'hard',
+    label: '生食或未殺菌製品',
+    // ⚠️ 「生」不單獨比對（花生、生粉、生菜都會誤中），只比對明確的組合
+    pattern:
+      /(生魚片|刺身|生蠔|生蚵|生蛋|生乳|生奶|溏心|半熟|未殺菌|未經殺菌|未煮熟|未全熟|raw fish|raw egg|raw milk|unpasteuri|unpasteurized|poached|medium rare)/i,
+    advice: '生食與未殺菌製品有感染風險（李斯特菌、沙門氏菌），請改吃全熟或經殺菌的版本。',
+  },
+  {
+    kind: 'hard',
+    label: '高汞魚類',
+    pattern:
+      /(鯊魚|劍魚|旗魚|馬鮫|方頭魚|大耳馬鮫|油魚|shark|swordfish|marlin|king mackerel|tilefish)/i,
+    advice: '這類大型掠食魚的甲基汞含量較高，孕期建議改吃鮭魚、鯖魚、秋刀魚等小型魚。',
+  },
+  {
+    kind: 'soft',
+    label: '咖啡因',
+    pattern: /(咖啡|咖啡因|可可|巧克力|能量飲料|濃茶|caffeine|coffee|cocoa|chocolate|energy drink)/i,
+    advice: '咖啡因每日建議不超過 200 毫克（約一杯中杯美式），茶、可樂、巧克力也要算進去。',
+  },
+];
+
+/**
+ * 檢查成分裡有沒有孕期危險項目。
+ *
+ * @returns 命中的項目（含分級與說明）
+ */
+function findPregnancyHazards(profile: NutritionProfile): typeof PREGNANCY_HAZARDS {
+  const text = [...profile.ingredients, ...profile.allergens, profile.foodName]
+    .filter(Boolean)
+    .join(' ');
+  if (!text.trim()) return [];
+  return PREGNANCY_HAZARDS.filter((h) => h.pattern.test(text));
+}
+
 export function analyzeNutritionWithIndicators(
   profile: NutritionProfile,
   selectedConditions: string[],
@@ -288,7 +360,17 @@ export function analyzeNutritionWithIndicators(
    *    也就是使用者沒有明確同意上傳時，全部由這裡判斷。
    *    所以英文介面要真的可用，這裡必須跟著雙語 —— 不能只做雲端提示詞。
    */
-  language: 'zh-TW' | 'en' = 'zh-TW'
+  language: 'zh-TW' | 'en' = 'zh-TW',
+  /**
+   * 學習者身分。
+   *
+   * ⚠️ **刻意設計成必要參數**，不是可選。
+   *    因為孕婦的危險成分把關只在身分為 `pregnant` 時執行 ——
+   *    若做成可選，日後新增呼叫端時漏傳就會**靜默跳過安全檢查**，
+   *    而且不會有任何錯誤訊息。
+   *    本專案已經吃過五次「不會報錯的 bug」的虧，這裡不重蹈覆轍。
+   */
+  profileId?: LearnerProfileId
 ): LabelAnalysisResult {
   /** 依語言挑字串。中文是預設，英文只在 language === 'en' 時使用。 */
   const L = (zh: string, en: string) => (language === 'en' ? en : zh);
@@ -440,6 +522,33 @@ export function analyzeNutritionWithIndicators(
       matchedConditions.push('麵粉麩質 (肚子易脹氣)');
       riskScore += 2;
     }
+  }
+
+  /**
+   * ★★ 孕期危險成分把關（2026-10-04）。
+   *
+   * 位置刻意放在「決定總體風險」之前 ——
+   * 因為它會直接把 riskScore 推到紅燈門檻（>=3），
+   * 後面的 >=3 / >=1 / else 三段判決就會自然走到紅燈那一段。
+   */
+  const pregnancyHazards = profileId === 'pregnant' ? findPregnancyHazards(profile) : [];
+  const hardHazards = pregnancyHazards.filter((h) => h.kind === 'hard');
+  const softHazards = pregnancyHazards.filter((h) => h.kind === 'soft');
+
+  if (hardHazards.length > 0) {
+    for (const h of hardHazards) {
+      concerns.push(`🔴 檢出【${h.label}】：${h.advice}`);
+      matchedConditions.push(`孕期應避免（${h.label}）`);
+    }
+    // 直接推到紅燈門檻 —— 這種東西不是「少吃一點」，是「不該吃」
+    riskScore = Math.max(riskScore, 3);
+  } else if (softHazards.length > 0) {
+    for (const h of softHazards) {
+      concerns.push(`🟡 含有【${h.label}】：${h.advice}`);
+      matchedConditions.push(`孕期需限量（${h.label}）`);
+    }
+    // 限量類：至少黃燈，但不單獨推到紅燈
+    riskScore = Math.max(riskScore, 1);
   }
 
   /**

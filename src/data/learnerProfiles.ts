@@ -93,7 +93,8 @@ const TEEN_SUGAR: NutritionTarget = {
 
 /* ---------------------------------------------------------------------------
  * 七種身分
- *   長者 senior／兒童 child／青少年 teen／健身人士 fitness／青年 young／中年 middle／學生 student
+ *   長者 senior／兒童 child／青少年 teen／健身人士 fitness／青年 young／
+ *   中年 middle／學生 student／孕婦 pregnant（2026-10-04 新增）
  * ------------------------------------------------------------------------- */
 
 const PROFILES: LearnerProfile[] = [
@@ -392,6 +393,79 @@ const PROFILES: LearnerProfile[] = [
     recommendKeywords: ['低鈉', '高纖', '少油', '無糖', '原型食物'],
     preferredTopics: ['basics', 'dangers', 'shopping', 'profiles'],
   },
+
+  /* ======================= 8. 孕婦（2026-10-04 新增） =======================
+   *
+   * ★★ 這個身分與其他七個的**性質不同**，寫的時候要記得：
+   *   其他身分主要是「某項數字要低一點」；
+   *   孕婦除此之外還有「**某些成分絕對不能有**」——
+   *   酒精、生食、未殺菌製品、高汞魚類。
+   *   那不是「超標」而是「不該出現」，所以：
+   *     · targets 裡列「酒精 0」是刻意的（沒有已知的安全劑量）
+   *     · 規則引擎另有一條**成分層級**的把關
+   *       （見 smartNutritionAnalyzer 的 PREGNANCY_HAZARDS）
+   *
+   * ⚠️ 名稱用「孕婦」而不是「懷孕」——那是使用者的說法，
+   *    而且身分卡片顯示的是「人」不是「狀態」。
+   */
+  {
+    id: 'pregnant',
+    name: '孕婦',
+    emoji: '🤰',
+    accent: 'rose',
+    focusSummary: '懷孕期間「吃得安全」比「吃得營養」更要緊，最怕吃到不該吃的東西',
+    aiPersona:
+      '像一位細心溫和的產科護理師：先講「能不能吃」，再講營養。語氣安定、不製造恐慌，但遇到不確定的成分要明確說「不確定就不要吃，先問您的醫生」',
+    aiFocus: '酒精、生食與未殺菌製品、高汞魚類、咖啡因、鈉、葉酸／鐵／鈣',
+    targets: [
+      {
+        nutrient: '酒精',
+        target: '0（完全避免）',
+        direction: 'limit',
+        note: '懷孕期間沒有已知的安全劑量，含酒精的料理（米酒、紹興酒）也要算在內',
+      },
+      {
+        nutrient: '咖啡因',
+        target: '200 毫克',
+        direction: 'limit',
+        note: '約等於一杯中杯美式；茶、可樂、能量飲料、巧克力都含有咖啡因',
+      },
+      SODIUM_STANDARD,
+      SUGAR_STANDARD,
+      {
+        nutrient: '葉酸',
+        target: '600 微克',
+        direction: 'target',
+        note: '胎兒神經管發育的關鍵營養素，深綠色蔬菜與豆類含量豐富',
+      },
+      {
+        nutrient: '鐵',
+        target: '27 毫克',
+        direction: 'target',
+        note: '孕期需求量約為平時的 1.5 倍，紅肉、深綠蔬菜、豆類可補充',
+      },
+      {
+        nutrient: '鈣',
+        target: '1000 毫克',
+        direction: 'target',
+        note: '供應胎兒骨骼發育，乳製品、小魚乾、板豆腐是主要來源',
+      },
+    ],
+    numericLimits: {
+      鈉: { value: 2000, unit: '毫克' },
+      添加糖: { value: 50, unit: '公克' },
+      咖啡因: { value: 200, unit: '毫克' },
+    },
+    learningObjectives: [
+      '認出成分表裡的酒精：不只有「酒」，米酒、料理酒、紹興酒、酒釀都算',
+      '知道哪些魚要避開：鯊魚、劍魚、旗魚、馬鮫等大型掠食魚類汞含量較高',
+      '看懂「未殺菌」字樣：生乳、未殺菌乳酪、生蛋製品有感染風險',
+      '知道咖啡因不只在咖啡裡：濃茶、可樂、能量飲料、巧克力也算',
+      '養成「不確定就問醫生，不要自己判斷」的習慣',
+    ],
+    recommendKeywords: ['無酒精', '全熟', '經殺菌', '低鈉', '高鈣', '高鐵', '葉酸'],
+    preferredTopics: ['basics', 'dangers', 'reading', 'shopping'],
+  },
 ];
 
 /* ---------------------------------------------------------------------------
@@ -463,6 +537,13 @@ export const PROFILE_AGE_ORDER: LearnerProfileId[] = [
   'student', // 學生
   'young', // 青年
   'fitness', // 健身人士（不以年齡定義）
+  /**
+   * ★ 孕婦也**不以年齡定義**（20～40 歲都可能）。
+   *   和健身人士一樣放在成年人的區段裡，不打斷「由年輕到年長」的閱讀動線。
+   *   ⚠️ 畫面上就是「青年 → 健身人士 → 孕婦 → 中年 → 長者」；
+   *      要調整只動這個陣列就好，不必改任何元件。
+   */
+  'pregnant', // 孕婦
   'middle', // 中年
   'senior', // 長者
 ];

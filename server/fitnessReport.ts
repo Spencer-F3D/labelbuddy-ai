@@ -17,6 +17,8 @@
  *   ⚠️ 健身專區的介紹頁寫的是「紀錄只存在這台手機裡」——
  *      所以前端按鈕上**必須**寫明這個動作會把統計數字送到雲端，
  *      否則就是在使用者不知道的情況下打破自己的承諾。
+ *   ★ 2026-10-04 補上同意閘門：分析模式為「只在本機」時**完全不呼叫雲端**
+ *     （前端不提供按鈕 + 後端 `localOnly` 檢查雙重把關，見 `FitnessReportInput.localOnly`）。
  *
  * 【為什麼一定要有離線備援】
  *   NIM 的冷啟動可能長達 86～156 秒（實測）。使用者按了按鈕不該看到「失敗」。
@@ -42,6 +44,20 @@ export interface FitnessReportInput {
   /** 每日目標 */
   targetKcal?: number;
   targetProteinG?: number;
+  /**
+   * 同意閘門（2026-10-04 補上）。
+   *
+   * ⚠️ 這個欄位是**由前端依 `analysisMode` 推導**後送來的，不是使用者自己傳的參數。
+   *    `true` = 使用者選了「只在本機」→ 這個請求**一個位元都不能離開裝置**。
+   *
+   * 【為什麼一定要有】
+   *   先前這個端點**完全沒有檢查**：使用者在「只在本機」模式下按下
+   *   「用 AI 產生這週的報告」，統計數字照樣被送到 NVIDIA。
+   *   畫面上不會有任何異狀 —— 這是「不會報錯、只會偷偷違背承諾」的 bug，
+   *   與 `analyze-indicators`／`ask-health-question` 先前踩過的是同一類。
+   *   前端現在會直接擋住（不提供按鈕），這裡是**第二道防線**。
+   */
+  localOnly?: boolean;
 }
 
 export interface FitnessReport {
@@ -161,6 +177,13 @@ function buildSystemInstruction(en: boolean): string {
  */
 export async function generateFitnessReport(input: FitnessReportInput): Promise<FitnessReport> {
   const en = input.language === 'en';
+
+  // ★ 同意閘門（第二道防線）：使用者選「只在本機」→ 直接回本機版，不呼叫任何外部服務。
+  //   前端已經不會在 local_only 時送出這個請求；這裡再擋一次，
+  //   確保「就算有人直接打這個 API」也不會外洩。
+  if (input.localOnly === true) {
+    return buildLocalFitnessReport(input);
+  }
 
   const ai = await callNvidiaNim({
     systemInstruction: buildSystemInstruction(en),

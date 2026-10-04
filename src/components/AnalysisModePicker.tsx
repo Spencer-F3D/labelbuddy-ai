@@ -16,7 +16,10 @@
  *   這是三個模式唯一的差別，也是使用者做選擇的唯一依據。
  *   只寫「準確 / 快速 / 私密」這種形容詞是不夠的 ——
  *   使用者有權知道**具體哪一項資料**會被送出去。
- *   這一行與後端 `handlers.ts` 的 `localOnly` 判斷必須一致。
+ *   這一行與後端**所有** `localOnly` 判斷必須一致 —— 目前有三處：
+ *   `server/handlers.ts` 的 analyze-label／ask-health-question，
+ *   以及 `server/fitnessReport.ts` 的 fitness-report（2026-10-04 補上）。
+ *   新增任何會呼叫雲端的功能時，這裡的文案與該功能的閘門都要一起改。
  */
 
 import React from 'react';

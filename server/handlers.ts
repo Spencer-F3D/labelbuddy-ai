@@ -376,6 +376,35 @@ ${promptContext}`;
         aiResult.data.data_handling = 'cloud';
         aiResult.data.learner_profile_id = learnerProfile.id;
         aiResult.data.learner_profile_name = profileName(learnerProfile.id, learnerProfile.name, language);
+
+        /**
+         * ★★ 2026-10-04：**顏色一律不採信 AI** —— 照片有問題時強制改掉綠燈。
+         *
+         * 【問題】使用者回報「本機模式會把不是食物、沒有任何成分的東西（如紙）
+         *   也說可以食用」。實測找到真正的原因在**雲端路徑**：
+         *   AI 正確地判斷「這不是食物標籤」，但同時回了 `risk_level: "green"`。
+         *   於是畫面上是一張**綠燈卡片**（綠色在這個 App 就是「可以吃」），
+         *   標題卻寫「這不是食物標籤」—— 使用者看到的就是「說可以食用」。
+         *
+         * 【為什麼這一定要在後端擋】
+         *   `photo_issue` 在前端只用來決定「重拍按鈕的文字」，
+         *   沒有任何地方用它修正顏色。也就是說 AI 一旦回錯顏色，
+         *   前端完全沒有能力救 —— 而這件事已經發生過。
+         *
+         * 【修法】把 AI 的顏色當成建議，`photo_issue` 存在時一律至少黃燈：
+         *   不是食物標籤 / 照片模糊 → 不可能有「可以放心吃」的結論，
+         *   因為**根本沒有讀到這份食品的資料**。
+         *   ★ 這與本專案的核心原則一致：顏色以確定性規則為準，AI 只提供文字。
+         */
+        if (aiResult.data.photo_issue) {
+          const before = aiResult.data.risk_level;
+          aiResult.data.risk_level = 'yellow';
+          console.log(
+            `[LabelBuddy AI] 照片問題 ${aiResult.data.photo_issue}：` +
+              `顏色由 ${before} 強制改為 yellow（沒有讀到食品資料，不能給綠燈）`
+          );
+        }
+
         // 模型漏給食育欄位時用確定性內容補上（由真實 nutrient_facts 推導）
         ensureEducationFields(aiResult.data, cloudFacts, language);
         writeCache(cacheKey, aiResult.data, aiResult.model, aiResult.provider);
@@ -443,7 +472,9 @@ ${promptContext}`;
       ocr.profile,
       conditions,
       learnerProfile.numericLimits,
-      language
+      language,
+      // ⚠️ 一定要傳身分 —— 孕婦的危險成分把關靠這個參數決定要不要執行
+      learnerProfile.id
     );
     // 引擎內部的比對關鍵字維持中文，這裡只把**輸出欄位**轉成英文。
     const localizedResult = translateLocalResult(smartResult, language);

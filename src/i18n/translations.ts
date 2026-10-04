@@ -420,7 +420,7 @@ const zhTW = {
   'onboard.fitnessPlanBody': '選目標（增肌／減脂／雕塑）與每週天數，直接排出課表。',
   'onboard.fitnessLogBody': '記下重量、組數、次數與休息，看得到這週練了多少。',
   'onboard.fitnessNutritionBody': '算出每日熱量與蛋白質目標，並記錄吃了什麼。',
-  'onboard.fitnessPrivacy': '健身紀錄只存在這台手機裡，不會自動上傳。只有您自己按下「用 AI 產生報告」時，才會把統計數字送出去。',
+  'onboard.fitnessPrivacy': '健身紀錄只存在這台手機裡，不會自動上傳。只有您自己按下「用 AI 產生報告」時，才會把統計數字送到雲端 AI；如果您選的是「只在本機」，這個按鈕不會出現。',
 
   'onboard.howTitle': '這個 App 怎麼用',  'onboard.how1Title': '第一步：拍照',
   'onboard.how1Body': '對著包裝後面那張表拍一張。光線亮一點、手不要晃。也可以從相簿選已經拍好的照片。',
@@ -749,19 +749,25 @@ const zhTW = {
   'fit.addMeal': '新增這一餐',
   'fit.todayKcal': '今天累計 {n} 大卡',
   'fit.unnamedMeal': '未命名',
-  'fit.mealNote': '營養素可以留空，只記熱量也可以。重點是**持續記**，不是記得多精確。',
+  'fit.mealNote': '營養素可以留空，只記熱量也可以。重點是持續記，不是記得多精確。',
   'fit.groupHint': '課表會涵蓋的部位：{list}',
   'fit.notForProfile': '健身專區只提供給「健身人士」這個身分。你目前的設定不是健身人士。',
   'fit.backHome': '回到主頁',
 
-  /* ── AI 健身週報（2026-10-02）
+  /* ── AI 健身週報（2026-10-02；同意閘門 2026-10-04）
      ★ 隱私原則：健身紀錄平常完全留在裝置上（專區介紹頁也是這樣寫的），
-       所以按鈕上的說明**必須自己講清楚會送出什麼** ——
+       所以按鈕上的說明必須自己講清楚會送出什麼 ——
        與標籤辨識的同意閘門是同一條原則：
-       「不可以在使用者不知道的情況下上傳」。 */
+       「不可以在使用者不知道的情況下上傳」。
+     ⚠️ 這些字串是**純文字**，不要寫 Markdown —— `**粗體**` 會原樣顯示星號。 */
   'fit.reportTitle': '這週的 AI 報告',
   'fit.reportNote':
-    '按下按鈕會把這週的**統計數字**送到雲端 AI（訓練天數、總訓練量、動作名稱、平均熱量）。逐筆紀錄與日期不會送出。',
+    '按下按鈕會用雲端 AI 產生這週的報告：會送出這週的統計數字（訓練天數、總訓練量、動作名稱、平均熱量），逐筆紀錄與日期不會送出。',
+  /* 「只在本機」時顯示（取代上面的說明，按鈕不渲染）。
+     報告本身仍然是真的用 AI 產生，只是這個模式不能連網 ——
+     所以這裡要告訴使用者「去哪裡改」，而不是偷偷降級成本機版。 */
+  'fit.reportNoteLocal':
+    '您目前選的是「只在本機」，紀錄不會離開這台手機，所以這個報告無法產生。想用 AI 產生這週的報告，請到「設定」把「AI 方式」改成「雲端」或「本機圖像識別」。',
   'fit.reportButton': '用 AI 產生這週的報告',
   'fit.reportLoading': 'AI 正在看您的紀錄…',
   'fit.reportError': '暫時拿不到報告。請稍後再試一次——紀錄都還在，不會不見。',
@@ -1102,7 +1108,7 @@ const en: Record<TranslationKey, string> = {
   'onboard.fitnessPlanBody': 'Pick a goal (build muscle / lose fat / tone) and days per week to get a plan.',
   'onboard.fitnessLogBody': 'Record weight, sets, reps and rest — and see how much you trained this week.',
   'onboard.fitnessNutritionBody': 'Get daily calorie and protein targets, and log what you ate.',
-  'onboard.fitnessPrivacy': 'Your training records stay on this phone and are never uploaded automatically. Only when you tap "Generate report with AI" are summary numbers sent.',
+  'onboard.fitnessPrivacy': 'Your training records stay on this phone and are never uploaded automatically. Only when you tap \u201cGenerate report with AI\u201d are summary numbers sent to a cloud AI. If you choose \u201cOn-device only\u201d, that button will not appear.',
 
   'onboard.howTitle': 'How this app works',
   'onboard.how1Title': 'Step 1: Take a photo',
@@ -1444,10 +1450,15 @@ const en: Record<TranslationKey, string> = {
   'fit.notForProfile': 'The fitness zone is only for the "Fitness" profile, and your current profile is not that one.',
   'fit.backHome': 'Back to home',
 
-  /* ── AI weekly fitness report (2026-10-02) ── */
+  /* ── AI weekly fitness report (2026-10-02; consent gate 2026-10-04) ── */
   'fit.reportTitle': 'This week\u2019s AI report',
   'fit.reportNote':
-    'Tapping the button sends this week\u2019s summary numbers to a cloud AI (training days, total volume, exercise names, average calories). Individual entries and dates are not sent.',
+    'Tapping the button uses a cloud AI to write this week\u2019s report: it sends this week\u2019s summary numbers (training days, total volume, exercise names, average calories). Individual entries and dates are not sent.',
+  /* Shown in "On-device only" mode (replaces the note above; the button is not rendered).
+     The report itself is still genuinely AI-written \u2014 this mode simply cannot go online,
+     so we tell the user where to change it instead of silently downgrading to on-device. */
+  'fit.reportNoteLocal':
+    'You are on \u201cOn-device only\u201d, so your records never leave this phone and this report cannot be generated. To get the AI report, open Settings and change the AI analysis mode to \u201cCloud\u201d or \u201cOn-device image recognition\u201d.',
   'fit.reportButton': 'Generate this week\u2019s report with AI',
   'fit.reportLoading': 'The AI is reading your log\u2026',
   'fit.reportError': 'Could not get a report right now. Please try again later \u2014 your records are safe.',
