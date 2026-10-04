@@ -16,6 +16,9 @@ Typst 語法自查工具（本專案專用）
   2. `| a | b |`     → Markdown 表格；Typst 會當純文字印出（不報錯）
   3. 標題內的 `★` 等   → 從純文字筆記搬過來時常見的殘留標記
   4. 行內程式碼含中文  → 若字型堆疊沒有中文字型，會靜默 fallback 到隸書
+  5. 表格列結尾多一個 ] → 用「括號平衡」判斷（不可用字面模式，會誤砍）
+  6. 表格列用全角逗號 ，當分隔 → 只在表格上下文爆錯，段落裡完全正常
+  7. 行首 `* `        → 在 block 內容裡會被當成清單標記 → unclosed delimiter
 """
 import io
 import re
@@ -70,6 +73,64 @@ def lint(path, fix=False):
     if raw_cjk:
         issues.append(("RAW_CJK", len(raw_cjk), "行內程式碼含中文（需確認字型堆疊有中文字型）"))
 
+    # 5. 表格列結尾多一個 ]（' ]],' → ' ],'）
+    #    ⚠️ 不能用「行尾是不是 ]],」這種字面模式判斷 —— 那會誤砍
+    #    `#text(...)[內容]],` 這種「本來就需要兩個 ]」的行（已實際踩過一次）。
+    #    正確判準：該行若「只開啟一個 [」卻「以 ], 結尾」，才是多餘的 ]。
+    trow = 0
+    newlines = src.split("\n")
+    for i, ln in enumerate(newlines):
+        st = ln.strip()
+        if not (st.startswith("[") and st.endswith("]],")):
+            continue
+        opens, closes = st.count("["), st.count("]")
+        # 正常表格列：`[內容],` → opens=1 且 closes=1
+        # 誤標者：`[內容]],` → opens=1 但 closes=2
+        if opens == 1 and closes == 2:
+            trow += 1
+            if fix:
+                newlines[i] = ln[: ln.rindex("]],")] + "],"
+    if trow:
+        issues.append(("TABLE_ROW", trow, "表格列結尾多一個 ] （會造成 unclosed delimiter）"))
+        if fix:
+            src = "\n".join(newlines)
+
+    # 5b. 表格資料列用全角逗號當「欄位分隔」
+    #     症狀：`error: the character `，` is not valid in code`
+    #     只在表格上下文才爆，純文字段落裡的全角逗號完全正常 → 所以必須限縮在表格內
+    lines5b = src.split("\n")
+    fw = 0
+    inside = False
+    for i, ln in enumerate(lines5b):
+        if re.match(r"\s*#table\(", ln):
+            inside = True
+            continue
+        if inside:
+            if re.match(r"\s*\)\s*$", ln):
+                inside = False
+                continue
+            st = ln.rstrip()
+            # 表格列：以 [ 開頭；若行中含有「]，[」或行內「，[」→ 是把全角逗號當分隔符
+            if st.lstrip().startswith("["):
+                if re.search(r"\]，\s*\[", st):
+                    fw += 1
+                    if fix:
+                        lines5b[i] = re.sub(r"\]，\s*\[", "], [", ln)
+    if fw:
+        issues.append(("FW_COMMA_TABLE", fw,
+                       "表格列用全角逗號 ，當分隔（Typst 只認半角 ,）"))
+        if fix:
+            src = "\n".join(lines5b)
+
+    # 6. 行首 `* ` 清單標記（在 block 內容裡會被當成標記語法 → unclosed delimiter）
+    star_items = 0
+    for ln in src.split("\n"):
+        st = ln.strip()
+        if st.startswith("* "):
+            star_items += 1
+    if star_items:
+        issues.append(("STAR_ITEM", star_items, "行首「* 」在 block 內會被當成清單（可能造成 unclosed delimiter）"))
+
     if fix and src != original:
         io.open(path, "w", encoding="utf-8", newline="\n").write(src)
 
@@ -91,7 +152,8 @@ def main():
         if not issues:
             print("  [OK] 沒有發現已知陷阱")
         for code, n, desc in issues:
-            mark = "FIXED" if (fix and code in ("MD_BOLD", "HEAD_MARK")) else "WARN "
+            auto = code in ("MD_BOLD", "HEAD_MARK", "TABLE_ROW", "FW_COMMA_TABLE")
+            mark = "FIXED" if (fix and auto) else "WARN "
             print(f"  [{mark}] {n:>3} x {desc}")
             total += n
     print(f"\n合計 {total} 項" + ("（已就地修正可自動修的部分）" if fix else "（未修改，加 --fix 可自動修）"))
