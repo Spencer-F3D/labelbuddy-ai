@@ -23,14 +23,23 @@
 **排程**：09-28 雙語 ✅｜09-29 中性化＋條款 ✅｜09-30 三模式＋引導頁 ✅｜10-01~02 APK ✅ →
 10-03~05 四份英文文件 → 10-06~08 Poster＋影片 → **10-09 提交**。
 
-## 🚀 部署（09-28 上線；每次任務完成**自動**執行）
+## 🚀 部署與「三管道一致」（每次任務完成**自動**執行）
 正式網址 `https://app.labelbuddy-ai.workers.dev`（Worker 名 = `wrangler.toml` 的 `name`；
 **唯一可靠來源是 `wrangler deploy` 最後一行**）。帳號 `kanhf28@gmail.com`，
 Account ID `4ffa5d1a862bdbeaef2782f9b9774034`，憑證在 `%APPDATA%\xdg.config\.wrangler\config\default.toml`。
 Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。版控 `Spencer-F3D/labelbuddy-ai`（Private）。
-⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。每次任務完成自動跑：
-`git push origin main` → `vite build` → `wrangler deploy` → **驗證**線上首頁引用的
-`assets/index-XXXX.js` 必須等於 `dist/assets/` 的檔名。
+★★ **收尾的唯一正確動作是 `npm run ship`**（＝ `node scripts/ship-all.mjs`，或雙擊「一鍵同步.bat」）：
+工作區乾淨 → 跑檢查 → `vite build` → `git push` → `wrangler deploy` → 出 APK →
+**`check-consistency.ts` 驗證線上／GitHub／APK 三者一致**（沒過就以非零結束碼失敗）。
+⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。
+★ **判定「一致」的方式**：建置時把指紋寫進 `dist/index.html` 的
+  `<meta name="x-build-id">`（＝ `<commit>[-dirty]+<原始碼內容雜湊>`，見 `scripts/build-stamp.mjs`）；
+  `cap sync` 會把它一起帶進 APK，線上網站同理 → 三者比對**指紋 ＋ bundle 的 sha256**。
+  **不比檔名**（檔名一樣內容可能不同）、**不比時間**（複製／checkout 都會改時間）。
+★ 指紋含 commit → **任何 commit（連只改 .md）都要重新 ship**（使用者指定「每次改動都三者同步」）。
+★ 開發者面板（連點主標 7 下）顯示執行中的建置指紋 → 一眼知道手機裝的是哪一版。
+★ `deploy-worker.mjs`（「部署上線.bat」）原本**沒有先 `vite build`**，而 `wrangler.toml` 的
+  assets 指向 `./dist` → 會把舊版推上線且顯示成功；`SECRETS` 也漏了 `NVIDIA_API_KEY`。兩者已修。
 
 ## 📦 APK 建置（`npm run apk` / 建立APK.bat）
 應用名稱與桌面檔名都是 **營養放大鏡**。JDK 21 在 `D://Java//jdk-21.0.12.1+1`（⚠️ Capacitor 8.x
@@ -257,6 +266,7 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 
 ## 使用者決策與節奏
 1. **🚀 每次任務完成後自動部署上線（09-29）** → **不用問、不用等確認**。
+   現在的做法是 `npm run ship`（三管道一起同步，見上面的部署章節）。
    ⚠️ 但**破壞性操作仍要先問**（刪檔、改架構、動他的資料）。
 2. **🧹 死檔要刪除或合併（09-29）** → 刪前必須可達性分析＋字串搜尋雙重證明；
    刪後 `tsc`＋build＋檢查腳本全過。
@@ -264,6 +274,10 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 4. 使用者說「**Google**」常指 **Chrome 瀏覽器** → 模糊指涉先問來源。
 5. 每次回覆結束前**明確告訴他下一步要做什麼**。
 6. **完成任務播單響、需要確認播雙響**（`C:\Users\Spencer\.workbuddy-ai\notify\notify.py done|ask`）。
+7. **★ 三管道一致（2026-10-04 明確要求）**：原話「**我要不管是你還是另一個 AI，
+   做了改動便要保證線上／GitHub／APK 三者要一致**」。
+   → 每次改動（**含只改文件**）收尾都要跑 `npm run ship`；
+   驗證不過就等於任務沒完成。**不要用時間或檔名猜，要用建置指紋 ＋ sha256。**
 
 ## 📄 關鍵文件位置
 | 文件 | 位置 |
