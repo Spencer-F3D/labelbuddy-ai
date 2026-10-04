@@ -47,6 +47,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,10 +70,50 @@ const bad = (m) => {
   failures++;
 };
 
-const run = (cmd, cmdArgs, opts = {}) =>
-  spawnSync(cmd, cmdArgs, { cwd: ROOT, encoding: 'utf8', shell: false, ...opts });
+/**
+ * ★★ 執行外部程序 —— 一定要用 `stdio: 'inherit'`。
+ *
+ * 【為什麼】（2026-10-04 實測，花了三輪才找出來）
+ *   在這個沙箱環境裡，用 `spawnSync(cmd, args, { encoding: 'utf8' })`
+ *   （＝把 stdout 接管成 pipe）會**直接失敗**：
+ *     `EBUSY spawnSync <任何執行檔>`
+ *   而且 `cmd.exe`、`git.exe`、`python.exe`、`node.exe` **全部一樣** ——
+ *   不是某個程式的問題，是「接管 stdio」這件事本身被擋。
+ *   （`shell: true` 也一樣失敗，而且那本來就不該用。）
+ *
+ *   實測對照：
+ *     spawnSync(..., { encoding:'utf8' })  → EBUSY
+ *     spawnSync(..., { stdio:'inherit' })  → ✅ status 0
+ *     execFileSync(..., { stdio:'inherit' }) → ✅
+ *
+ *   → 代價是**拿不到子程序的輸出**，只能拿到結束碼。
+ *     所以本腳本的驗證一律改成「看結束碼 + 自己查檔案／網路」，
+ *     不解析子程序的 stdout。
+ *     （`build-apk.mjs` 早就是這樣寫的，所以它一直都能跑 ——
+ *       我當初沒照抄它的 stdio 設定，才踩到這個坑。）
+ */
+const run = (cmd, cmdArgs) => {
+  const r = spawnSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: false });
+  return r.status ?? 1;
+};
 
-const git = (gitArgs) => run(GIT, ['-C', ROOT, ...gitArgs]);
+/** git 需要讀輸出 → 用檔案重導，不能接管 stdio */
+const git = (gitArgs) => {
+  const tmp = path.join(ROOT, '.tmp-git-out');
+  const r = spawnSync(
+    process.env.ComSpec || 'cmd.exe',
+    ['/d', '/s', '/c', `"${GIT}" -C "${ROOT}" ${gitArgs.join(' ')} > "${tmp}" 2>&1`],
+    { cwd: ROOT, stdio: 'inherit' }
+  );
+  let out = '';
+  try {
+    out = readFileSync(tmp, 'utf8');
+    rmSync(tmp, { force: true });
+  } catch {
+    /* 沒有輸出檔也没關係 */
+  }
+  return { status: r.status ?? 1, stdout: out, stderr: '' };
+};
 
 /** 從 dist/index.html 取出 bundle 檔名 */
 function distBundle() {
@@ -113,8 +154,9 @@ const remoteBefore = (git(['rev-parse', 'origin/main']).stdout ?? '').trim();
 /* ── 步驟 1：驗證 ─────────────────────────────────────────── */
 if (!SKIP_CHECKS) {
   step(1, '靜態檢查與測試');
-  const tsc = run(NODE, [path.join(ROOT, 'node_modules/typescript/bin/tsc'), '--noEmit']);
-  tsc.status === 0 ? ok('tsc') : bad('tsc 失敗\n' + (tsc.stdout ?? '').slice(0, 600));
+  run(NODE, [path.join(ROOT, 'node_modules/typescript/bin/tsc'), '--noEmit']) === 0
+    ? ok('tsc')
+    : bad('tsc 失敗（輸出在上面）');
 
   const checks = [
     'check-i18n-leaks',
@@ -124,8 +166,9 @@ if (!SKIP_CHECKS) {
     'check-analysis-mode',
   ];
   for (const c of checks) {
-    const r = run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]);
-    r.status === 0 ? ok(c) : bad(`${c} 失敗\n${(r.stdout ?? '').slice(0, 400)}`);
+    run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]) === 0
+      ? ok(c)
+      : bad(`${c} 失敗（輸出在上面）`);
   }
   if (failures > 0) {
     console.log('\n❌ 檢查未通過，中止。修正後再執行。');
@@ -150,8 +193,7 @@ else bad('找不到 dist/index.html 的 bundle 檔名');
 /* ── 步驟 3：GitHub ───────────────────────────────────────── */
 step(3, '推送到 GitHub');
 if (headBefore !== remoteBefore) {
-  const r = git(['push', 'origin', 'main']);
-  (r.status === 0 ? ok : bad)((r.stderr || r.stdout || '').trim().split('\n').slice(-1)[0] || 'pushed');
+  git(['push', 'origin', 'main']) === 0 ? ok('已推送') : bad('推送失敗');
 } else {
   ok('本機與遠端已同步，無需推送');
 }
@@ -168,7 +210,6 @@ step(4, '部署到 Cloudflare Workers');
 }
 
 /* ── 步驟 5：APK ──────────────────────────────────────────── */
-let apk = { file: null, bundle: null };
 if (!NO_APK) {
   step(5, '建置 APK（會自動刪除舊的）');
   const r = run(NODE, [path.join(ROOT, 'scripts/build-apk.mjs')], {
@@ -189,22 +230,14 @@ if (!NO_APK) {
       兩個 AI 各寫一套一致性檢查只會製造新的不一致。 */
 step(6, '★ 驗證三者一致（check:consistency）');
 {
-  const r = run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), 'scripts/check-consistency.ts']);
-  const out = ((r.stdout ?? '') + (r.stderr ?? '')).trim();
-  if (r.status === 0) {
-    ok('三者一致');
-    console.log(
-      out
-        .split('\n')
-        .filter((l) => /指紋|bundle|✅|sha256|GitHub|線上|APK/.test(l))
-        .slice(-14)
-        .map((l) => '     ' + l)
-        .join('\n')
-    );
-  } else {
-    bad('三者不一致 —— 以下是 check-consistency 的輸出');
-    console.log(out.slice(-2000));
-  }
+const consistencyStarted = Date.now();
+const consistencyCode = run(NODE, [
+  path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'),
+  'scripts/check-consistency.ts',
+]);
+consistencyCode === 0
+  ? ok(`三者一致（${((Date.now() - consistencyStarted) / 1000).toFixed(1)}s）`)
+  : bad('三者不一致 —— 上面是 check-consistency 的逐項輸出');
 }
 
 /* ── 結果 ─────────────────────────────────────────────────── */
