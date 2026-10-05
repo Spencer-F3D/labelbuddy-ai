@@ -2,7 +2,8 @@
 
 > **本檔只放「規則與紅線」，每條一行。實作細節一律放 `ARCHITECTURE.md`**（不注入，可任意長）。
 > 逐日 `memory/YYYY-MM-DD.md`｜UI 規則 `UI_RULES.md`｜跨 AI 溝通板 `AI_COLLAB.md`。
-> ⚠️ **超過約 17KB 會被截斷（尾段消失）→ 重要規則往前放。**｜整理：2026-10-04
+> ⚠️ 2026-10-05 實測：**17,475 bytes 的版本仍被完整注入**（含尾段），
+> 先前的「約 17KB 就截斷」是**推論錯誤**。上限未知，但仍維持精簡。｜整理：2026-10-05
 
 ## 🏆 比賽（最高優先）
 2026 全球青少年人工智能未來創新競賽（澳門中學生賽區）｜**截止 2026-10-09**
@@ -20,7 +21,9 @@
 ★ 產品名 **LabelBuddy AI** ≠ 隊名：**檔名與封面作品名不變**（章程 `ProjectName`＝作品名）。
 ★★ **開發期 AI 工具（必須揭露）**：**WorkBuddy AI**（AI agent，模型 **DeepSeek-V4.1-Flash**）
 ＝實作／重構／測試腳本／建置部署；**Google AI Studio**（**Gemini 3.8 Flash**）＝產品原型與試驗。
-提交物 → `Desktop/*_LabelBuddyAI.pdf`（來源 `.typ` 在同名 `_競賽提交_來源/`；排版細節見 `ARCHITECTURE.md`）。
+★★ **提交包（常設，日後從這裡交）→ `Desktop/競賽提交_LabelBuddyAI/`**：
+`1_要交的檔案/`（3 份 PDF）｜`2_原始碼與圖片/`（**可編譯** `.typ`＋`assets/`）｜
+`3_參考文件/`（12 份回饋紀錄 PDF+TYP）｜`說明.txt`（檢查清單＋AI 揭露清單）。
 ★ RR 有 **11 個刻意保留的中文字元**（`公克`／`酒石酸`／`花生`／`粵語（香港）`）＝技術引用，**不可刪**。
 
 ## 👤 使用者決策與節奏
@@ -186,8 +189,7 @@ Gemini 支援區域**不含中國澳門／香港／大陸**；三把金鑰皆回
 不是寫死清單；清完 `location.reload()`。
 
 ## 📄 關鍵文件位置
-提交物 3 份 PDF → `Desktop/*_LabelBuddyAI.pdf`（來源 `.typ`＋素材在同名 `_競賽提交_來源/`）；
-★ 桌面根目錄另有**可編譯** `.typ` 副本（路徑已指向子資料夾）→ **與子資料夾版分岔**；
-章程 PDF（掃描版）→ `Downloads/labelbuddy-ai/`；UI 規則 → `memory/UI_RULES.md`；
-**架構／實作細節（不注入，可任意長）** → `memory/ARCHITECTURE.md`；逐日誌 → `memory/YYYY-MM-DD.md`；
-交接文件 → `docs/專案交接文件.md`；跨 AI 溝通板 → `AI_COLLAB.md`。
+來源 `.typ`＋素材 → `Desktop/LabelBuddyAI_競賽提交_來源/`（★ 桌面根目錄另有路徑已改寫的
+`.typ` 副本，**與來源版分岔**，改動前先問改哪份）；章程 PDF（掃描版）→ `Downloads/labelbuddy-ai/`；
+UI 規則 → `memory/UI_RULES.md`；**架構／實作細節（不注入，可任意長）** → `memory/ARCHITECTURE.md`；
+逐日誌 → `memory/YYYY-MM-DD.md`；交接文件 → `docs/專案交接文件.md`；跨 AI 溝通板 → `AI_COLLAB.md`。
