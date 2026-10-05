@@ -24,9 +24,11 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync, statSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, statSync, readdirSync, unlinkSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { BUILD_ID_META_NAME } from './build-stamp.mjs';
+import { readBuildIdFromHtml, readZipEntry } from './lib/zip.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ANDROID_DIR = path.join(ROOT, 'android');
@@ -194,7 +196,7 @@ if (!existsSync(apkPath)) {
 }
 
 /**
- * ⚠️⚠️ **確認 APK 真的比網頁新**（2026-10-02 新增）
+ * ⚠️⚠️ **確認 APK 真的含有這次的網頁內容**（2026-10-02 建立、2026-10-05 改為比指紋）
  *
  * 【為什麼需要這道檢查】
  *   實際踩過：APK 建好了，但裡面的 JS bundle 是**上一個版本** ——
@@ -202,25 +204,85 @@ if (!existsSync(apkPath)) {
  *   看起來成功、內容卻是舊的 APK。
  *   這種錯誤**不會有任何錯誤訊息**，只會在你向評審展示時才發現。
  *
- * 【檢查方式】
- *   APK 的修改時間必須晚於 `dist/index.html`。
- *   如果 APK 比較舊，代表它沒有包含這次的網頁改動。
+ * 【為什麼從「比時間」改成「比建置指紋」（2026-10-05）】
+ *   舊做法：`apkMtime < distMtime` 就報錯。
+ *   ★ 問題：gradle 對「資產沒變」的建置會合理地判 `packageRelease` UP-TO-DATE
+ *     → APK 時間比 `dist/index.html` 舊，但**內容其實完全相同**。
+ *     於是每次「沒改程式碼也重新 ship」都會亮紅燈 ——
+ *     這正是 MEMORY 說的「狼來了」：真的紅燈會被淹沒在假警報裡。
+ *   → 新做法：直接讀 **APK 裡的建置指紋**（`assets/public/index.html` 的
+ *     `<meta name="x-build-id">`），與目前 `dist` 的指紋比對。
+ *     · *指紋相同* → 內容正確，**通過**（即使 APK 的檔案時間較舊）。
+ *     · *指紋不同* → 這才是真的拿到舊包，**失敗**（並提示清快取）。
+ *   ★ 為什麼不看檔案時間：時間只證明「檔案被寫過」，
+ *     複製、checkout、切分支都會改時間但內容不變（或反之）。
+ *     真正的一致性只有比*內容*才算數 —— 這也是 `check-consistency.ts` 的判準。
  */
 const distIndex = path.join(ROOT, 'dist', 'index.html');
-const apkMtime = statSync(apkPath).mtimeMs;
-const distMtime = statSync(distIndex).mtimeMs;
-if (apkMtime < distMtime) {
+const distHtml = readFileSync(distIndex, 'utf8');
+const distStamp = readBuildIdFromHtml(distHtml, BUILD_ID_META_NAME);
+
+const apkIndexBuf = readZipEntry(apkPath, 'assets/public/index.html');
+const apkStamp = apkIndexBuf ? readBuildIdFromHtml(apkIndexBuf.toString('utf8'), BUILD_ID_META_NAME) : null;
+
+/**
+ * ★★ 只比「內容指紋」，不比 commit（2026-10-05）。
+ *
+ * 【為什麼】
+ *   指紋格式是 `<commit>[-dirty]+<內容雜湊>`。
+ *   若比整個字串，那麼「只改了文件、沒動 App 程式碼」的新 commit
+ *   會讓 APK 的 commit 標記落後 → 被誤判為內容不同而失敗。
+ *   （實測：APK 為 `9fbd870+3eadec…`、dist 為 `6bcaf91+3eadec…`，
+ *    內容雜湊相同、只是期間提交了一份文件。）
+ *   → 與 `check-consistency.ts` 一致：**內容雜湊相同 = 同一份程式碼**，
+ *     commit 落後只是「警告」級，不是失敗。
+ *
+ * @returns {string | null} `+` 後面的內容雜湊；格式不符時回 null
+ */
+const contentFingerprint = (stamp) => {
+  const m = stamp && stamp.match(/\+([0-9a-f]+)$/);
+  return m ? m[1] : null;
+};
+
+const distFp = contentFingerprint(distStamp);
+const apkFp = contentFingerprint(apkStamp);
+
+if (!distFp) {
   die(
-    'APK 比網頁還舊 —— 它沒有包含這次的改動。',
-    `APK 時間：${new Date(apkMtime).toLocaleString()}\n` +
-      `   網頁時間：${new Date(distMtime).toLocaleString()}\n` +
+    'dist/index.html 沒有建置指紋（x-build-id）—— 網頁可能沒有正確建置。',
+    '請確認 vite.config.ts 的 buildStampPlugin 有生效，再重新執行。'
+  );
+}
+
+if (!apkFp) {
+  die(
+    'APK 內找不到網頁資產或建置指紋（assets/public/index.html）。',
+    'APK 可能沒有跑過 `cap sync`，或資產沒有被打包進去。\n' +
+      '   請先清掉 Android 的建置快取再試：\n' +
+      '     android\\gradlew.bat clean'
+  );
+}
+
+if (apkFp !== distFp) {
+  // 真正的失敗：APK 的*內容*與目前網頁不同 → 它沒有包含這次的改動
+  const apkMtime = statSync(apkPath).mtimeMs;
+  const distMtime = statSync(distIndex).mtimeMs;
+  die(
+    'APK 的內容與目前網頁不同 —— 它沒有包含這次的改動。',
+    `APK 內容指紋：${apkFp}\n` +
+      `   網頁內容指紋：${distFp}\n` +
+      `   （APK 完整指紋：${apkStamp}\n` +
+      `     網頁完整指紋：${distStamp}）\n` +
+      `   （APK 時間：${new Date(apkMtime).toLocaleString()}\n` +
+      `     網頁時間：${new Date(distMtime).toLocaleString()}）\n` +
       '   請先清掉 Android 的建置快取再試：\n' +
       '     android\\gradlew.bat clean\n' +
       '   （或直接刪掉 android\\app\\build 目錄）'
   );
 }
+
 const sizeMb = (statSync(apkPath).size / 1024 / 1024).toFixed(1);
-ok(`app-release.apk（${sizeMb} MB，比網頁新 ✅）`);
+ok(`app-release.apk（${sizeMb} MB，內容指紋 ${apkFp} ✅）`);
 
 /**
  * 刪除「舊的」APK（2026-10-04 使用者要求自動化）。

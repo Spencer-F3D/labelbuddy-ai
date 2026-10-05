@@ -58,8 +58,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { inflateRawSync } from 'node:zlib';
 import { BUILD_ID_META_NAME, computeBuildStamp } from './build-stamp.mjs';
+import { readBuildIdFromHtml, readZipEntry } from './lib/zip.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const APP_URL = process.env.APP_URL || 'https://app.labelbuddy-ai.workers.dev';
@@ -133,10 +133,13 @@ function parseBuildId(
   return { commit: m[1], fingerprint: m[3], dirty: !!m[2] };
 }
 
-/** 從 HTML 取出建置指紋 */
+/**
+ * 從 HTML 取出建置指紋。
+ * ⚠️ 實作已抽到 `scripts/lib/zip.mjs`（與 `build-apk.mjs` 共用），
+ *    這裡只做參數綁定 —— 避免兩處各有一份解析邏輯而分歧。
+ */
 function readBuildId(html: string): string | null {
-  const m = html.match(new RegExp(`<meta\\s+name="${BUILD_ID_META_NAME}"\\s+content="([^"]+)"`, 'i'));
-  return m ? m[1] : null;
+  return readBuildIdFromHtml(html, BUILD_ID_META_NAME);
 }
 
 /**
@@ -189,55 +192,9 @@ function readBundlePath(html: string): string | null {
 /**
  * 從 ZIP（APK 就是 ZIP）取出單一檔案的內容。
  *
- * 【為什麼自己實作，不呼叫 `unzip`／`jar`】
- *   - `unzip` 在 Windows 上不是內建指令，使用者雙擊 .bat 時不一定有。
- *   - `jar` 只能列出或解到磁碟，不能把內容印到 stdout。
- *   → 自己讀 ZIP 的 central directory 最可靠，而且沒有額外依賴。
- *
- * APK 的 assets 用 deflate 壓縮，所以要 `inflateRawSync`。
+ * ⚠️ 實作已抽到 `scripts/lib/zip.mjs`（與 `build-apk.mjs` 共用）。
+ *    **不要在這裡重新實作** —— 見 `scripts/lib/zip.mjs` 檔頭的說明。
  */
-function readZipEntry(zipPath: string, entryName: string): Buffer | null {
-  const buf = readFileSync(zipPath);
-
-  // 1. 從檔尾往前找 EOCD（End Of Central Directory，簽章 0x06054b50）
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= 0 && i > buf.length - 22 - 65536; i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) {
-      eocd = i;
-      break;
-    }
-  }
-  if (eocd < 0) return null;
-
-  const cdCount = buf.readUInt16LE(eocd + 10);
-  let p = buf.readUInt32LE(eocd + 16); // central directory 的起始位移
-
-  // 2. 走訪 central directory，找目標檔名
-  for (let n = 0; n < cdCount; n++) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) return null;
-    const method = buf.readUInt16LE(p + 10);
-    const compressedSize = buf.readUInt32LE(p + 20);
-    const nameLen = buf.readUInt16LE(p + 28);
-    const extraLen = buf.readUInt16LE(p + 30);
-    const commentLen = buf.readUInt16LE(p + 32);
-    const localOffset = buf.readUInt32LE(p + 42);
-    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
-
-    if (name === entryName) {
-      // 3. 讀 local header 才能算出資料真正的起點（local 的 extra 長度可能不同）
-      if (buf.readUInt32LE(localOffset) !== 0x04034b50) return null;
-      const lNameLen = buf.readUInt16LE(localOffset + 26);
-      const lExtraLen = buf.readUInt16LE(localOffset + 28);
-      const dataStart = localOffset + 30 + lNameLen + lExtraLen;
-      const data = buf.subarray(dataStart, dataStart + compressedSize);
-      if (method === 0) return Buffer.from(data); // stored
-      if (method === 8) return inflateRawSync(data); // deflate
-      return null; // 其他壓縮法（APK 的 assets 不會用到）
-    }
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return null;
-}
 
 /** 找出桌面最新的 APK */
 function findNewestApk(): string | null {

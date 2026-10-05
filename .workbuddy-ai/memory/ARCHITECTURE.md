@@ -189,6 +189,8 @@ footer 的 CTA 分支（`activeTab === 'xxx' ? ... : ...` 鏈）。漏掉 footer
 | `cloud_text` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | 雲端文字模型 |
 | `local_only` | 跑 OCR | **什麼都不送** | 本機規則引擎 |
 
+★ 本機規則引擎 = `src/utils/smartNutritionAnalyzer.ts`（純函式、離線、不花額度）。
+
 ### 資料流與閘門
 
 - `App.tsx` 的 `sendImageForAnalysis()` 依模式分流，抽出 `postAnalyzeLabel()` helper
