@@ -684,8 +684,8 @@ Base URL `https://integrate.api.nvidia.com/v1`，**無每日上限**。加速關
 ## 🚀 部署／APK 建置細節
 
 正式網址 `https://app.labelbuddy-ai.workers.dev`（Worker 名 = `wrangler.toml` 的 `name`；
-**唯一可靠來源是 `wrangler deploy` 最後一行**）。帳號 `kanhf28@gmail.com`，
-Account ID `4ffa5d1a862bdbeaef2782f9b9774034`，憑證 `%APPDATA%\xdg.config\.wrangler\config\default.toml`。
+**唯一可靠來源是 `wrangler deploy` 最後一行**）。帳號與 Account ID 已遮蔽
+（2026-10-06，此 repo 可能改為公開）；憑證 `%APPDATA%\xdg.config\.wrangler\config\default.toml`。
 Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。
 版控 `Spencer-F3D/labelbuddy-ai`（Private）。
 
