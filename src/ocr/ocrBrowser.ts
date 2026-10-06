@@ -87,7 +87,9 @@ import { createWorker, type Worker } from 'tesseract.js';
  *   **不支援 SIMD 的舊手機將完全無法使用本機 OCR**。
  *
  * → 大小 4.4 倍、速度 2.35 倍慢、精度沒有提升、還會犧牲舊裝置相容性。
- *   維持 `fast`。若日後真的要再試，`scripts/check-ocr-langs.mjs` 可直接量測。
+ *   維持 `fast`。
+ *   （當初的比較腳本已於 2026-10-06 移除；量測方式記在
+ *     `.workbuddy-ai/memory/ARCHITECTURE.md` 附錄 A4，要重測就照那份記錄重建。）
  */
 export const OCR_LANGS_PRIMARY = 'chi_tra+eng';
 export const OCR_LANGS_FALLBACK = 'chi_tra';
