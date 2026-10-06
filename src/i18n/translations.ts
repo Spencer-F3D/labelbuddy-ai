@@ -424,6 +424,14 @@ const zhTW = {
   /* ★ 2026-10-06：自填病症的輸入框只在設定頁（引導頁沒有輸入框），
      所以要明講去哪裡加 —— 否則使用者會以為只能選這幾項。 */
   'onboard.conditionsMore': '清單上沒有的病症，可以在之後的「健康設定」裡自行填寫。',
+  /* ★ 2026-10-06：常見補充病症收在一個折疊區裡（這一頁原本已 3.1 個螢幕高）。
+     ⚠️ `conditionsOtherSelected` 是**收合時的必要資訊** ——
+        收起「已選 2 項」的話，使用者會以為自己的勾選不見了。 */
+  'onboard.conditionsOther': '其他常見病症',
+  /* ⚠️ 這兩句必須**短到不會折行**（可用寬度約 176px，長者字級 19px）——
+     實測「點一下展開（6 項）」會斷成「項）」單獨一行。 */
+  'onboard.conditionsOtherHint': '點一下展開',
+  'onboard.conditionsOtherSelected': '已選 {n} 項',
   'onboard.identityTitle': '先問一下：您是誰？',
   'onboard.identityBody':
     '這個答案很重要。同一包食物，對不同的人結論可能完全相反。',
@@ -1137,6 +1145,9 @@ const en: Record<TranslationKey, string> = {
   'onboard.conditionsAllergyNote': 'Please tick any food you are allergic to.',
   'onboard.conditionsMore':
     'If your condition is not on the list, you can type it in later under "Health settings".',
+  'onboard.conditionsOther': 'Other common conditions',
+  'onboard.conditionsOtherHint': 'Tap to expand',
+  'onboard.conditionsOtherSelected': '{n} selected',
   'onboard.identityTitle': 'First, who are you?',
   'onboard.identityBody':
     'This answer matters. The same food can get opposite verdicts for different people.',

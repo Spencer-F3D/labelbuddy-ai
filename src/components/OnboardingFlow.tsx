@@ -157,6 +157,27 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   /** 第 3 頁的勾選（與設定頁共用同一個儲存鍵，由 App 負責存） */
   const [conditions, setConditions] = useState<string[]>(initialConditions);
   /**
+   * ★ 2026-10-06：第 3 頁的「其他常見病症」是否展開。**預設收起。**
+   *
+   * 【為什麼要收】
+   *   實測（`npm run measure:onboarding`）：第 3 頁原本就已溢出 2.3 個螢幕，
+   *   加上 6 項補充病症後變成 **1996px／640px＝3.1 個螢幕**。
+   *   收起來之後，長者要面對的還是原本那 12 項；
+   *   真的需要的人點一下就看到全部 —— 比強迫每個人滑過 18 列好。
+   *
+   * ⚠️ **但已經勾過的人一定要預設展開**：
+   *   否則他會看到「其他常見病症」是收起的、以為自己沒勾過，
+   *   而實際上勾選還在（`initialConditions`）—— 那等於藏起了他的健康設定。
+   */
+  const [showOtherConditions, setShowOtherConditions] = useState<boolean>(() =>
+    PHYSICAL_INDICATORS.some(
+      (c) =>
+        c.category === 'other' &&
+        c.localRule !== false &&
+        initialConditions.includes(c.id)
+    )
+  );
+  /**
    * 分析模式。
    *
    * ⚠️ 預設 `cloud_image`（雲端）—— 這是使用者指定的預設。
@@ -179,10 +200,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
    * 向下捲動提示（2026-10-02 使用者要求）。
    *
    * 【為什麼需要】
-   *   引導頁有 5 頁的內容超出手機畫面（實測第 3 頁超出 859px，
-   *   是螢幕的 1.3 倍高）。而**「下一步」按鈕在捲動容器裡面** ——
+   *   引導頁有多頁的內容超出手機畫面。而**「下一步」按鈕在捲動容器裡面** ——
    *   也就是說，內容溢出的頁面，使用者**看不到按鈕**，
    *   會以為「這一頁卡住了、按不動」。
+   *
+   * ⚠️ 數字會隨改動漂移，所以**不要在這裡寫死**。
+   *    要最新的實測值請跑 `npm run measure:onboarding <url>`。
+   *    （2026-10-06 量到：第 1 頁 972px／第 2 頁 1040px／第 3 頁 1996px，
+   *      畫面 640px。第 3 頁的 1996px 是「其他常見病症」展開時的數字；
+   *      收合後會明顯變短 —— 該區塊現在預設收起。）
    *
    *   使用者原話：「如果一定要滾動才能展示，可以像一些普通頁面的
    *   新手教學一樣弄一個半透明的向下箭頭方塊作為輔助引導。」
@@ -235,22 +261,27 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     setConditions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   /**
-   * 慢性病（非過敏原）與食物過敏原分開列 —— 兩者的後果等級完全不同。
+   * 第 3 頁的清單分成三組：
+   *   ① `mainChronicItems`  主要慢性病 12 項 —— 直接列出
+   *   ② `otherChronicItems` 常見補充病症 6 項 —— **收在「其他常見病症」裡**
+   *   ③ `allergenItems`     食物過敏原 4 項 —— 直接列出（後果等級完全不同，要顯眼）
    *
-   * ★ 2026-10-06：常見補充病症（脂肪肝、心臟衰竭、缺鐵性貧血、便秘、失眠、偏頭痛）
-   *   也一起列出來，使用者第一次設定就能勾到。
-   *
-   * ⚠️ 但「其他（自行填寫）」**刻意不在這裡列**：
+   * ⚠️ ①② 都排除 `localRule === false`，也就是「其他（自行填寫）」：
    *   引導頁的勾選列只有名稱與勾選框（沒有說明、也沒有輸入框），
    *   把它列出來只會變成一個「勾了卻不能填字、等於什麼都沒做」的選項 ——
    *   那正是本專案最想避免的靜默失效。
-   *   所以判準用 `localRule !== false`（＝本機有規則的項目），
-   *   而不是寫死 `id !== 'other'` —— 日後若又多了一個自填類項目，這裡自動就對。
+   *   判準用 `localRule`（語意）而不是寫死 `id !== 'other'`（字串）——
+   *   日後若又多了一個自填類項目，這裡自動就對。
    */
-  const chronicItems = PHYSICAL_INDICATORS.filter(
-    (c) => c.category !== 'allergen' && c.localRule !== false
+  const mainChronicItems = PHYSICAL_INDICATORS.filter(
+    (c) => c.category !== 'allergen' && c.category !== 'other' && c.localRule !== false
+  );
+  const otherChronicItems = PHYSICAL_INDICATORS.filter(
+    (c) => c.category === 'other' && c.localRule !== false
   );
   const allergenItems = PHYSICAL_INDICATORS.filter((c) => c.category === 'allergen');
+  /** 「其他常見病症」裡已經勾了幾項 —— 收合時要顯示，否則使用者不知道自己的設定還在 */
+  const otherSelectedCount = otherChronicItems.filter((c) => conditions.includes(c.id)).length;
 
   /** 一列勾選項（引導頁精簡版：只有名稱與勾選框，詳情留給設定頁） */
   const renderConditionRow = (id: string, isAllergen: boolean) => {
@@ -469,11 +500,62 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   {t('onboard.conditionsChronic')}
                 </h2>
                 <div className="flex flex-col gap-2">
-                  {chronicItems.map((c) => renderConditionRow(c.id, false))}
+                  {mainChronicItems.map((c) => renderConditionRow(c.id, false))}
                 </div>
+
+                {/* ── 常見補充病症：**預設收合**（2026-10-06）─────────────
+                    ★ 為什麼要收：實測這一頁 1996px／640px＝3.1 個螢幕，
+                      展開時長者要滑過 18 列才看得到過敏原那一段。
+                    ★ 收合時**一定要顯示已選數量** —— 這是本專案對收合元件的通則
+                      （見 `SettingsSection` 的說明）：只留標題的話，
+                      使用者得點開才知道自己設了什麼，比不收更麻煩。
+                    ★ 用 `+` / `−` 而不是只有 chevron：加號代表「這裡還有東西可以加」，
+                      對不熟悉折疊介面的長者比一個箭頭直觀。
+                    ⚠️ 面板用條件渲染（不是 CSS 隱藏）—— 收起時那 6 列不在 DOM 裡，
+                      `check:layout` 才不會去量被折疊的內容（它會把 0 高度的祖先當成遮蔽）。 */}
+                <button
+                  type="button"
+                  id="onboard-other-toggle"
+                  aria-expanded={showOtherConditions}
+                  aria-controls="onboard-other-panel"
+                  onClick={() => setShowOtherConditions((v) => !v)}
+                  className="w-full min-h-[56px] px-4 py-2 rounded-xl border-2 border-dashed border-blue-900 bg-blue-50 flex items-center gap-3 text-left cursor-pointer active:scale-[0.99] transition-all"
+                >
+                  <span
+                    className="w-[24px] h-[24px] shrink-0 text-[20px] font-black leading-none text-center text-blue-900"
+                    aria-hidden="true"
+                  >
+                    {showOtherConditions ? '−' : '+'}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[19px] font-black text-blue-950 leading-tight">
+                      {t('onboard.conditionsOther')}
+                    </span>
+                    {/* ⚠️ 這兩句刻意很短 —— 這裡可用寬度只有約 176px（扣掉 +／− 與 chevron），
+                        實測 19px 下「點一下展開（6 項）」會斷成「項）」單獨一行（很難看）。
+                        所以拿掉括號裡的數量，只留動作；數量在展開後自然看得到。 */}
+                    <span className="block text-[16px] font-bold text-slate-600 leading-snug mt-[2px]">
+                      {otherSelectedCount > 0
+                        ? t('onboard.conditionsOtherSelected', { n: otherSelectedCount })
+                        : t('onboard.conditionsOtherHint')}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`w-[24px] h-[24px] shrink-0 text-blue-900 transition-transform duration-300 ${
+                      showOtherConditions ? 'rotate-180' : ''
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {showOtherConditions && (
+                  <div id="onboard-other-panel" className="flex flex-col gap-2">
+                    {otherChronicItems.map((c) => renderConditionRow(c.id, false))}
+                  </div>
+                )}
+
                 {/* ★ 清單上沒有的病症要告訴使用者去哪裡加 ——
                     否則他會以為這個 App 只能選這幾項。
-                    （自填輸入框只在設定頁，見上方 chronicItems 的說明。） */}
+                    （自填輸入框只在設定頁，見上方 mainChronicItems 的說明。） */}
                 <p className="text-[16px] font-bold text-slate-600 leading-snug">
                   {t('onboard.conditionsMore')}
                 </p>
