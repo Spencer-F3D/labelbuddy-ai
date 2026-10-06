@@ -24,7 +24,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
@@ -32,6 +32,15 @@ import WebSocket from 'ws';
 const BASE = process.argv[2] ?? 'http://127.0.0.1:3300';
 const PORT = 9444;
 const OUT_DIR = path.resolve(import.meta.dirname, '..', 'shots-onboarding');
+/**
+ * ⚠️ 2026-10-06 修正：這支腳本原本**沒有建立輸出目錄**，
+ *    第一次跑（或目錄被清掉之後）會在寫第一張截圖時直接
+ *    `ENOENT: no such file or directory` 中斷 ——
+ *    而且是**量完第 1 頁、正要存檔時**才死，
+ *    看起來像「量測成功但壞在別的地方」，很浪費時間。
+ *    （`shots` 開頭的目錄已在 .gitignore，所以不會進版控。）
+ */
+mkdirSync(OUT_DIR, { recursive: true });
 
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',

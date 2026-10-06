@@ -22,6 +22,15 @@ export const CONDITION_CATEGORIES: ConditionCategoryItem[] = [
   { id: 'organ', name: '臟器骨骼', icon: '🦴' },
   { id: 'digestive', name: '腸胃消化', icon: '🌿' },
   { id: 'allergen', name: '食物過敏原', icon: '🛡️' },
+  /**
+   * ★ 2026-10-06 新增（使用者指定）：常見補充病症 ＋ 自行填寫。
+   *   ⚠️ 放在最後 —— 過敏原是最需要被看見的一類，不該被推到後面。
+   *   ⚠️ 名稱「其他」只有 2 個全形字，遠低於 320px 兩顆一行的上限。
+   *   ⚠️ 這裡的 `name` 只在**找不到英文對照時**當後備用，
+   *      「全部 (N種)」與「其他」的顯示文字都由 `categoryPillLabel()`
+   *      依陣列長度與語言推導（見 App.tsx）—— 不要改成寫死數字。
+   */
+  { id: 'other', name: '其他', icon: '➕' },
 ];
 
 export const PHYSICAL_INDICATORS: ChronicCondition[] = [
@@ -120,5 +129,95 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     description: '清查小麥、大麥、黑麥與燕麥成分',
     targetNutrients: ['小麥粉 (Wheat Flour)', '大麥芽 (Barley Malt)', '黑麥 (Rye)', '麵筋蛋白 (Gluten)'],
     defaultChecked: false,
+  },
+
+  /* ═══════════════════════════════════════════════════════════════════
+   * 常見補充病症（2026-10-06 使用者指定新增）
+   * ═══════════════════════════════════════════════════════════════════
+   * 【為什麼是這 6 項，而不是甲狀腺／自體免疫那些更常被提到的】
+   *   判斷標準只有一條：**營養標示上真的讀得到、本機規則引擎真的能判斷**。
+   *   甲狀腺疾病（碘）、自體免疫疾病在包裝上沒有可靠對應的成分欄位 ——
+   *   把它們列進來，使用者會勾了卻拿不到任何把關，
+   *   那正是本專案紅線所說的「靜默失效」（不報錯、只是什麼都沒做）。
+   *
+   * ⚠️⚠️ **名稱必須含本機引擎認得的關鍵字**（同檔開頭的警告）：
+   *   `server/smartNutritionAnalyzer.ts` 與 `server/conditionAdvice.ts`
+   *   都是用「中文字子字串 includes()」比對，不是比對 id。
+   *   改名前請先跑 `npm run verify:conditions`。
+   * ═══════════════════════════════════════════════════════════════════ */
+  {
+    id: 'fatty_liver',
+    name: '脂肪肝',
+    category: 'other',
+    description: '把關精緻糖、果糖與飽和脂肪，避免肝臟堆積過多油脂',
+    targetNutrients: ['添加糖 (Added Sugars)', '高果糖玉米糖漿', '飽和脂肪 (Saturated Fat)'],
+    defaultChecked: false,
+  },
+  {
+    id: 'heart_failure',
+    name: '心臟衰竭',
+    category: 'other',
+    description: '嚴格把關鈉含量與湯汁，避免水分滯留加重心臟負擔',
+    targetNutrients: ['鈉 (Sodium)', '高鈉醬油', '濃縮湯汁'],
+    defaultChecked: false,
+  },
+  {
+    id: 'iron_anemia',
+    name: '缺鐵性貧血',
+    category: 'other',
+    description: '提醒茶、咖啡、可可與高鈣成分會妨礙鐵質吸收，並留意鐵與維生素 C',
+    targetNutrients: ['鐵 (Iron)', '維生素C (Vitamin C)', '單寧酸 (Tannins)'],
+    defaultChecked: false,
+  },
+  {
+    id: 'constipation',
+    name: '便秘',
+    category: 'other',
+    description: '檢視是否為精製澱粉為主的低纖維食品，提醒多補充蔬菜水果與水分',
+    targetNutrients: ['膳食纖維 (Dietary Fiber)'],
+    defaultChecked: false,
+  },
+  {
+    id: 'insomnia',
+    name: '失眠',
+    category: 'other',
+    description: '排查咖啡因成分，避免影響入睡與睡眠品質',
+    targetNutrients: ['咖啡因 (Caffeine)'],
+    defaultChecked: false,
+  },
+  {
+    id: 'migraine',
+    name: '偏頭痛',
+    category: 'other',
+    description: '排查味精、酪胺酸（熟成起司、紅酒）與咖啡因等常見誘發因子',
+    targetNutrients: ['味精 (L-麩酸鈉)', '酪胺酸 (Tyramine)', '咖啡因 (Caffeine)'],
+    defaultChecked: false,
+  },
+  {
+    /**
+     * ★ 自行填寫（2026-10-06 使用者指定）。
+     *
+     * 【⚠️ 這一項與上面 6 項性質完全不同 —— 一定要看懂再改】
+     *   它是唯一 `localRule: false` 的項目：本機規則引擎**沒有、也不可能有**
+     *   對應規則，因為內容是使用者自己打的字。
+     *   所以：
+     *     ① 勾了但沒填字 → 前端**不會**把它送出去（見 App.tsx 的 conditionNames）
+     *     ② 填了字 → 送給雲端 AI 判斷（並自動進入快取鍵）
+     *     ③ 在本機模式下 → 前端必須**明說「這一項本機無法把關」**，
+     *        不可以讓使用者以為填了就有人看。這正是本專案最重視的一條：
+     *        「勾了卻沒有把關」比報錯更危險，因為它不會被發現。
+     *
+     * ⚠️ 名稱刻意就是「其他」兩個字：
+     *   `conditionAdvice.ts` 用它當關鍵字，把送出的「其他：XXX」
+     *   對應到一句誠實的通用提醒（而不是落到 console.warn 的通用分支）。
+     */
+    id: 'other',
+    name: '其他',
+    category: 'other',
+    description:
+      '清單上沒有的病症，請在下面自行填寫名稱。填寫後會交給雲端 AI 一起判斷；在「只在本機」模式下無法自動把關。',
+    targetNutrients: [],
+    defaultChecked: false,
+    localRule: false,
   },
 ];

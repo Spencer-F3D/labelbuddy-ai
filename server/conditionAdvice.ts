@@ -40,10 +40,12 @@ interface ReminderRule {
 }
 
 /**
- * 12 項慢性病／過敏原的提醒規則。
+ * 18 項慢性病／過敏原的提醒規則（原 12 項 ＋ 2026-10-06 新增 6 項補充病症 ＋ 自行填寫）。
  *
- * ⚠️ 這份清單必須涵蓋 `src/data/conditions.ts` 的全部 12 項。
+ * ⚠️ 這份清單必須涵蓋 `src/data/conditions.ts` 的**每一項**。
  *    新增慢性病時要一起加，並跑 `npm run verify:conditions` 確認沒有漏。
+ *    （唯一不適用的是「其他（自行填寫）」的本機規則，
+ *      但它在這裡仍有一條誠實的提醒 —— 見清單最後一項。）
  *
  * ⚠️ 新增規則時**兩個語言都要填**（advice 與 adviceEn）——
  *    只填中文的話，英文介面會漏出中文提醒。
@@ -145,6 +147,81 @@ const REMINDER_RULES: ReminderRule[] = [
     nameEn: 'Gluten sensitivity',
     adviceEn:
       'Avoid wheat, barley, rye and flour products. Choose oats labelled "gluten-free" to avoid cross-contamination.',
+  },
+
+  /* ══════════════════════════════════════════════════════════════════
+   * 常見補充病症的提醒（2026-10-06 使用者指定新增）
+   * ⚠️ `keys` 必須與 `src/data/conditions.ts` 的 name 對得上（子字串比對）。
+   *    對不上時不會報錯 —— 只會靜默落到 GENERIC_REMINDER，
+   *    而 `npm run verify:conditions` 會把這件事抓出來。
+   * ══════════════════════════════════════════════════════════════════ */
+  {
+    keys: ['脂肪肝'],
+    icon: '🍰',
+    advice: '含糖飲料、果汁與甜食是脂肪肝最主要的來源。先看「糖」那一列，再看「飽和脂肪」，兩個都低才適合天天吃。',
+    nameEn: 'Fatty liver',
+    adviceEn:
+      'Sugary drinks, juice and sweets are the main drivers of fatty liver. Check the "sugar" row first, then "saturated fat" — both need to be low for everyday eating.',
+  },
+  {
+    keys: ['心臟衰竭', '心衰竭'],
+    icon: '💧',
+    advice: '限鈉要比一般人更嚴格。湯、醬料、滷味與加工肉都要少，一天鈉的目標請依醫師指示（通常低於 2000 毫克）。',
+    nameEn: 'Heart failure',
+    adviceEn:
+      "Your sodium limit is stricter than usual. Go easy on soup, sauces, braised food and processed meat — follow your doctor's daily sodium target (often under 2,000 mg).",
+  },
+  {
+    keys: ['貧血', '缺鐵'],
+    icon: '🥬',
+    advice: '鐵要和維生素 C 一起吃才好吸收。茶、咖啡、可可與牛奶會妨礙吸收，請與補鐵的那一餐間隔兩小時。',
+    nameEn: 'Iron-deficiency anaemia',
+    adviceEn:
+      'Iron is absorbed best together with vitamin C. Tea, coffee, cocoa and milk block it — leave two hours between them and an iron-rich meal.',
+  },
+  {
+    keys: ['便秘'],
+    icon: '🥦',
+    advice: '一天膳食纖維要 25 公克以上。挑成分表裡有全麥、燕麥、豆類或蔬果的，並且記得多喝水。',
+    nameEn: 'Constipation',
+    adviceEn:
+      'Aim for at least 25 g of fibre a day. Choose products whose ingredient list includes wholegrain, oats, beans, vegetables or fruit — and drink more water.',
+  },
+  {
+    keys: ['失眠', '睡眠'],
+    icon: '🌙',
+    advice: '咖啡因在身體裡要 4～6 小時才代謝一半。下午兩點以後改喝溫開水，或無咖啡因的麥茶。',
+    nameEn: 'Insomnia',
+    adviceEn:
+      'Caffeine takes 4–6 hours to clear by half. After 2 p.m. switch to warm water or caffeine-free barley tea.',
+  },
+  {
+    keys: ['偏頭痛'],
+    icon: '🤕',
+    advice: '味精、熟成起司、紅酒、巧克力與咖啡因是常見誘發因子。每個人不一樣，可以寫飲食日記找出自己的。',
+    nameEn: 'Migraine',
+    adviceEn:
+      'MSG, aged cheese, red wine, chocolate and caffeine are common triggers. They differ from person to person — keep a food diary to find yours.',
+  },
+  {
+    /**
+     * ★ 「其他（自行填寫）」。
+     *
+     * 【為什麼一定要有這一條，不能讓它落到 GENERIC_REMINDER】
+     *   使用者自己打的病名（例如「甲狀腺機能低下」）本來就沒有專屬規則，
+     *   會落到通用分支並在伺服器日誌留下 console.warn —— 每次都留一筆噪音，
+     *   而且通用文案（「請以包裝上的營養標示為準」）**沒有講出真正該講的事**：
+     *   這一項是本機引擎判不了的。
+     *
+     * ⚠️ 文案必須誠實：不可以讓使用者以為「填了就有人看」。
+     *    雲端模式會納入判斷；本機模式不會。
+     */
+    keys: ['其他'],
+    icon: '📝',
+    advice: '這是您自行填寫的病症。雲端模式會一起判斷；「只在本機」模式無法自動把關，請依醫師或營養師的指示挑選。',
+    nameEn: 'Other (self-described)',
+    adviceEn:
+      'This is a condition you typed in yourself. Cloud mode takes it into account; local-only mode cannot check it, so follow your doctor\'s or dietitian\'s advice.',
   },
 ];
 

@@ -92,6 +92,21 @@ export const CONDITION_NAME_EN: Record<string, string> = {
   seafood_allergy: 'Seafood allergy',
   lactose_intolerance: 'Lactose intolerance',
   gluten_sensitivity: 'Gluten sensitivity',
+  // 常見補充病症（2026-10-06）。⚠️ 缺一項，英文介面就會顯示中文病名。
+  fatty_liver: 'Fatty liver',
+  heart_failure: 'Heart failure',
+  iron_anemia: 'Iron-deficiency anaemia',
+  constipation: 'Constipation',
+  insomnia: 'Insomnia',
+  migraine: 'Migraine',
+  /**
+   * 「其他（自行填寫）」。
+   * ⚠️ 使用者實際送出的字串是「其他：<自填內容>」，
+   *    不會命中這個鍵 —— 它會原樣（中文）進提示詞。
+   *    那是**使用者自己的資料**，不是我們漏翻的文案；
+   *    模型看得懂，而且改寫它反而會讓使用者認不出自己填了什麼。
+   */
+  other: 'Other',
 };
 
 /** 風險等級標籤（前端與後端共用） */

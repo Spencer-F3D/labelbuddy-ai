@@ -893,3 +893,110 @@ git show 847dbd0:scripts/<檔名> > scripts/<檔名>
 （對方 `git pull` 會把檔案從硬碟刪掉）。`.workbuddy-ai/memory/` 與 `AI_COLLAB.md`
 **因此維持進版控** —— 它們是兩個 clone 之間的共享記憶與溝通管道，不是普通的開發紀錄。
 
+---
+
+## 2026-10-06（下午）：字體大小控制 ＋ 慢性病「其他」
+
+### A. 字級三級化
+
+改動前：`data-density` 只有 `compact`／`comfortable` 兩個值，**由身分自動決定**，
+使用者不能選。使用者要求「在設定加入字體大小控制」。
+
+| 級別 | `data-density` | px 對應（16/18/19/20 →） |
+| --- | --- | --- |
+| 小 | `compact` | 14 / 16 / 17 / 18 |
+| 中 | `normal` | **16 / 18 / 19 / 20（＝原始值，刻意沒有 CSS 規則）** |
+| 大 | `comfortable` | 19 / 22 / 23 / 24 |
+
+- 推導入口只有一個：`src/utils/fontScale.ts` 的 `resolveDensity(profileId, manual)`
+  ＝ `手動值 ?? 身分預設`。抽成純函式是為了能單獨驗證 ——
+  寫在元件裡就沒辦法測「改了映射函式沒改呼叫端」這種不會報錯的 bug。
+- **`loadFontScale()` 回傳 `null` 代表「沒選過」**，不可回填預設值：
+  一回填，長者一進設定頁就被當成已手動選過，之後換身分字級不會跟著變。
+- `normal` 沒有 CSS 規則**不是漏寫** —— Tailwind 產生的原始值本來就是 16/18/19/20。
+  寫 `font-size: 16px` 只是把 16px 蓋成 16px。
+- 長者預設仍是 `comfortable` → `check-layout-senior.mjs:719` 的斷言（量到必須是
+  `comfortable`）不會被破壞。**這也是不動 `compact`/`comfortable` 名稱的原因** ——
+  改名要同時改兩支稽核腳本，風險大於收益。
+- 設定頁位置：**語言之後、身分之前**（與語言同性質：影響整頁看起來怎樣）。
+  元件 `src/components/FontSizeSection.tsx`，含**即時預覽句** ——
+  只給「小／中／大」三顆按鈕，使用者不知道選下去會變多大。
+
+### B. 慢性病清單 12 → 19 項
+
+新增分類膠囊 **`other`（其他）**，內含 6 項**有真實本機規則**的補充病症，
+外加 1 項「其他（自行填寫）」：
+
+| id | 名稱 | 本機規則實際查什麼 |
+| --- | --- | --- |
+| `fatty_liver` | 脂肪肝 | 糖 ≥15 或飽和脂肪 ≥8 → 紅；糖 ≥8 → 黃 |
+| `heart_failure` | 心臟衰竭 | 鈉 ≥1000 → 紅；≥600 → 黃（比一般限鈉更嚴） |
+| `iron_anemia` | 缺鐵性貧血 | 成分含茶／咖啡／可可 → 黃；過敏原含乳製品 → 黃 |
+| `constipation` | 便秘 | 精製澱粉／油炸為主**且**無全穀蔬果豆類 → 黃 |
+| `insomnia` | 失眠 | 成分含咖啡因（咖啡／可可／能量飲料…）→ 黃 |
+| `migraine` | 偏頭痛 | 味精／酪胺酸／熟成起司／紅酒／咖啡因 → 黃 |
+| `other` | 其他 | **`localRule: false`** —— 使用者自填，本機無法判斷 |
+
+- ⚠️ `NutritionProfile` **沒有膳食纖維欄位**，所以「便秘」不能比對纖維數字，
+  改成看**成分特徵**（精製澱粉／油炸為主且無全蔬果豆類）。這是誠實的推論，不是猜數字。
+- ⚠️ 缺鐵性貧血的「高鈣」只認**乳製品**，不認「碳酸鈣」這類強化鈣 ——
+  否則一杯加鈣豆漿會對貧血使用者誤亮黃燈（實測 `soy_milk` 樣本）。
+- ⚠️ 新增的每一句中文輸出，都必須在 `server/localEngineEn.ts` 的 `LOCAL_TEXT_EN`
+  有對應英文，否則英文介面漏中文且 `check:i18n` 會失敗。
+
+### C. `localRule` 旗標與驗證的關係（★ 不要整項跳過）
+
+`verify-condition-keywords.ts` 對每一項檢查兩件事：
+① 規則引擎要有反應 ② 提醒必須是專屬的（icon ≠ 📋）。
+「其他（自行填寫）」的內容是使用者打的字，**本機不可能有規則** → 只跳過 ①，
+**② 仍然要驗**。所以它在 `conditionAdvice.ts` 有一條 `keys: ['其他']` 的誠實提醒；
+若讓它落到 `GENERIC_REMINDER`，每次請求都會在日誌留一筆 `console.warn`，
+而且文案講不到重點（「這一項本機判不了」）。
+
+### D. 自填病症的資料流
+
+```
+輸入框 (App.tsx #custom-condition-input)
+  → state customCondition → localStorage `labelbuddy_custom_condition_v1`
+  → conditionNames：`其他：<自填>`（CUSTOM_CONDITION_PREFIX）
+  → POST /api/analyze-label 的 conditions → makeCacheKey（自動納入，不必改）
+  → handlers.ts 提示詞「使用者的慢性病史」
+  → conditionAdvice 用 keys ['其他'] 給誠實提醒
+```
+- ⚠️ **空字串不送出**：送一個空的「其他」給模型，它只會自己編一個病症出來。
+- ⚠️ 自填文字**不進 `selectedConditions`** —— 那是一組固定 id，
+  混入自由文字會讓 `VALID_CONDITION_IDS` 的舊版偵測誤判而跳遷移提示。
+- ⚠️ 本機模式判不了 → 前端在 `analysisMode === 'local_only'` 時顯示
+  `conditions.customLocalOnly`（安全文案，不可為簡潔刪掉）。
+
+### E. 順手修掉的兩個「不會報錯」的問題
+
+1. `server/handlers.ts` 的 `conditionText`：**英文提示詞的慢性病名稱一直是中文**。
+   原因：前端送的是**中文病名**（`conditionNames` 刻意不隨語言變），
+   但後端只用 `c.id === id` 查表 → 永遠查不到 → `conditionName()` 也查不到英文 → 退回中文。
+   中文介面完全看不出來。修法：id 與 name 都比對，再把真正的 id 交給 `conditionName()`。
+2. `scripts/measure-onboarding.mjs` 沒有建立輸出目錄 → 第一次跑一定
+   `ENOENT: shots-onboarding/page-01.png`（而且是**量完第 1 頁、正要存檔時**才死）。
+   已加 `mkdirSync(OUT_DIR, { recursive: true })`。
+
+### F. 驗證方式（★ 靜態掃描不算驗收）
+
+- `lint`／`verify:all`／`check:pregnancy` 全過（19 項慢性病 0 失敗、9 張對照表 0 孤兒鍵）。
+- `check:layout` 中英 × 長者/健身 → **0 筆問題**；量到 `comfortable 16px→19px`（最壞情況）。
+- `check:ui` → 17 畫面、英文零中文；但**「本機模式長條圖」那一項 ❌**。
+  → 已用 `git stash` 在**原始碼**上重跑確認：**基準線同樣 ❌（exit 1）**，是既有的
+    headless Chrome OCR 讀不到示範標籤數字，**與本次改動無關**。
+  → 另以 API 直呼 `/api/analyze-label`（`localOnly: true`）證明本機路徑**有**產生
+    `nutrient_facts`（鈉 99%、飽和脂肪 49%），所以不是本機引擎壞了。
+- 另寫一次性瀏覽器探針（CDP）驗 26 項：三顆按鈕真的改變 `data-density` 與 computed
+  font-size（14/16/19）、`aria-pressed` 正確、重載後仍記得、勾「其他」才出現輸入框、
+  自填文字真的寫進 localStorage 且 `selected_conditions` 變成 `["other"]`。
+- ⚠️ **`check:ui` 的退出碼會被 `| tail` 吃掉** —— 用管線看輸出時務必另外
+  `echo $?` 或寫進檔案再 `grep`，否則 ❌ 會被當成通過。
+
+### G. 未處理（留給使用者決定）
+
+引導頁第 3 頁（慢性病）量到 **1996px／640px ＝ 3.1 個螢幕**（加這 6 項之前約 2.3）。
+原本就已溢出（該頁從一開始就沒有「不用滾動」的保證），這次再增加約 500px。
+建議做法：把「其他」分類在引導頁改成**收合**（預設收起，點一下才展開 6 項）。
+
