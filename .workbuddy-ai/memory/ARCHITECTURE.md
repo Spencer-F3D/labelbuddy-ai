@@ -189,6 +189,8 @@ footer 的 CTA 分支（`activeTab === 'xxx' ? ... : ...` 鏈）。漏掉 footer
 | `cloud_text` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | 雲端文字模型 |
 | `local_only` | 跑 OCR | **什麼都不送** | 本機規則引擎 |
 
+★ 本機規則引擎 = `src/utils/smartNutritionAnalyzer.ts`（純函式、離線、不花額度）。
+
 ### 資料流與閘門
 
 - `App.tsx` 的 `sendImageForAnalysis()` 依模式分流，抽出 `postAnalyzeLabel()` helper
@@ -447,3 +449,388 @@ normalizeNutrientFacts(raw, numericLimits, directions?)
 
 ⚠️ 設定 localStorage 的時機：**引導頁的 `useState` 預設值會覆寫回去**，
 所以「改模式」必須在走完引導頁**之後**再做。
+
+---
+
+# 2026-10-02 ～ 10-04 補充
+
+## 🔊 語音朗讀（TTS）實作細節
+
+★ **APK 是 Capacitor Android WebView，不實作 Web Speech 合成 API**
+（`window.speechSynthesis` 只有 Chrome 有）→ 舊版 `speakText()` 每次靜默 `return false`
+（**不拋錯、不記錄、畫面無異狀**）。→ 原生走 `@capacitor-community/text-to-speech`，
+瀏覽器走 Web Speech。
+
+★ **只裝 npm 套件不算生效，要驗三件事**：
+1. `android/app/capacitor.build.gradle` 有 `implementation project(':capacitor-community-text-to-speech')`
+2. APK 內 `assets/capacitor.plugins.json` 有 `...tts.TextToSpeechPlugin`
+3. **合併後的 AndroidManifest 有 `<queries><intent><action TTS_SERVICE>`**
+   （Android 11+ 套件可見性；少了它引擎找不到**且不報錯**）
+
+→ 驗法：`aapt2 dump xmltree --file AndroidManifest.xml <apk>`。
+
+★ **發音語言由「文字本身」決定，不是介面語言。** 全站 12 個朗讀呼叫點原本都傳
+`ttsLanguageFor(介面語言)` → 英文介面唸中文內容會變成拼音般的噪音、中文介面唸英文成分表
+會變中文腔。修法寫在 `speakText` **內部**（含 CJK → 使用者選定的中文語言；純拉丁 → 英文）——
+改呼叫端要記得改 12 處，本專案已踩過五次以上「改了 A 沒改 B」。
+驗證：`scripts/check-tts-speak.mjs` 配對 **6/6** 正確。
+
+★ **設定頁試聽必須用 `forceLanguage`**（不套用字集改寫），且三種語言**各自一句示範句**
+（用該語言本身寫，不是共用一句）。否則中文介面按 English 會聽到粵語 ——
+使用者只會認為功能壞了。⚠️ 一般朗讀仍要套用字集改寫，那才是修「英文語音唸中文」的機制。
+
+★ **「手機只說普通話」的根因不在 App**：有些 Android TTS 引擎會回報支援 `zh-HK`，
+實際卻用預設（通常是國語）發音 → 只問「支不支援」會拿到**誤導的答案**。
+→ 用 `getSupportedVoices()` 比對出 `zh-HK` 的索引，把 `voice: index` 傳給 `speak()`
+（指定了就沒有「引擎自己挑」的餘裕）。設定頁顯示「這個裝置會用：語音名稱」。
+App 啟動時預載語音清單，否則第一次朗讀會退回預設。
+★ 判斷「該用哪一個語音」時，**普通話刻意排除粵語**，避免反向錯誤。
+
+★ `getVoices()` **非同步** → 要監聽 `voiceschanged`，否則第一次朗讀挑不到語音。
+★ 澳門用 `zh-HK`（粵語），不是 `zh-TW`。
+★ 設定存 `labelbuddy_tts_v1`（`volume`／`touched`／`voiceLang`）；
+**長者預設開、其他身分預設關**；有 `touched` 旗標，手動改過就永遠以使用者為準
+（否則改身分時會被覆蓋）。
+★ 「關閉」在 `speakText` 最前面擋掉，**不是** volume 設 0（會被當無效參數 → 反而變大聲）。
+★ **音量一律由 `getTtsVolume()` 決定 —— 呼叫端不要傳 `volume`**，傳了會覆寫使用者的設定。
+★ TTS 語速固定 0.88（稍慢），不隨身分調整。
+
+★ **「完全沒有聲音」的診斷**：實測程式正常（這台機器有 22 個語音、含
+`zh-HK | Google 粵語（香港）`；三種語言都挑到正確語音；`error:not-allowed` 純粹是
+無頭瀏覽器沒有使用者手勢，用 CDP 送真實滑鼠點擊後全部 `start,end` 正常）。
+重現不出來時**不要繼續猜** → `getLastTtsDiagnostic()` 記錄「挑了哪個語音、有沒有送出、
+結局、錯誤原文」，設定頁直接顯示。四種原因處理方式完全不同：
+
+| 畫面顯示 | 意思與處理方式 |
+| --- | --- |
+| 目前沒有聲音 | 音量是 0（非長者身分預設靜音）→ 把音量條往右拉 |
+| 找不到這個語言的語音 | 這台裝置沒裝該語言語音 → 到系統設定安裝 |
+| 被瀏覽器擋下 | 需要先點一下畫面（Chrome 的使用者手勢政策） |
+| 已送出朗讀卻沒聽到 | 唸了，但系統音量或分頁靜音 |
+
+## 📷 本機 OCR：10-04 實測結論
+
+引擎 = 瀏覽器端 tesseract.js，要下載 **約 6.4 MB**（`chi_tra.traineddata` 2.37MB
+＋ WASM 約 4MB ＋ worker）。
+
+★ **`warmUpBrowserOcr()` 必須在完成引導頁後就呼叫。** 它曾長期是死匯入（存在但沒人呼叫）
+→ 6.4MB 在按下快門那一刻才開始下載 → 超市弱訊號下失敗 → App 卻說「請重拍」
+→ **使用者一直重拍而照片從來沒問題**。
+
+★★ **`chi_tra` 會把小數點全部吃掉** —— 這是只有實測才看得到的：
+
+| 英文標籤 | 只有 `chi_tra` | `chi_tra+eng` |
+| --- | --- | --- |
+| `Protein` | `Protean 250g` ❌ | `Protein 2.509` ✅ |
+| `Carbohydrate` | `680g` ❌ | `6.80g` ✅ |
+| `Sugar` | `100g9` ❌ | `1.009` ✅ |
+| `Percentage` | `Percenmtage` ❌ | `Percentage` ✅ |
+
+`6.80` → `680` 差 100 倍，**在畫面上看起來像正常的數字**。
+
+★ **但這是雙向取捨，沒有一個設定全贏**：中文「大卡」在 `chi_tra+eng` 會變成 `x +`、
+「公克」變成 `2%`／`公交`，而解譯器正是靠那個關鍵字抓數值。
+→ **兩輪各用一組語言模型**：第一輪 `chi_tra+eng`（英文／中英混排，實拍最常見），
+第二輪 `chi_tra`（中文救援）。
+⚠️ 陷阱：worker 快取原本是「單一 promise」，第二輪會沿用第一輪的 worker ——
+**語言模型根本沒換**，等於白跑一次且**不報錯** → 快取必須改成以**語言組合為鍵**的 Map。
+★ 伺服器端離線 OCR 預設也改 `chi_tra+eng`（可用 `TESSERACT_LANG` 覆寫）。
+
+★ **`tessdata_best` 實測是退步 → 不採用**（結論已寫進 `ocrBrowser.ts` 註解，不要重跑）：
+
+| 測試項目 | fast（現用） | best |
+| --- | --- | --- |
+| 英文輸出 | `Protein 2.509` … | **逐字相同**（連錯字 `Dally` 都一樣） |
+| 中文欄位數 | **5** | 4（較差） |
+| 中文耗時 | 1526 ms | **3580 ms（2.35 倍）** |
+| 模型大小 | 6.2 MB | **27 MB（4.4 倍）** |
+
+而且 best 在我們的核心上直接崩潰：
+`RuntimeError: Aborted(missing function: _ZN9tesseract13DotProductSSE…)` ——
+best 是全精度**浮點**、需要 SSE 路徑；fast 是**整數量化**不需要。把 `corePath` 從
+「目錄」改成指定 SIMD 那個檔案就跑得起來，**但那等於放棄 tesseract.js 的「執行時自動挑
+核心」→ 不支援 SIMD 的舊手機將完全無法使用本機 OCR**。
+（tesseract.js 的 CDN 已 404，best 檔要改用 GitHub 官方 repo。）
+
+⚠️ **商標／圖案被當成字**（使用者原文裡的 `隊二放生生莘讓人`）屬於「把非文字區域也送去
+辨識」的問題，**換語言模型救不了**。只有像 Google ML Kit 那類**有區域偵測**的引擎才可能
+解決（僅支援 Android）。
+★ 順帶一提：使用者的**雲端 AI 結果其實是正確的**（鈣 101mg、蛋白質 2.5g 全對，
+還推導出「換算成 100g 則高達 805mg」）—— 雲端模型有能力從 `S0tium 175mg` 還原正確數值。
+
+★ **診斷鐵則：要測 App 真正在跑的那份程式碼。** 探針頁載 tesseract.js 的 **UMD 版**
+會繞過 App 的 ESM 路徑 →「探針說可以、使用者說不行」。正確做法：跑 Vite dev server，
+在頁面裡 `await import('/src/ocr/ocrBrowser.ts')` 再呼叫它。
+★ 失敗要分「引擎」與「照片」（`errorKind`）；**引擎失敗不要叫使用者重拍**。
+★ 資產快取標頭在 `public/_headers`（Workers Assets 預設 `max-age=0` → 每次重驗）。
+★ 工具：`scripts/check-ocr-pipeline.mjs`（標籤佔畫面 100%→25% 逐級測）、
+`scripts/check-local-ocr.mjs`（**唯一走瀏覽器 OCR 的檢查**）、
+`scripts/make-ocr-test-photos.py` —— 三支都記錄了「我自己量錯的方式」，**先讀檔頭再用**。
+
+## ⚠️ AI 供應商與模型鏈
+
+輪替鏈 `orderedProviders(hasClientKey, hasImage)` = **nvidia → gemini → openrouter**
+（排序＝使用率低者優先；`DAILY_QUOTA.nvidia = 100000` 是**輪替權重**，讓沒有上限的它先吃請求）。
+`DEFAULT_MODEL_CHAIN` **上限 3 個**。
+
+★ **NIM 是文字模型、收不下圖片** → 含圖請求必須跳過它。不跳過會把失敗計數推高 →
+最後讓這個「沒有上限」的供應商被冷卻 → **反而失去省額度的意義**。
+★ **免費模型會變動** → 失敗時先查 `GET /api/v1/models`，過濾 `pricing.prompt == 0`
+且 `input_modalities` 含 `image`。
+★ **改供應商清單時要同步改 `/api/ai-status` 的 providers 迴圈**（漏了不會報錯，
+面板只會與事實不符）。
+★ NIM 金鑰 = Worker secret `NVIDIA_API_KEY`（本機測試放 `.dev.vars`）；
+Base URL `https://integrate.api.nvidia.com/v1`，**無每日上限**。加速關鍵：
+`reasoning_effort: 'low'`。現役 `NVIDIA_MODEL_CHAIN` **只有 `openai/gpt-oss-20b`**（實測 0.76s）。
+★ 已測並移除（**不要重試**）：`z-ai/glm-5.3-flash`（13～33s 太慢，且 `content` 是 null、
+答案在 `reasoning_content`）、`nvidia/nemotron-3.5-lightning-30b-a3b`（40s 逾時）。
+**會逾時的模型比沒有備援更糟。**
+★ `/api/fitness-report` 只送**彙總數字**、不送逐筆紀錄；AI 失敗回**離線規則版**。
+
+## 🎓 身分定義與孕期把關
+
+`LearnerProfileId`：`senior`／`child`／`teen`／`fitness`／`young`／`middle`／`student`／
+`pregnant`（10-04 新增第 8 個）。定義集中 `src/data/learnerProfiles.ts`，**前後端共用**
+→ 必須**純資料**。
+
+★★ **孕婦與其他七個性質不同**：別人是「某項數字要低一點」，孕婦多了「**某些成分絕對不能出現**」。
+**酒精 0.5 公克不會讓任何營養數字超標** —— 但對胎兒就是風險，靠每日上限永遠抓不到。
+→ `PREGNANCY_HAZARDS` 成分層級把關：
+
+| 分級 | 項目 | 關鍵字 |
+| --- | --- | --- |
+| 🔴 紅燈 | 酒精 | 酒精／米酒／料理酒／紹興／酒釀／清酒／啤酒／`alcohol`／`wine` |
+| 🔴 紅燈 | 生食與未殺菌 | 生魚片／刺身／生乳／未殺菌／溏心／`raw fish`／`unpasteurized` |
+| 🔴 紅燈 | 高汞魚類 | 鯊魚／劍魚／旗魚／馬鮫／`shark`／`swordfish`／`marlin` |
+| 🟡 黃燈 | 咖啡因 | 咖啡／可可／巧克力／能量飲料／`caffeine` |
+
+⚠️ **關鍵字必須避開「同字不同物」的誤判**：`酒` 要排除 `酒石酸`（合法食品添加物、
+**不含酒精**）；`生` **不能單獨比對**（「花生」「生菜」「生粉」都會誤中）。
+
+★ **規則引擎的簽章刻意把 `profileId` 做成必要參數**（不是可選）——
+若可選，日後新增呼叫端時漏傳就會**靜默跳過安全檢查**且沒有錯誤訊息。
+★ 驗證：`scripts/check-pregnancy.mjs` **16 項全部通過**，同時檢查兩個方向 ——
+「該紅的要紅」（7 個危險成分案例含英文關鍵字）、「該黃的要黃」（咖啡因）、
+**「不該紅的不要紅」**（一般餅乾、`酒石酸`、`花生`、`生菜` 4 項誤判防護）、
+「非孕婦身分不該被孕期規則影響」。
+★ 為什麼要測「不該紅的不要紅」：**過度觸發會讓使用者學會忽略紅燈** ——
+一個永遠在響的警報等於沒有警報。
+
+| 欄位 | 內容 |
+| --- | --- |
+| 名稱 | 孕婦（英文用 `Pregnancy` —— 描述「階段」比描述「人」中性） |
+| 限制項 | 鈉 2000mg／添加糖 50g／咖啡因 200mg／酒精 **0（完全避免）** |
+| 目標項 | 葉酸 600µg／鐵 27mg／鈣 1000mg |
+| 顯示順序 | 健身人士之後（兩者都不以年齡定義，不打断「由年輕到年長」的動線） |
+| 配色 | rose（**刻意不做粉紅／心形之類的聯想**，只是一個可辨識的色相） |
+
+★ 名稱不得含評價性字眼（「長者三高」→**長者**）；身分卡片不得顯示說明文字。
+⚠️ `bilingual.ts` 的 `PROFILE_NAME_EN` 曾漏改，長者英文名寫成 "Senior with hypertension…"
+（＝把三高貼在長者身上，**只有英文介面看得到**）。
+★ **改 id 一定要同時寫遷移**（`LEGACY_PROFILE_IDS`）：否則舊裝置的值被判無效而
+**靜默退回長者**（鈉上限 2000→1500、字級放大），使用者不會知道為什麼。
+★ 「中年」＝**一般成人上限**，重點放在三高**長期累積**（不併入長者＝不讓未確診的人過度緊張；
+不併入青年＝保留「預防」這個判讀角度）。
+⚠️ 兒童／青少年鈉糖上限明顯低於成人；**快取鍵必須含身分**；
+`targets[].target` 是給人看的字串，**不能做數學運算**。
+⚠️ 尚未做孕期專屬教學卡與題庫（`preferredTopics` 目前指向既有主題）；
+**咖啡因只靠成分關鍵字抓**（解析器沒有咖啡因欄位 → 標示「咖啡因 150 毫克」但成分沒寫咖啡的
+產品抓不到）。
+
+## 🏋️ 健身專區
+
+只在身分＝`fitness` 時出現在側邊選單。★ **過濾寫在 render 裡，不是 `MENU_ITEMS` 常數** ——
+常數是模組層、看不到 state，寫在那裡切換身分不會更新且**不會報錯**。
+三分頁：課表規劃／訓練紀錄／飲食熱量。儲存鍵 `labelbuddy_fitness_v1`（純本機）。
+
+★ **課表用確定性規則**（3 目標 × 5 天數 ＝ 15 模板，`src/data/fitnessContent.ts`），
+**不叫 AI** —— AI 會每次不一樣、吃掉標籤辨識額度，還可能生出解剖學上不合理卻看不出來的組合。
+★ 熱量用 Mifflin-St Jeor；蛋白質／脂肪**以每公斤體重**計（寫死公克數對 50kg 與 90kg 都是錯的）；
+畫面必須寫明是**估算值（±10%）**。★ 不預填任何示範資料；不做醫療建議。
+★ 圖表只算「有填重量」的動作並註明 —— 自重訓練算進去會讓圖表看起來像「這週沒練」，
+那是**錯誤的視覺暗示**。
+★ BMR 公式**需要**生理性別參數（生理事實，與稱謂無關）→ 由使用者在該頁**自己填**，
+不從全域設定偷偷帶進來。
+
+## 🎨 字級縮放與版面稽核
+
+`<html data-density>` 由 `App.tsx` 依 `learnerProfileId !== 'senior'` 切換，`index.css` 命中
+**四種**字級：`compact`（非長者）14/16/17/18；`comfortable`（長者）**19/22/23/24**。
+★ **新增字級必須兩個模式都補一行**；寫在 `<html>` 而非包 div（fixed 元素才蓋得到）。
+★ **唯一例外：12px**（`LegalNotice.tsx`）刻意不受縮放影響。
+★ 內距／間距用**明確 px**（`:root{font-size:20px}` 讓 `p-4`／`gap-4` 實際是 20px）。
+
+⚠️ 改動後**必須跑 `npm run check:layout`**，且**一定要加 `--lang=en`**
+（中文一字一方塊、英文以詞斷行，中文乾淨**不代表**英文乾淨）與 **`--profile=fitness`**
+（不加就整塊沒被看過 → 報告全綠，**假通過**）。
+★ **`min-w-0` ＋ `whitespace-nowrap` ＝保證溢出** → 要單行的標籤改 **`shrink-0`**。
+★ **`truncate` 用於「狀態摘要」等於讓該設計失效**（那些欄位就是要讓長者不展開也知道設了什麼）
+→ 要折行。
+★ **孤行的常見成因是「flex 兄弟搶寬度」**（圖示／勾勾／間距都吃同一行）→
+把最重要的那行**移出 flex 列、改獨立一行取全寬**比縮文案更治本。
+★ **中文孤行要用 `text-wrap: balance`，`text-wrap: pretty` 對中文無效** ——
+它是為「詞」設計的，中文沒有詞邊界，單一個中文字不算 orphan。
+（改用 `balance` 後版面稽核由 2 筆問題變成 **0 筆**。）
+
+## 🛠️ 開發者面板（隱藏）
+
+連點主標「LabelBuddy AI」**7 下**進入。計數用 **ref 不用 state**（state 會全樹重繪），
+且必須有**時間窗**（2 秒），否則分幾天點也會開。內容：供應商用量／上限、冷卻、上次錯誤、
+模型鏈、快取、NVIDIA 狀態、執行環境。★ 供應商清單以 `orderedProviders` 為準。
+★ 面板會顯示執行中的**建置指紋** → 一眼知道手機裝的是哪一版。
+★ **溢出修法本身才是問題**：原本「看到哪個元素會溢出就補 `break-all`」天生會漏
+（漏了 `openrouterQuota` 那一行）→ 改成在**最外層容器**加 `overflow-wrap: anywhere`：
+它是**繼承屬性**，底下所有文字自動生效；且與 `break-word` 不同，**會影響 min-content 尺寸**，
+所以 flex 子項也算得對。之後再加任何欄位都不需要記得補斷行。
+
+## 🚀 部署／APK 建置細節
+
+正式網址 `https://app.labelbuddy-ai.workers.dev`（Worker 名 = `wrangler.toml` 的 `name`；
+**唯一可靠來源是 `wrangler deploy` 最後一行**）。帳號與 Account ID 已遮蔽
+（2026-10-06，此 repo 可能改為公開）；憑證 `%APPDATA%\xdg.config\.wrangler\config\default.toml`。
+Secret：`OPENROUTER_API_KEY`、`GEMINI_API_KEY`、`NVIDIA_API_KEY`。
+版控 `Spencer-F3D/labelbuddy-ai`（Private）。
+
+★★ **收尾的唯一正確動作是 `npm run ship`**（＝`node scripts/ship-all.mjs`／雙擊「一鍵同步.bat」）：
+工作區乾淨 → 跑檢查 → `vite build` → `git push` → `wrangler deploy` → 出 APK →
+**`check-consistency.ts` 驗證線上／GitHub／APK 三者一致**（沒過以非零結束碼失敗）。
+⚠️⚠️ **`git commit` 只是本機動作** —— 不上 GitHub、更不上線。
+
+★ **判定「一致」**：建置時把指紋寫進 `dist/index.html` 的 `<meta name="x-build-id">`
+（＝`<commit>[-dirty]+<原始碼內容雜湊>`，`scripts/build-stamp.mjs`）；`cap sync` 會把整個
+`dist/` 複製進 Android 專案，所以 APK 也帶著它；線上網站同理。
+→ 三者比對**指紋 ＋ bundle 的 sha256**。
+**不比檔名**（檔名是建置工具算的內容雜湊，正常會一致，但「檔名一樣、內容不同」是可能的）、
+**不比時間**（複製／checkout／切分支都會改時間；本專案吃過「時間對了但內容是舊的」的虧）。
+
+★★ **指紋只能放 `index.html`，不可注入 JS** —— 注入進 JS 會讓 bundle 的雜湊取決於 commit，
+於是「同一份程式碼、不同 commit」也產生不同的 bundle → sha256 比對永遠過不了。
+
+★★ **判準分兩級**：內容指紋不同／sha256 不同／用未提交內容建置（`-dirty`）→ **失敗**；
+**只有 commit 雜湊不同 → 警告**。理由：兩個 AI 同時提交時，對方提交文件就會讓我方剛建好的
+產物變成「上一個 commit」；若算失敗，檢查會永遠是紅的而原因與 App 無關 → 沒人看它，
+保證反而死掉。要嚴格語意 → `--strict-commit`。
+
+★ **驗證有沒有推上去要看 `origin/main`，不要只看結束碼** ——
+`ship-all.mjs` 的 `git push` 曾用「cmd.exe 重導到檔案」而**沒有真的推上去**（結束碼被吃掉）；
+已改成 `execFileSync` ＋明確 stdio。
+★ `deploy-worker.mjs`（「部署上線.bat」）原本**沒有先 `vite build`**，而 `wrangler.toml` 的
+assets 指向 `./dist` → 會把舊版推上線且顯示成功；`SECRETS` 也漏了 `NVIDIA_API_KEY`。兩者已修。
+
+★ 沙箱裡建 APK 有三個關卡：
+1. `vite build` 清 dist 被防大量刪除 shim 擋（EBUSY）→ 加 `CODEBUDDY_SAFE_DELETE_ENABLED=0`
+2. `cap sync` 的 `update` 會 EPERM 並刪掉
+   `capacitor-cordova-android-plugins/cordova.variables.gradle` → 手動刪 `.../build` 再跑
+   （`copy` 成功就夠）
+3. gradle 可能把 `packageRelease` 判成 `UP-TO-DATE` → 產出「看起來成功但內容是舊的」APK
+   （`build-apk.mjs` 的「APK 必須比 dist 新」檢查就是擋這個）
+
+★ 應用名稱與桌面檔名都是 **營養放大鏡**。JDK 21 在 `D://Java//jdk-21.0.12.1+1`
+（⚠️ Capacitor 8.x 要 **21**，17 會 `invalid source release: 21`）；Android SDK 在
+`D://Android//Sdk`；簽章 `android/labelbuddy-release.jks`＋`keystore.properties`
+（**兩者都不可進版控**）。
+★ **打包網頁進 APK**（不用 `server.url`）→ WebView origin 是 `https://localhost` →
+API 一律走 `src/utils/apiBase.ts` 的 `apiUrl()`。
+★★ **`gradlew.bat` 不能直接 `spawnSync`**（Node 18.20.2+ 修 CVE-2024-27980 會回
+`EINVAL errno:-4071`，訊息**像找不到檔案或權限問題**）→ 走 `cmd.exe /d /s /c`，
+**不要用 `shell: true`**（那正是 CVE 的成因）。
+★ 檔名日期用**本機時區**（曾用 UTC → 16:00 後寫成「昨天」）。
+★ 驗章用 `apksigner verify`，**不要**看「META-INF 有沒有 .RSA」（v2/v3 在 Signing Block
+→ 假警報）。
+★ 沙箱「防大量刪除」是**累計**（50 檔/回合）→ 同回合連刪大檔會害後面的 `vite build`
+清 dist 被擋。
+
+★ **`ship-all.mjs` 的三個「工具本身的 bug」**（共同特徵：**不會報錯、只會給你一個看起來
+很合理的錯誤答案**）：
+
+| bug | 後果與修法 |
+| --- | --- |
+| `spawnSync` 接管 stdout | 這個沙箱環境會直接回 `EBUSY`，而且**任何執行檔都一樣**（`cmd.exe`／`git`／`python`／`node`）。不是程式的問題，是「接管 stdio」被擋 → 改用 `stdio: 'inherit'`（代價：拿不到子程序輸出、只能拿結束碼） |
+| 改回傳型別忘了改呼叫端 | `run()` 從「回傳物件」變成「回傳結束碼（數字）」後，呼叫端還留著 `r.status === 0` → 永遠是 `undefined === 0` → **明明成功卻每次都報失敗** |
+| 結束碼 0 ≠ 檔案更新 | APK 步驟結束碼 0、輸出看起來正常，但**桌面 APK 的時間沒變**（舊檔還在）→ 加入「比對建置前後的 mtime」。**只看結束碼抓不到「靜默地什麼都沒做」** |
+
+★ **另一個 AI 的驗證工具也踩了同一個坑**：它的 `git()` 用
+`stdio: ['ignore','pipe','pipe']` 讀輸出 → `EBUSY` → 被 `try/catch` 接住 → `pushed` 恆為
+false → **報告永遠說「本機 main 沒推上 GitHub」**，但 `git status -sb` 明明顯示
+`## main...origin/main`。**驗證工具自己在說謊，比不驗證更糟** —— 會讓人開始忽略它的輸出。
+→ 改成**直接讀 `.git/refs/**` 檔**（零子程序）：HEAD 是符號引用要追一層；分支可能被 pack
+進 `packed-refs`，所以要有後備。
+
+## 🤝 兩個 AI 同時改同一個專案
+
+★ **`AI_COLLAB.md` 的結構**：0.4 工作流程（開始前讀訊息＋登記＋寫計劃；完成後驗證＋
+`ship-all`＋追加訊息）／0.5 同時編輯的注意事項／1 硬規則（8 條）／2 目前狀態／
+**3 已有結論的事**／4 訊息區（追加式）。
+**第 3 節最有價值** —— 它讓下一個 AI 不必重跑「`tessdata_best` 到底有沒有比較好」這類實驗
+（要花幾十分鐘，結論只是一行字）。
+
+★ **不要用 `git add -A`** —— 曾把另一個 AI 還沒提交的進行中變更一起包進 commit，
+那個 commit（`cae5f45`）**本身編譯不過**（其中一個元件的函式體用了 `localOnly`，
+但函式簽章與呼叫端都沒有這個 prop）。提交前看 `git diff --stat`，動手前先登記。
+★ **改完立刻 commit** —— `ship-all.mjs` 要求工作區乾淨才肯跑，但兩個 AI 都在改檔案時
+兩邊的工作區都不乾淨 → **兩邊的 `ship-all` 都拒絕執行**，只能靠「其中一個人先提交完」解開。
+★ 兩個 AI 同時跑 gradle 會造成鎖衝突（APK 建置失敗過一次，單獨重跑就成功）。
+★ **工具最後收斂成一套**：它的 `一鍵同步.bat` 呼叫我的 `ship-all.mjs`，我的腳本呼叫它的
+`check-consistency.ts`。⚠️ 我原本自己寫了一套「比對 bundle 檔名」的驗證，**後來刪除了** ——
+兩個 AI 各寫一套一致性檢查，只會製造新的不一致。
+
+## 🔒 同意閘門（第三個端點，2026-10-04）
+
+★★ **任何「會呼叫雲端」的功能都要有同意閘門**：`/api/analyze-label`、
+`/api/ask-health-question`、`/api/fitness-report` —— 前端要傳 `localOnly`、後端要真的檢查
+（**兩道防線**）。2026-10-04 補上的就是漏掉的第三個（健身專區 AI 週報）：
+**前端元件原本連 `analysisMode` 都沒接收**，所以「只在本機」照樣上傳統計數字到 NVIDIA。
+→ 修法：`FitnessZone` 收 `analysisMode` → 推導 `localOnly` → 傳給 `LogTab`
+（按鈕與 `generateReport()` 都在 `LogTab`，**不要在子元件各自再算一次**）；
+`local_only` 時**不渲染按鈕**、改顯示「要切換模式才能用」；後端 `localOnly === true`
+→ 直接回本機版、不呼叫 NIM（第二道防線）。
+★ 使用者明確要求：報告**要繼續真的用 AI**，不可以靜默降級成本機版。
+★ **驗證方法**：比對「帶／不帶 `localOnly`」的**耗時差 65 倍**。
+只比對 `source` 欄位是驗不出來的（NIM 失敗時兩邊都回 `local`）。
+
+## 🧪 「非食物被判綠燈」的真因（2026-10-04）
+
+★ 使用者回報「本機模式時會把不是食物但沒有任何成分的東西（如紙）也說可以食用」，
+但**本機的兩條路徑全部正確**（9 種非食物 × 2 種本機模式都正確拒絕）→ 重現不出來。
+
+★★ **真因在雲端路徑**：AI **正確地**判斷「這不是食物標籤」，**但同時回了**
+`risk_level: "green"` → 畫面上是一張**綠燈卡片**（綠色在這個 App 的意思就是「可以吃」），
+標題卻寫「這不是食物標籤」。**使用者看到的就是「說可以食用」。**
+★ **為什麼前端救不了**：`photo_issue` 這個欄位唯一的消費端，是用來決定「重拍按鈕的文字」。
+**沒有任何地方用它修正顏色。**
+→ 修法：後端強制覆寫 —— `photo_issue` 存在時（不是食物標籤／照片模糊）一律**至少黃燈**。
+
+★ **順手加硬的第二道門檻**：原本的門檻是「至少 3 個欄位 ＋ 必須有鈉或糖」——
+意味著**只要 OCR 把一段不相干的文字誤讀成「鈉 800 毫克」之類的組合就會通過門檻**，
+接著規則引擎看到一份「數值都很正常」的資料，回你一個綠燈「很適合您」。
+→ 新增 `FOOD_CONTEXT` 門檻：文字裡必須出現食品情境詞
+（營養／成分／每份／熱量／`nutrition`／`serving`／`sodium` …）。
+⚠️ **關鍵字刻意取寬** —— 過嚴會誤殺真的標籤，那比漏放更糟（使用者會一直重拍）。
+回歸檢查：5 個真標籤（中文完整／只寫成分／英文完整／英文簡寫／只寫每份）全部仍被接受。
+
+★ **檢查腳本自己會誤判**：`check-nonfood.mjs` 用 `/適合/` 判斷「有沒有說可以食用」，
+但**正確拒絕**的文案裡也有這兩個字（「…才能幫您分析是否*適合*長者食用」）
+→ 一個正確的拒絕被判成事故。→ 先排除明確拒絕的字眼，再判斷有沒有正向字眼。
+
+## 📋 介面修正（2026-10-04）
+
+★ **右上角的模式標籤永遠顯示「雲端 AI」**：它顯示的其實是 `geminiConnected`（**連線狀態**），
+與分析模式完全無關 → 只要連得到伺服器就永遠寫「雲端 AI」，**連選「只在本機」也一樣**。
+對一個**隱私指示器**來說這是最糟的錯誤方向。
+→ 改為顯示目前的模式，並**另外定義** `MODE_CHIP_KEY` —— 不重用 `MODE_LABEL_KEY`，
+因為它的 `cloudText` 是「本機圖像識別」（7 個字），塞不進這個只剩約 9 個字餘裕的標籤。
+→ 圓點顏色改為反映**該模式的隱私行為**：只在本機＝綠、其餘＝藍、雲端模式若連不上則轉灰。
+
+| 模式 | 右上角顯示 | 圓點顏色 |
+| --- | --- | --- |
+| 直接雲端 | 雲端辨識 | 藍 |
+| 只送文字 | 只送文字 | 藍 |
+| 只在本機 | 只在本機 | **綠** |
+
+★ **選單順序**：健身專區移到「飲食紀錄」下面 → 用**明確的位置表**取代
+`a.tab === 'fitness' ? -1 : 1`（後者只能表達「放最前面」，表達不了「放在某一項之後」；
+位置表還讓「沒列到的項目自動留在原位」）。
+★ **朗讀語言與音量拆成兩區**：兩者其實是**不同的問題**（用什麼語言發音 vs 要不要出聲、
+多大聲）。並排在同一區會讓人以為「選了粵語就等於開啟語音」。
+→ 拆為 `TtsVoiceLangSection` 與 `TtsVolumeSection`，朗讀語言那區加一行說明
+「這三個是『唸出來的語言』，跟畫面上的文字語言無關」。
