@@ -114,6 +114,18 @@ const zhTW = {
   'settings.conditions.availableCount': '共 {n} 項可選',
   'settings.conditions.desc': 'AI 在超市幫您看食品時，會依據勾選項目比對成分與禁忌：',
 
+  /* ── 字體大小（2026-10-06 使用者指定新增）─────────────────────
+     ★ 使用者只要三顆按鈕，所以「跟隨身分」**不是選項** ——
+       它是「從沒調過」時的行為（見 utils/fontScale.ts 的說明）。
+     ★ 一定要有預覽句：只給「小／中／大」，長者不會知道選下去變多大。 */
+  'settings.fontSize.title': '字體大小',
+  'settings.fontSize.desc': '覺得字太小或太大，可以在這裡調整。沒有調過的話，會依您的身分自動選擇。',
+  'settings.fontSize.small': '小',
+  'settings.fontSize.normal': '中',
+  'settings.fontSize.large': '大',
+  'settings.fontSize.preview': '預覽',
+  'settings.fontSize.sample': '這是調整後的字體大小，看清楚了嗎？',
+
   /* ── 拍照辨識流程（第二階段）───────────────────────────────── */
   /* 重拍提示卡 */
   'scan.retakeTitle': '這次沒成功',
@@ -409,6 +421,9 @@ const zhTW = {
   'onboard.conditionsChronic': '慢性病',
   'onboard.conditionsAllergy': '食物過敏',
   'onboard.conditionsAllergyNote': '會過敏的食物請務必打勾。',
+  /* ★ 2026-10-06：自填病症的輸入框只在設定頁（引導頁沒有輸入框），
+     所以要明講去哪裡加 —— 否則使用者會以為只能選這幾項。 */
+  'onboard.conditionsMore': '清單上沒有的病症，可以在之後的「健康設定」裡自行填寫。',
   'onboard.identityTitle': '先問一下：您是誰？',
   'onboard.identityBody':
     '這個答案很重要。同一包食物，對不同的人結論可能完全相反。',
@@ -494,6 +509,16 @@ const zhTW = {
   'conditions.allergenHint': '請勾選您會過敏的食物',
   'conditions.allChosen': '所有項目都已勾選完畢。',
   'conditions.categoryAllChosen': '這個分類的項目都已勾選，都在上方的「已選擇」區。',
+
+  /* ── 「其他（自行填寫）」輸入框（2026-10-06 使用者指定）───────────
+     ★ customLocalOnly 這一句是**安全文案，不要為了簡潔刪掉**：
+       本機模式真的判不了自填病症，使用者有權知道，
+       否則他會以為填了就有人看（本專案最危險的失敗模式）。 */
+  'conditions.customLabel': '請填寫您的病症名稱',
+  'conditions.customPlaceholder': '例如：甲狀腺機能低下',
+  'conditions.customHint': '填寫後會交給雲端 AI 一起判斷。',
+  'conditions.customLocalOnly':
+    '注意：「只在本機」模式下，這一項無法自動把關。要讓 AI 一起判斷，請改用「直接雲端」或「只送文字」模式。',
 
   /* ── 健康設定頁的其餘文字（第三階段）───────────────────────── */
   'settings.savedKept': '已保留您原本的設定',
@@ -848,6 +873,16 @@ const en: Record<TranslationKey, string> = {
   'settings.conditions.desc':
     'When you photograph a product, the AI checks the ingredients against the items you select:',
 
+  /* ── Text size (added 2026-10-06) ── */
+  'settings.fontSize.title': 'Text size',
+  'settings.fontSize.desc':
+    'If the text feels too small or too large, change it here. Until you change it, it follows your profile automatically.',
+  'settings.fontSize.small': 'Small',
+  'settings.fontSize.normal': 'Medium',
+  'settings.fontSize.large': 'Large',
+  'settings.fontSize.preview': 'Preview',
+  'settings.fontSize.sample': 'This is the text size you have chosen. Is it clear enough?',
+
   'scan.retakeTitle': 'That did not work',
   'scan.retakeSubtitle': 'It is not your fault — nothing is broken.',
   'scan.retakeTips': 'Three things you can try:',
@@ -1100,6 +1135,8 @@ const en: Record<TranslationKey, string> = {
   'onboard.conditionsChronic': 'Long-term conditions',
   'onboard.conditionsAllergy': 'Food allergies',
   'onboard.conditionsAllergyNote': 'Please tick any food you are allergic to.',
+  'onboard.conditionsMore':
+    'If your condition is not on the list, you can type it in later under "Health settings".',
   'onboard.identityTitle': 'First, who are you?',
   'onboard.identityBody':
     'This answer matters. The same food can get opposite verdicts for different people.',
@@ -1193,6 +1230,13 @@ const en: Record<TranslationKey, string> = {
   'conditions.allergenHint': 'Tick the foods you are allergic to',
   'conditions.allChosen': 'Every item has been selected.',
   'conditions.categoryAllChosen': 'Every item in this category is selected and listed above.',
+
+  /* ── "Other (self-described)" input (added 2026-10-06) ── */
+  'conditions.customLabel': 'Type the name of your condition',
+  'conditions.customPlaceholder': 'For example: hypothyroidism',
+  'conditions.customHint': 'It will be passed to the cloud AI together with the other items.',
+  'conditions.customLocalOnly':
+    'Note: in "on-device only" mode this item cannot be checked automatically. Switch to "Direct cloud" or "Text only" mode so the AI can take it into account.',
 
   'settings.savedKept': 'Your original settings were kept',
   'settings.savedReset': 'The default health items were applied again',

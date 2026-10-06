@@ -193,6 +193,20 @@ export const CONDITION_DESCRIPTION_EN: Record<string, string> = {
   seafood_allergy: 'Checks for shrimp, crab, shellfish, fish, fish sauce and shrimp paste',
   lactose_intolerance: 'Checks for milk, whey protein, casein and butter',
   gluten_sensitivity: 'Checks for wheat, barley, rye and oat ingredients',
+  // 常見補充病症（2026-10-06）
+  fatty_liver:
+    'Checks refined sugar, fructose and saturated fat so the liver does not store extra fat',
+  heart_failure:
+    'Strictly checks sodium and liquid-heavy soups, so fluid does not build up and strain the heart',
+  iron_anemia:
+    'Warns that tea, coffee, cocoa and high-calcium foods block iron absorption, and looks at iron and vitamin C',
+  constipation:
+    'Checks whether the product is mostly refined starch with little fibre, and reminds you to add vegetables, fruit and water',
+  insomnia: 'Screens for caffeine, which can delay sleep and lower sleep quality',
+  migraine:
+    'Screens for common triggers — MSG, tyramine (aged cheese, red wine) and caffeine',
+  other:
+    'A condition that is not on the list — type its name below. It is passed to the cloud AI; in local-only mode it cannot be checked automatically.',
 };
 
 /** 取慢性病說明。找不到英文時退回中文原文。 */
@@ -207,12 +221,20 @@ export function conditionDescription(
 
 /** 慢性病分類膠囊名稱 */
 export const CATEGORY_NAME_EN: Record<string, string> = {
-  all: 'All (12)',
+  /**
+   * ⚠️ `all` 的值**不會被使用** —— 「全部 (N種)」由 `categoryPillLabel()`
+   *    依 `ALL_CONDITIONS.length` 推導（見 App.tsx）。
+   *    原本這裡寫死 'All (12)'，新增病症後就會與實際數量不一致，
+   *    所以改成不帶數字的字串，避免日後有人誤以為它才是來源。
+   */
+  all: 'All',
   cardio: 'Heart',
   metabolic: 'Metabolic',
   organ: 'Organs & bones',
   digestive: 'Digestive',
   allergen: 'Allergens',
+  // 常見補充病症（2026-10-06）
+  other: 'Other',
 };
 
 /** 取分類名稱。 */

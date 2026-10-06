@@ -524,6 +524,127 @@ export function analyzeNutritionWithIndicators(
     }
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+   * 13～18. 常見補充病症把關（2026-10-06 使用者指定新增）
+   *
+   * 【★ 為什麼每一項都必須真的寫規則，不能只放進清單就好】
+   *   本專案最危險的失敗模式是「勾了卻沒有把關」——
+   *   不當機、不報錯、畫面一切正常，使用者以為有人在看，其實什麼都沒做。
+   *   所以這 6 項**全部**都有對應的判斷規則，而且會被
+   *   `npm run verify:conditions` 逐項驗證（餵最壞情境，必須真的產生警示）。
+   *
+   * 【⚠️ 判斷只能用 NutritionProfile 真的有的欄位】
+   *   這個結構沒有「膳食纖維」欄位（見檔頭），所以「便秘」不能直接比對纖維含量，
+   *   改成看**成分特徵**（是否為精製澱粉／油炸為主、且沒有全穀蔬果豆類）——
+   *   這是誠實的推論，不是猜測數字。
+   *
+   * 【⚠️⚠️ 這裡新增的每一句中文字串，都必須在 `server/localEngineEn.ts`
+   *    的 `LOCAL_TEXT_EN` 有對應英文】否則英文介面會漏出中文，
+   *   而且 `npm run check:i18n` 會失敗。
+   * ══════════════════════════════════════════════════════════════════════ */
+
+  // 13. 脂肪肝把關 (大白話：糖和動物油太多，肝臟會囤脂肪)
+  const hasFattyLiver = selectedConditions.some((c) => c.includes('脂肪肝'));
+  if (hasFattyLiver) {
+    if (profile.sugarG >= 15 || profile.saturatedFatG >= 8) {
+      concerns.push('🔴 糖和動物油都放得多：肝臟會把多餘的糖變成脂肪囤起來，脂肪肝容易變嚴重！');
+      matchedConditions.push('脂肪肝 (糖油過量)');
+      riskScore += 3;
+    } else if (profile.sugarG >= 8) {
+      concerns.push('🟡 糖分稍微偏高：肝臟要把多餘的糖轉成脂肪存起來，有脂肪肝的人要少吃甜的。');
+      matchedConditions.push('脂肪肝 (糖分偏多)');
+      riskScore += 1;
+    }
+  }
+
+  // 14. 心臟衰竭把關 (大白話：鈉會把水留在身體裡，心臟打血更吃力)
+  const hasHeartFailure = selectedConditions.some(
+    (c) => c.includes('心臟衰竭') || c.includes('心衰竭')
+  );
+  if (hasHeartFailure) {
+    if (profile.sodiumMg >= 1000) {
+      concerns.push(
+        '🔴 太鹹了：心臟衰竭要嚴格限鈉，鈉會讓水分留在身體裡，心臟打血更吃力，容易喘、腳腫！'
+      );
+      matchedConditions.push('心臟衰竭 (嚴格限鈉)');
+      riskScore += 3;
+    } else if (profile.sodiumMg >= 600) {
+      concerns.push('🟡 口味偏鹹：心臟衰竭的人要限鈉，湯汁和醬料盡量不要喝。');
+      matchedConditions.push('心臟衰竭 (鈉分注意)');
+      riskScore += 1;
+    }
+  }
+
+  // 15. 缺鐵性貧血把關 (大白話：茶咖啡可可的單寧酸會把鐵綁住、鈣會搶鐵)
+  const hasAnemia = selectedConditions.some((c) => c.includes('貧血') || c.includes('缺鐵'));
+  if (hasAnemia) {
+    const blocksIron = profile.ingredients.some((i) => /茶|咖啡|可可|巧克力|紅酒/.test(i));
+    /**
+     * ⚠️ 只認**乳製品**，不認「碳酸鈣」這類強化鈣。
+     *    實測：加鈣豆漿的成分含「碳酸鈣」，若一併比對，
+     *    一杯健康的高鈣豆漿會對貧血使用者亮黃燈 —— 那是誤報。
+     */
+    const highCalcium = profile.allergens.some((a) => /牛奶|乳/.test(a));
+    if (blocksIron) {
+      concerns.push('🟡 含有茶、咖啡或可可：其中的單寧酸會妨礙鐵質吸收，請與補鐵的食物間隔兩小時以上。');
+      matchedConditions.push('缺鐵性貧血 (阻礙鐵吸收)');
+      riskScore += 1;
+    }
+    if (highCalcium) {
+      concerns.push('🟡 含乳製品（鈣較多）：鈣會和鐵競爭吸收，補鐵的那一餐盡量不要同時吃。');
+      matchedConditions.push('缺鐵性貧血 (鈣競爭吸收)');
+      riskScore += 1;
+    }
+  }
+
+  // 16. 便秘把關 (大白話：整包都是精製澱粉跟油，纖維少得可憐)
+  const hasConstipation = selectedConditions.some((c) => c.includes('便秘'));
+  if (hasConstipation) {
+    const refinedOnly = profile.ingredients.some((i) =>
+      /麵粉|精製|精緻|油炸|樹薯|玉米澱粉|麥芽糊精|白砂糖/.test(i)
+    );
+    const hasFibreSource = profile.ingredients.some((i) =>
+      /全麥|燕麥|糙米|蔬菜|水果|豆|纖維|蒟蒻|堅果/.test(i)
+    );
+    if (refinedOnly && !hasFibreSource) {
+      concerns.push(
+        '🟡 幾乎都是精製澱粉與油脂、膳食纖維很少：纖維不夠容易便秘，建議搭配蔬菜、水果或全穀類一起吃。'
+      );
+      matchedConditions.push('便秘 (纖維不足)');
+      riskScore += 1;
+    }
+  }
+
+  // 17. 失眠把關 (大白話：咖啡因代謝慢，下午之後吃會睡不著)
+  const hasInsomnia = selectedConditions.some((c) => c.includes('失眠') || c.includes('睡眠'));
+  if (hasInsomnia) {
+    const hasCaffeine = profile.ingredients.some((i) =>
+      /咖啡|咖啡因|可可|巧克力|能量飲料|濃茶|抹茶|瓜拿納/.test(i)
+    );
+    if (hasCaffeine) {
+      concerns.push(
+        '🟡 含有咖啡因：咖啡因在身體裡要 4～6 小時才代謝一半，下午之後吃容易睡不著、睡不好。'
+      );
+      matchedConditions.push('失眠 (咖啡因影響)');
+      riskScore += 1;
+    }
+  }
+
+  // 18. 偏頭痛把關 (大白話：味精、熟成起司、紅酒是常見誘發因子)
+  const hasMigraine = selectedConditions.some((c) => c.includes('偏頭痛'));
+  if (hasMigraine) {
+    const hasTrigger = profile.ingredients.some((i) =>
+      /味精|麩酸鈉|L-麩酸|酪胺|熟成起司|起司|紅酒|咖啡|可可|巧克力|亞硝酸/.test(i)
+    );
+    if (hasTrigger) {
+      concerns.push(
+        '🟡 含有常見的偏頭痛誘發因子（味精、熟成起司、紅酒或咖啡因）：每個人體質不同，先少量試並記錄會不會頭痛。'
+      );
+      matchedConditions.push('偏頭痛 (常見誘發因子)');
+      riskScore += 1;
+    }
+  }
+
   /**
    * ★★ 孕期危險成分把關（2026-10-04）。
    *

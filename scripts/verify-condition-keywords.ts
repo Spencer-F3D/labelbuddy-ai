@@ -29,22 +29,26 @@ import {
 import { buildConditionReminders } from '../server/conditionAdvice';
 
 /**
- * 刻意做壞的產品：把 12 條規則的觸發條件全部拉到最滿。
+ * 刻意做壞的產品：把每一條規則的觸發條件全部拉到最滿。
  * 只要某項慢性病的關鍵字斷了，該項就不會出現在 matched_conditions 裡。
+ *
+ * ⚠️ 新增慢性病規則時，這裡也要補上能觸發它的成分／數值 ——
+ *    否則新項目會「驗證失敗」，但原因不是規則壞了，而是測試資料不夠壞。
  */
 const WORST_CASE_PROFILE: NutritionProfile = {
   foodName: '測試用最壞情境食品',
-  sodiumMg: 2000, // >=1200 高血壓紅燈、>=1000 心血管/骨質疏鬆、>=800 腎臟
-  sugarG: 20, // >=15 糖尿病紅燈、痛風（糖漿促尿酸）
+  sodiumMg: 2000, // >=1200 高血壓紅燈、>=1000 心血管/骨質疏鬆/心臟衰竭、>=800 腎臟
+  sugarG: 20, // >=15 糖尿病/脂肪肝紅燈、痛風（糖漿促尿酸）
   carbsG: 70,
-  saturatedFatG: 10, // >=8 高血脂紅燈
+  saturatedFatG: 10, // >=8 高血脂、脂肪肝
   transFatG: 0.5, // >0.3 高血脂、>0 心血管
   calories: 500,
   purineLevel: 'high', // 痛風
   hasPhosphates: true, // 腎臟、骨質疏鬆
   hasHighPotassium: true, // 腎臟（鉀）
   allergens: ['花生', '堅果', '甲殼類', '魚類', '牛奶製品', '小麥麩質'],
-  ingredients: ['辣椒', '油炸麵條'], // 胃食道逆流
+  // 胃食道逆流（辣椒）／便秘（油炸麵條）／缺鐵性貧血與失眠（咖啡）／偏頭痛（咖啡、熟成起司）
+  ingredients: ['辣椒', '油炸麵條', '咖啡', '熟成起司'],
 };
 
 /** 這個身分的每日上限（借用長者三高的，足以產生 nutrient_facts） */
@@ -68,26 +72,41 @@ function main(): void {
       LIMITS
     );
 
+    /**
+     * ★ 2026-10-06：「其他（自行填寫）」是本機引擎**不可能**有規則的項目
+     *   （內容是使用者自己打的字），所以跳過「規則引擎要有反應」那一項檢查。
+     *
+     * ⚠️ 但**提醒**仍然要驗 —— 它必須有專屬的誠實文案，
+     *    不可以落到 GENERIC_REMINDER（那會讓每次請求都在日誌留下警告，
+     *    而且文案講不到重點：這一項本機判不了）。
+     *    所以這裡不是「整項跳過」，只跳過一半。
+     */
+    const needsLocalRule = condition.localRule !== false;
+
     const detected = (result.matched_conditions || []).length > 0;
     const reminders = buildConditionReminders([condition.name]);
     const hasSpecificReminder = reminders.length === 1 && reminders[0].icon !== '📋';
 
     const marks = [
-      detected ? '✅' : '❌',
+      needsLocalRule ? (detected ? '✅' : '❌') : '➖',
       hasSpecificReminder ? '✅' : '❌',
     ].join(' ');
 
     console.log(
       `${marks}  ${condition.name.padEnd(8, '　')} ` +
-        `規則引擎：${detected ? (result.matched_conditions || []).join('、') : '未產生任何警示'}`
+        (needsLocalRule
+          ? `規則引擎：${detected ? (result.matched_conditions || []).join('、') : '未產生任何警示'}`
+          : '規則引擎：不適用（使用者自行填寫）')
     );
 
-    if (!detected || !hasSpecificReminder) {
+    const failedHere = (needsLocalRule && !detected) || !hasSpecificReminder;
+
+    if (failedHere) {
       failed += 1;
       if (!hasSpecificReminder) {
         console.log('        └─ conditionAdvice 沒有對應的專屬提醒（用了通用提醒）');
       }
-      if (!detected) {
+      if (needsLocalRule && !detected) {
         console.log(
           '        └─ 規則引擎沒有反應 → 名稱可能已失去關鍵字，請檢查 ' +
             'server/smartNutritionAnalyzer.ts 的 includes() 條件'

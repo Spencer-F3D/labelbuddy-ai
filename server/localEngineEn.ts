@@ -102,6 +102,39 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
   '🟡 鹽巴多又含化學粉：會把身體裡的鈣質偷偷帶走，骨頭容易變脆、怕跌倒骨折！':
     '🟡 High in salt and contains phosphate additives: these quietly drain calcium from your body and make bones brittle.',
 
+  // ── 常見補充病症的顧慮（2026-10-06）──────────────────────────
+  // ⚠️ 鍵必須與 smartNutritionAnalyzer.ts 的輸出**一字不差**（含 emoji 與標點）。
+  //    漏一條 → 英文介面會靜默顯示中文，而且 check:i18n 會抓到。
+  '🔴 糖和動物油都放得多：肝臟會把多餘的糖變成脂肪囤起來，脂肪肝容易變嚴重！':
+    '🔴 High in sugar and animal fat: the liver turns the extra sugar into fat, which makes fatty liver worse.',
+  '🟡 糖分稍微偏高：肝臟要把多餘的糖轉成脂肪存起來，有脂肪肝的人要少吃甜的。':
+    '🟡 A little high in sugar: the liver stores the extra sugar as fat, so go easy on sweet food if you have fatty liver.',
+  '🔴 太鹹了：心臟衰竭要嚴格限鈉，鈉會讓水分留在身體裡，心臟打血更吃力，容易喘、腳腫！':
+    '🔴 Far too salty: heart failure needs strict sodium limits. Sodium holds water in the body, making the heart work harder — you can become breathless or your ankles can swell.',
+  '🟡 口味偏鹹：心臟衰竭的人要限鈉，湯汁和醬料盡量不要喝。':
+    '🟡 On the salty side: with heart failure you need to limit sodium — skip the soup and sauces.',
+  '🟡 含有茶、咖啡或可可：其中的單寧酸會妨礙鐵質吸收，請與補鐵的食物間隔兩小時以上。':
+    '🟡 Contains tea, coffee or cocoa: the tannins in these block iron absorption. Leave at least two hours between them and iron-rich food.',
+  '🟡 含乳製品（鈣較多）：鈣會和鐵競爭吸收，補鐵的那一餐盡量不要同時吃。':
+    '🟡 Contains dairy (high in calcium): calcium competes with iron for absorption, so avoid having them in the same meal.',
+  '🟡 幾乎都是精製澱粉與油脂、膳食纖維很少：纖維不夠容易便秘，建議搭配蔬菜、水果或全穀類一起吃。':
+    '🟡 Almost entirely refined starch and fat, with very little fibre: too little fibre causes constipation. Eat it with vegetables, fruit or wholegrains.',
+  '🟡 含有咖啡因：咖啡因在身體裡要 4～6 小時才代謝一半，下午之後吃容易睡不著、睡不好。':
+    '🟡 Contains caffeine: it takes 4–6 hours for your body to clear half of it, so having it in the afternoon can make it hard to fall asleep.',
+  '🟡 含有常見的偏頭痛誘發因子（味精、熟成起司、紅酒或咖啡因）：每個人體質不同，先少量試並記錄會不會頭痛。':
+    '🟡 Contains common migraine triggers (MSG, aged cheese, red wine or caffeine): triggers differ from person to person — try a small amount and note whether you get a headache.',
+
+  // ── 常見補充病症的名稱（2026-10-06）──────────────────────────
+  '脂肪肝 (糖油過量)': 'Fatty liver (too much sugar and fat)',
+  '脂肪肝 (糖分偏多)': 'Fatty liver (a little too much sugar)',
+  '心臟衰竭 (嚴格限鈉)': 'Heart failure (strict sodium limit)',
+  '心臟衰竭 (鈉分注意)': 'Heart failure (watch the sodium)',
+  '缺鐵性貧血 (阻礙鐵吸收)': 'Iron-deficiency anaemia (blocks iron absorption)',
+  '缺鐵性貧血 (鈣競爭吸收)': 'Iron-deficiency anaemia (calcium competes with iron)',
+  '便秘 (纖維不足)': 'Constipation (not enough fibre)',
+  '失眠 (咖啡因影響)': 'Insomnia (caffeine effect)',
+  '偏頭痛 (常見誘發因子)': 'Migraine (common trigger found)',
+
   // ── 食育教學：每個營養項目的「為什麼」────────────────────
   // ⚠️⚠️ 這裡的**鍵必須是「完整句子」**，不是營養素名稱。
   //      `translateOne()` 是拿 `knowledge_point` 的全文去查表，

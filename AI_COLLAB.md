@@ -169,8 +169,11 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ## 2. 目前狀態（**每次改完請更新這一節**）
 
-- 最後更新：2026-10-04 15:10
+- 最後更新：2026-10-06 18:17
 - 最新 commit：見 `git log -1`
+- ★ **2026-10-06 新增**：設定頁「字體大小」三級（`compact`/`normal`/`comfortable`，
+  手動值優先、沒選過才依身分）；慢性病清單 **12 → 19 項**（新增分類「其他」，
+  含 6 項有本機規則的補充病症 ＋ 1 項自行填寫）。詳見第 4 節最新一則。
 - ★ **三者一致性有機械保證了**：`npm run ship`（＝ `node scripts/ship-all.mjs`，
   或雙擊「一鍵同步.bat」）→ 建置 → 推送 → 部署 → 出 APK → **驗證**。
   判定方式（建置指紋 ＋ sha256，失敗／警告兩級）見第 0.4 節。
@@ -183,14 +186,19 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 - ⚠️ **改完立刻 commit**：`ship-all` 要求工作區乾淨，兩邊都留著未提交的變更時
   會變成「兩邊都跑不動」的死結。
 - ⚠️ 沙箱裡建 APK 要記得 `CODEBUDDY_SAFE_DELETE_ENABLED=0`（見第 4 節 15:05 那則）。
-- 測試指令：`npm run check` 系列請看 `package.json`；常用：
-  - `node scripts/check-layout-senior.mjs <url>` — 版面（穿出／裁切／孤行）
-  - `node scripts/check-ocr-langs.mjs <url> [en|zh]` — OCR 語言模型比較
-  - `node scripts/check-nonfood.mjs <url>` — 非食物圖片是否被誤判
-  - `node scripts/check-mode-chip.mjs <url>` — 右上角模式標籤
-  - `node scripts/check-tts-speak.mjs <url>` — 語音語言配對與事件
-  - `node scripts/check-pregnancy.mjs <url>` — 孕期危險成分把關（含誤判防護）
-  - `node scripts/check-tts-voices.mjs` — 列出瀏覽器實際可用的語音
+- 測試指令：`npm run check` 系列請看 `package.json`；常用
+  （⚠️ **2026-10-06 更正**：這份清單原本列了 5 支已在死檔清理中**刪除**的腳本
+  ——`check-ocr-langs`／`check-nonfood`／`check-mode-chip`／`check-tts-speak`／
+  `check-tts-voices`，會讓人找不到檔案。已改成實際存在的）：
+  - `npm run lint`、`npm run verify:all` — 型別 ＋ 7 支靜態檢查（**不需要伺服器**）
+  - `npm run check:pregnancy` — 孕期危險成分把關（含誤判防護，**需要伺服器**）
+  - `node scripts/check-layout-senior.mjs <url> [--lang=en] [--profile=fitness]` — 版面（穿出／裁切／孤行）
+  - `node scripts/check-ui-cjk.mjs <url>` — 17 畫面截圖 ＋ 英文零中文殘留
+  - `node scripts/measure-onboarding.mjs <url>` — 量引導頁每一頁的實際高度
+  - ⚠️ 沙箱裡「需要伺服器」的檢查：**必須在同一個指令內啟動伺服器**
+    （跨指令會被回收 → `ECONNREFUSED`）。
+  - ⚠️ **`| tail` 會吃掉退出碼** —— 要看退出碼請另外 `echo $?` 或寫進檔案再 grep，
+    否則 ❌ 會被誤讀成通過（2026-10-06 實際踩到）。
 
 ### 使用者的原始需求（會變，以對話為準）
 比賽：2026 全球青少年人工智能未來創新競賽（澳門中學生賽區），**截止 2026-10-09**，
@@ -674,6 +682,93 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
     字型堆疊裡放 `"Noto Sans TC"` 會解析到 **Thin**，
     body 文字變淡而且**編譯時完全沒有警告** ——
     只有檢查 PDF 的 `/BaseFont` 才發現。
+
+---
+
+### [2026-10-06 13:35] 墨影（WorkBuddy）
+
+- **動了什麼**：應使用者要求做「專案精簡」。
+  - **刪除 15 支無引用腳本**（commit `771a5c9`）：
+    9 支孤兒檢查 —— `check-indicator-ui`／`check-local-ocr`／`check-mode-chip`／
+    `check-nonfood`／`check-ocr-langs`／`check-ocr-pipeline`／`check-pregnancy`／
+    `check-tts-speak`／`check-tts-voices`；
+    6 支一次性工具 —— `analyze-dead-code.py`／`verify-dead-code.py`／
+    `md-table-to-typst.mjs`／`typst-lint.py`／`make-app-icon.py`／`make-ocr-test-photos.py`。
+  - 同時把本機的 13 個 `shots-*/`、17 個 `.log`、`.tmp-*` 等約 32 MB 暫存檔送進資源回收筒。
+  - **修掉 `src/ocr/ocrBrowser.ts` 的註解**：它原本指向已刪的 `scripts/check-ocr-langs.mjs`。
+- **為什麼**：使用者說「有甚麼檔案對專案沒用或不用給評審的為我刪除，如一些檢查腳本等」。
+  每支都做過「是否有任何程式引用」的交叉檢查（package.json／`ship-all.mjs` 檢查清單／
+  `.bat`／其他腳本／`src/` 與 `server/` 的註解）。
+  ★ **`npm run ship` 只跑 5 支 `.ts` ＋ `check-consistency.ts`，所以不影響上線流程。**
+- **驗證方式**：`tsc --noEmit` → 0；`npm run ship` 全流程成功
+  （5 支檢查、build、deploy、APK 內容指紋 `b927b90b720a`）；合併 `origin/main` 21 個提交 → **零衝突**。
+- **還沒做／有疑問**：
+  - ⚠️ **我原本還要把 `.workbuddy-ai/memory/`、`AI_COLLAB.md`、`docs/` 移出版控，已撤回。**
+    原因：推送時發現**本專案有兩個 clone**（你我在不同資料夾、透過 GitHub 同步）。
+    把這些檔案移出版控＝你下一次 `git pull` 會把它們**從你的硬碟刪掉** → 你會直接失去專案記憶。
+    → 這兩個路徑**維持進版控**。若你認為該改，請先確認你那邊的 clone 狀態再動。
+  - ★ 被刪工具的**量測方式已抄錄在 `ARCHITECTURE.md` 附錄**（瀏覽器 OCR 端到端測法、
+    測試圖劣化方式、語言模型比較、死檔分析兩道做法），需要時可照著重建，
+    或 `git show 847dbd0:scripts/<檔名>` 取回原檔。
+  - ⚠️ `check-local-ocr.mjs` 與 `check-ocr-langs.mjs` 是**唯二的瀏覽器 OCR 量測工具**，
+    刪掉後若 OCR 行為再出問題，**這是第一個要重建的東西**。
+  - 我另外重寫了一份 `MEMORY.md`（→11.3 KB），但**合併時採用你的版本**（你已做過同一件事，
+    且實測 17,475 bytes 仍被完整注入）。我的版本留在備份分支 `backup-memory-rewrite-20261006`。
+
+---
+
+### [2026-10-06 18:17] 墨影（Mo）
+
+**做了什麼**：使用者要求「在設定加入字體大小控制，慢性病加入其他」。
+
+1. **字體大小控制（三級）** — 新增 `src/utils/fontScale.ts`（推導純函式）＋
+   `src/components/FontSizeSection.tsx`（三顆按鈕 ＋ 即時預覽句）。
+   - `compact` 小 14/16/17/18｜**`normal` 中 16/18/19/20（刻意沒有 CSS 規則＝原始值）**｜
+     `comfortable` 大 19/22/23/24。
+   - **`compact`／`comfortable` 的名稱與數值完全沒動** —— 改名會連帶要改
+     `check-layout-senior.mjs` 與 `measure-onboarding.mjs` 的斷言，風險大於收益。
+   - 儲存鍵 `labelbuddy_font_scale_v1`。★ `loadFontScale()` 回傳 **`null` ＝沒選過**
+     （不可回填預設值，否則長者一進設定頁就被當成已手動選過，換身分字級不會跟著變）。
+   - **預設行為與改動前 100% 一致**（長者→大、其他→小）。
+
+2. **慢性病 12 → 19 項** — 新增分類膠囊「其他」，內含
+   脂肪肝／心臟衰竭／缺鐵性貧血／便秘／失眠／偏頭痛（**每一項都有真的本機規則＋專屬提醒**）
+   ＋ 1 項「其他（自行填寫）」。
+   - ★ 我**沒有**選甲狀腺疾病／自體免疫疾病：那兩類在營養標示上沒有可靠可查的成分，
+     本機引擎比對不到 → 就是本專案最怕的「勾了卻沒把關」。
+   - 自填項送出格式固定 **`其他：<自填>`**（`conditionAdvice` 用 `keys: ['其他']` 對上）；
+     **空字串不送出**；`local_only` 模式下前端**明說判不了**（安全文案，別刪）。
+   - 引導頁也列出 6 項補充病症；自填項**刻意不列**（引導頁沒有輸入框，
+     列出來就是「勾了卻不能填字」）。
+
+**為什麼**：見上。另修掉兩個**不會報錯**的問題（順手，但都影響正確性）：
+- `server/handlers.ts` 的 `conditionText`：**英文提示詞的慢性病名稱一直是中文** ——
+  前端送的是**中文病名**（`conditionNames` 刻意不隨語言變），但後端只用 `c.id === id` 查表，
+  永遠查不到 → 退回中文。中文介面完全看不出來。已改成 id 與 name 都比對。
+- `scripts/measure-onboarding.mjs` 沒有建立輸出目錄 → 第一次跑一定
+  `ENOENT: shots-onboarding/page-01.png`（而且是量完第 1 頁、正要存檔時才死）。已補 `mkdirSync`。
+
+**怎麼驗證**：
+- `lint` 0｜`verify:all` 0（19 項慢性病 0 失敗、9 張對照表 0 孤兒鍵）｜`check:pregnancy` 0。
+- `check:layout` **中英 × 長者/健身 → 0 筆問題**（量到 `comfortable 16px→19px`＝最壞情況）。
+- `check:ui` → 17 畫面、英文零中文；**但「本機模式長條圖」那一項 ❌**。
+  → 我用 `git stash` 在**原始碼**上重跑，**基準線同樣 ❌（exit 1）** → **既有問題，與本次無關**
+    （headless Chrome 的 OCR 讀不到示範標籤數字）。另以 API 直呼 `/api/analyze-label`
+    （`localOnly: true`）證明本機路徑**有**產生 `nutrient_facts`（鈉 99%、飽和脂肪 49%）。
+- 另寫一次性瀏覽器探針（CDP）驗 **26 項**：三顆按鈕真的改變 `data-density` 與 computed
+  font-size（14/16/19）、`aria-pressed` 正確、重載後仍記得、勾「其他」才出現輸入框、
+  自填文字真的寫進 localStorage 且 `selected_conditions` 變成 `["other"]`。
+- `npm run ship` → 15 項一致性全過，建置指紋 **`e71a30b+c1ce142b20ea`**。
+
+**還沒做／有疑問**：
+- ⚠️ **引導頁第 3 頁（慢性病）量到 1996px／640px ＝ 3.1 個螢幕**（加這 6 項前約 2.3，
+  本來就已溢出）。我已向使用者回報並建議：**把「其他」分類在引導頁改成收合**
+  （預設收起，點一下才展開）。**等他決定，請不要自行改。**
+- ⚠️ 上面那個「本機長條圖」的 ❌ 是**既有**的 headless Chrome OCR 問題。
+  若你要碰 OCR，這是最值得先修的一個（它會讓 `check:ui` 永遠是紅的，
+  久了就會被當成雜訊而忽略）。
+- ⚠️ `AI_COLLAB.md` 第 2 節的測試指令清單原本有 5 支已刪除的腳本，我已更正；
+  若你手上有別處引用那幾支，記得一起改。
 
 ---
 

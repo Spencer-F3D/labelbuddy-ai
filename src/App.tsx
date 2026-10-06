@@ -64,6 +64,10 @@ import {
   Users as UsersIcon,
   Activity as ActivityIcon,
   MessageCircleQuestion,
+  // 字體大小區塊（2026-10-06）。
+  // ⚠️ 必須用別名：`Type` 已經被 './theme' 的設計權杖佔用了，
+  //    直接匯入會撞名（而且 tsc 會擋下來，不會靜默出錯）。
+  Type as TypeIcon,
 } from 'lucide-react';
 import { LabelAnalysisResult, DietRecord, LearnerProfileId, AnalysisMode } from './types';
 import { compressImage } from './utils/imageCompression';
@@ -98,6 +102,15 @@ import {
 } from './data/analysisModes';
 // 設定頁的可收合區塊（2026-09-28）：整頁原本超過 3 個螢幕高，收合後好找很多。
 import { SettingsSection } from './components/SettingsSection';
+// 字體大小控制（2026-10-06 使用者指定）：三級，可手動覆寫身分預設值。
+import { FontSizeSection } from './components/FontSizeSection';
+import {
+  loadFontScale,
+  saveFontScale,
+  resolveDensity,
+  defaultFontScale,
+  type FontScale,
+} from './utils/fontScale';
 // 身分名稱的英文對照（2026-09-28）：後端回傳的 learner_profile_name 是中文原名，
 // 英文介面要換成英文，否則長條圖下方會寫「依『長者』的每日參考值計算」。
 import {
@@ -230,6 +243,21 @@ const MENU_ITEMS: Array<{
 
 const STORAGE_CONDITIONS_KEY = 'labelbuddy_selected_conditions';
 const STORAGE_CONDITIONS_MIGRATED_KEY = 'labelbuddy_conditions_migrated_v1';
+/**
+ * 「其他（自行填寫）」的自填病症名稱（2026-10-06 使用者指定新增）。
+ *
+ * 【為什麼要跟前綴一起看】
+ *   送出時會組成「其他：<自填內容>」——
+ *   那個前綴是**後端認得出來的記號**：
+ *   `server/conditionAdvice.ts` 的 `keys: ['其他']` 靠它給出一句誠實的提醒
+ *   （「這一項本機無法把關」），而不是落到通用提醒 + 每次請求都留一筆 console.warn。
+ *
+ * ⚠️ 空字串**不會**被送出（見下方 `conditionNames`）——
+ *    勾了卻沒填字等於什麼都沒說，送「其他」給模型只會得到幻覺。
+ */
+const STORAGE_CUSTOM_CONDITION_KEY = 'labelbuddy_custom_condition_v1';
+/** 自填病症送出時的前綴（**必須與 conditionAdvice.ts 的 keys 對得上**）。 */
+const CUSTOM_CONDITION_PREFIX = '其他：';
 const STORAGE_DIET_RECORDS_KEY = 'labelbuddy_diet_records_v1';
 const STORAGE_PROFILE_KEY = 'labelbuddy_learner_profile_v1';
 /**
@@ -685,6 +713,30 @@ export default function App() {
     } catch {}
   };
 
+  /**
+   * 「其他（自行填寫）」的自填病症名稱（2026-10-06）。
+   *
+   * ⚠️ 它**不進 `selectedConditions`** —— 那是一組固定的 id，
+   *    存自填文字進去會讓 `VALID_CONDITION_IDS` 的舊版偵測誤判
+   *    （見上方遷移邏輯：只要出現非法 id 就會跳遷移提示）。
+   *    所以自填文字有自己的一個鍵。
+   */
+  const [customCondition, setCustomCondition] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_CUSTOM_CONDITION_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+
+  /** 自填病症的輸入處理。立即寫入儲存 —— 沒有「儲存」按鈕，長者不會記得按。 */
+  const handleChangeCustomCondition = (text: string) => {
+    setCustomCondition(text);
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_CONDITION_KEY, text);
+    } catch {}
+  };
+
   // 1.0.1 清單 UI 狀態：分類篩選、展開說明的項目（單一展開）、舊版設定遷移提示
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [expandedConditionId, setExpandedConditionId] = useState<string | null>(null);
@@ -953,20 +1005,44 @@ export default function App() {
     }
   });
   /**
-   * 非長者身分 → 整體字級下調 2px。
+   * ★ 2026-10-06：使用者**手動選的**字體大小。
+   *
+   * 【`null` 代表「沒選過」—— 這個區分很重要】
+   *   沒選過 → 依身分自動（長者＝大、其他＝小），與改動前的行為完全一致。
+   *   選過   → 就固定在使用者選的那一級，不再跟著身分跑。
+   *   若這裡直接填預設值，長者一進設定頁就會被當成「已手動選過」，
+   *   之後換身分字級不會跟著變 —— 那是一個不會報錯的 bug。
+   *
+   * ⚠️ 推導邏輯在 `utils/fontScale.ts`，不在這裡 ——
+   *    寫在元件裡就沒辦法單獨驗證。
+   */
+  const [fontScaleManual, setFontScaleManual] = useState<FontScale | null>(loadFontScale);
+  /** 目前**實際生效**的級別（給設定頁的三顆按鈕標示選中狀態）。 */
+  const effectiveFontScale: FontScale = fontScaleManual ?? defaultFontScale(learnerProfileId);
+
+  /** 使用者按下「小／中／大」。存檔與套用分開：state 立即生效，儲存只影響下次開啟。 */
+  const handleChangeFontScale = (scale: FontScale) => {
+    setFontScaleManual(scale);
+    saveFontScale(scale);
+  };
+
+  /**
+   * 套用字級：手動值優先，沒有才依身分。
    *
    * 【為什麼寫在 <html> 上而不是包一層 div】
    *   縮放規則要蓋過全 App 的字級工具類，寫在根元素最不容易漏掉
    *   （側邊選單、彈窗、引導頁都是 fixed 定位，包 div 蓋不到）。
    *   實際的 px 對應在 index.css，這裡只負責切換屬性。
    *
-   * ⚠️ 這裡刻意**只依身分**，不看年齡 —— 我們沒有使用者的年齡資料，
+   * ⚠️ 這裡刻意**只看身分，不看年齡** —— 我們沒有使用者的年齡資料，
    *    而「長者」這個身分本身就代表需要大字。
    */
   useEffect(() => {
-    const compact = learnerProfileId !== 'senior';
-    document.documentElement.setAttribute('data-density', compact ? 'compact' : 'comfortable');
-  }, [learnerProfileId]);
+    document.documentElement.setAttribute(
+      'data-density',
+      resolveDensity(learnerProfileId, fontScaleManual)
+    );
+  }, [learnerProfileId, fontScaleManual]);
   const latencyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTickRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1351,8 +1427,19 @@ export default function App() {
      *
      * ⚠️ 2026-09-30 從 `postAnalyzeLabel()` 內部**提到外層** ——
      *    飲食紀錄的 `matched_conditions` 也要用同一份，提到外層才不會兩處各算一次。
+     *
+     * ★ 2026-10-06：「其他（自行填寫）」在此展開成「其他：<自填內容>」。
+     *   - 有填字 → 送出去（後端會納入 AI 提示詞，並自動進入快取鍵）
+     *   - 沒填字 → **整個項目不送出**。送一個空的「其他」給模型，
+     *     它只會自己編一個病症出來 —— 那正是本專案最想避免的幻覺。
      */
-    const conditionNames = selectedConditions.map((id) => conditionName(id, 'zh-TW'));
+    const conditionNames = selectedConditions.flatMap((id) => {
+      if (id === 'other') {
+        const typed = customCondition.trim();
+        return typed ? [`${CUSTOM_CONDITION_PREFIX}${typed}`] : [];
+      }
+      return [conditionName(id, 'zh-TW')];
+    });
 
     /**
      * 送出一次分析請求。成功回傳結果；失敗**丟出錯誤**（由呼叫端決定是否降級）。
@@ -3102,6 +3189,26 @@ export default function App() {
             {/* 第零部分：介面語言（放在最前面，因為它影響整頁的顯示方式） */}
             <LanguagePicker />
 
+            {/* 字體大小（2026-10-06 使用者指定新增）
+                ★ 放在語言之後、身分之前：它和語言同性質 ——
+                  都是「影響整頁看起來怎樣」的設定，而不是健康資料。
+                ⚠️ 收合時的摘要必須顯示目前級別：
+                   這是使用者唯一能一眼確認「現在字有多大」的地方。 */}
+            <SettingsSection
+              id="settings-font-size"
+              icon={<TypeIcon className="w-[26px] h-[26px]" />}
+              title={t('settings.fontSize.title')}
+              summary={t(
+                effectiveFontScale === 'small'
+                  ? 'settings.fontSize.small'
+                  : effectiveFontScale === 'large'
+                    ? 'settings.fontSize.large'
+                    : 'settings.fontSize.normal'
+              )}
+            >
+              <FontSizeSection value={effectiveFontScale} onChange={handleChangeFontScale} />
+            </SettingsSection>
+
             {/* 第一部分：學習者身分（決定 AI 的判斷基準與每日參考值） */}
             <SettingsSection
               id="settings-profile"
@@ -3336,6 +3443,45 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* ── 自填病症輸入框（2026-10-06 使用者指定）─────────────────────
+                  ★ 只在勾了「其他（自行填寫）」時才出現 —— 沒勾就完全不佔版面。
+                  ★ 放在「已選擇」釘選區的正下方：使用者剛在那裡勾了「其他」，
+                    輸入框就長在旁邊，不必回頭找。
+                  ★★ 一定要**當面講清楚「本機模式無法把關」**：
+                    「勾了卻沒有把關」是本專案最危險的失敗模式 ——
+                    不報錯、不當機，使用者只會以為有人在看。
+                    所以這裡寧可講得直白，也不要讓它靜默失效。 */}
+              {selectedConditions.includes('other') && (
+                <div className="flex flex-col gap-[8px] bg-slate-50 border-2 border-slate-300 rounded-[12px] px-[12px] py-[12px]">
+                  <label
+                    htmlFor="custom-condition-input"
+                    className="text-[18px] font-black text-slate-900"
+                  >
+                    {t('conditions.customLabel')}
+                  </label>
+                  <input
+                    id="custom-condition-input"
+                    type="text"
+                    value={customCondition}
+                    onChange={(e) => handleChangeCustomCondition(e.target.value)}
+                    /* 20 字：足夠寫下完整的病症名（最長常見者約 8 字），
+                       又能避免有人貼一整段文章進來。 */
+                    maxLength={20}
+                    placeholder={t('conditions.customPlaceholder')}
+                    className="w-full min-h-[52px] px-[12px] rounded-[10px] border-2 border-slate-400 bg-white text-[19px] font-bold text-slate-900"
+                  />
+                  <p className="text-[16px] font-bold text-slate-600 leading-snug">
+                    {t('conditions.customHint')}
+                  </p>
+                  {/* 只有在真的選了「只在本機」時才提醒 —— 其他模式不需要嚇人 */}
+                  {analysisMode === 'local_only' && (
+                    <p className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-[10px] px-[10px] py-[8px] leading-snug">
+                      {t('conditions.customLocalOnly')}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* ── 主清單（依分類篩選；排除已在釘選區的項目，避免同一項出現兩次） ── */}
               <div className="flex flex-col gap-[8px]">

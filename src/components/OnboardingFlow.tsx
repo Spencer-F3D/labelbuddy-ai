@@ -234,8 +234,22 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const toggleCondition = (id: string) =>
     setConditions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  /** 慢性病（非過敏原）與食物過敏原分開列 —— 兩者的後果等級完全不同 */
-  const chronicItems = PHYSICAL_INDICATORS.filter((c) => c.category !== 'allergen');
+  /**
+   * 慢性病（非過敏原）與食物過敏原分開列 —— 兩者的後果等級完全不同。
+   *
+   * ★ 2026-10-06：常見補充病症（脂肪肝、心臟衰竭、缺鐵性貧血、便秘、失眠、偏頭痛）
+   *   也一起列出來，使用者第一次設定就能勾到。
+   *
+   * ⚠️ 但「其他（自行填寫）」**刻意不在這裡列**：
+   *   引導頁的勾選列只有名稱與勾選框（沒有說明、也沒有輸入框），
+   *   把它列出來只會變成一個「勾了卻不能填字、等於什麼都沒做」的選項 ——
+   *   那正是本專案最想避免的靜默失效。
+   *   所以判準用 `localRule !== false`（＝本機有規則的項目），
+   *   而不是寫死 `id !== 'other'` —— 日後若又多了一個自填類項目，這裡自動就對。
+   */
+  const chronicItems = PHYSICAL_INDICATORS.filter(
+    (c) => c.category !== 'allergen' && c.localRule !== false
+  );
   const allergenItems = PHYSICAL_INDICATORS.filter((c) => c.category === 'allergen');
 
   /** 一列勾選項（引導頁精簡版：只有名稱與勾選框，詳情留給設定頁） */
@@ -457,6 +471,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 <div className="flex flex-col gap-2">
                   {chronicItems.map((c) => renderConditionRow(c.id, false))}
                 </div>
+                {/* ★ 清單上沒有的病症要告訴使用者去哪裡加 ——
+                    否則他會以為這個 App 只能選這幾項。
+                    （自填輸入框只在設定頁，見上方 chronicItems 的說明。） */}
+                <p className="text-[16px] font-bold text-slate-600 leading-snug">
+                  {t('onboard.conditionsMore')}
+                </p>
               </div>
 
               {/* 過敏原用紅色：與慢性病在視覺上區隔開（這是最容易誤食的一類） */}

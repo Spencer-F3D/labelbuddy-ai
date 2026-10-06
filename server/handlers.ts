@@ -172,13 +172,29 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     // 必須另外從 targets 攤平。漏掉的話膳食纖維／蛋白質會被當成「上限」。
     const nutrientDirections = getNutrientDirections(profileId);
 
-    // 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
+    /**
+     * 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
+     *
+     * ★ 2026-10-06 修正一個**不會報錯的 bug**：
+     *   前端送來的 `conditions` 是**中文病名**（見 App.tsx 的 `conditionNames`，
+     *   那裡刻意不隨介面語言改變，因為它同時是快取鍵的一部分）。
+     *   但這裡原本只用 `c.id === id` 查表 —— 中文病名永遠查不到，
+     *   於是 `zh` 退回原字串、`conditionName()` 也查不到英文對照，
+     *   結果**英文提示詞裡一直是中文病名**（中文介面完全看不出來）。
+     *   修法：id 與 name 都比對，再把真正的 id 交給 `conditionName()`。
+     *
+     * ⚠️ 自填病症（「其他：XXX」）本來就不在表裡，會原樣保留 ——
+     *    那是使用者自己的資料，不是我們漏翻的文案。
+     */
+    const resolveCondition = (raw: string) =>
+      PHYSICAL_INDICATORS.find((c) => c.id === raw || c.name === raw);
+
     const conditionText =
       conditions.length > 0
         ? conditions
-            .map((id: string) => {
-              const zh = PHYSICAL_INDICATORS.find((c) => c.id === id)?.name ?? id;
-              return conditionName(id, zh, language);
+            .map((raw: string) => {
+              const hit = resolveCondition(raw);
+              return conditionName(hit?.id ?? raw, hit?.name ?? raw, language);
             })
             .join(isEnglish ? ', ' : '、')
         : isEnglish
@@ -252,7 +268,8 @@ ${vitalText}
           )
           .join(', ')}
 
-[General condition checklist] Hypertension (sodium), high blood sugar / diabetes (sugar and refined carbs), heart and cardiovascular (trans fats and high caffeine), high cholesterol (saturated and trans fats), gout (purines and fructose), kidney disease (sodium, potassium, phosphorus), acid reflux (spicy, acidic, irritating foods), osteoporosis (phosphates and heavy salt), plus food allergens (peanuts, tree nuts, seafood, dairy, wheat gluten).`
+[General condition checklist] Hypertension (sodium), high blood sugar / diabetes (sugar and refined carbs), heart and cardiovascular (trans fats and high caffeine), high cholesterol (saturated and trans fats), gout (purines and fructose), kidney disease (sodium, potassium, phosphorus), acid reflux (spicy, acidic, irritating foods), osteoporosis (phosphates and heavy salt), fatty liver (sugar, fructose, saturated fat), heart failure (strict sodium limit), iron-deficiency anaemia (tannins and calcium block iron), constipation (too little fibre), insomnia (caffeine), migraine (MSG and tyramine), plus food allergens (peanuts, tree nuts, seafood, dairy, wheat gluten).
+If the user added their own condition (shown as "其他：<name>" / "Other: <name>"), judge it too, using general nutrition principles — and say plainly that this item was not checked against a built-in rule.`
       : `
 【使用者的慢性病史】${conditionText}
 ${vitalText}
@@ -263,7 +280,8 @@ ${vitalText}
           .map((t) => `${t.nutrient}${t.direction === 'limit' ? '不超過' : '至少'}${t.target}`)
           .join('、')}
 
-【通用慢性病比對清單】高血壓(鈉含量)、高血糖/糖尿病(糖分與精製碳水)、心跳與心血管(反式油脂與高咖啡因)、高血脂(飽和脂肪與反式脂肪)、痛風(普林與果糖)、腎臟病(鈉鉀磷)、胃食道逆流(刺激辛辣酸)、骨質疏鬆(磷酸與重鹽)，以及食物過敏原(花生、堅果、海鮮、乳製品、小麥麩質)。`;
+【通用慢性病比對清單】高血壓(鈉含量)、高血糖/糖尿病(糖分與精製碳水)、心跳與心血管(反式油脂與高咖啡因)、高血脂(飽和脂肪與反式脂肪)、痛風(普林與果糖)、腎臟病(鈉鉀磷)、胃食道逆流(刺激辛辣酸)、骨質疏鬆(磷酸與重鹽)、脂肪肝(糖與飽和脂肪)、心臟衰竭(嚴格限鈉)、缺鐵性貧血(單寧酸與鈣妨礙鐵吸收)、便秘(纖維不足)、失眠(咖啡因)、偏頭痛(味精與酪胺酸)，以及食物過敏原(花生、堅果、海鮮、乳製品、小麥麩質)。
+若使用者自行填寫了病症（會以「其他：病名」的形式出現），也請一併用一般營養原則判斷，並坦白說明這一項沒有內建規則可比對。`;
 
     const userPromptText = isEnglish
       ? hasOcrText

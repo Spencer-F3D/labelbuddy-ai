@@ -3,7 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ConditionCategory = 'cardio' | 'metabolic' | 'organ' | 'allergen' | 'digestive';
+/**
+ * 慢性病分類。
+ *
+ * ★ `other`（2026-10-06 新增）：放「清單上原本沒有的常見病症」——
+ *   脂肪肝、心臟衰竭、缺鐵性貧血、便秘、失眠、偏頭痛，
+ *   以及最後那個讓使用者自行填寫的 `other` 項目。
+ *   獨立成一類是刻意的：把 6 項塞進既有的 cardio／metabolic／digestive
+ *   會讓那幾顆膠囊底下的清單突然變長，長者得重新找一遍。
+ */
+export type ConditionCategory =
+  | 'cardio'
+  | 'metabolic'
+  | 'organ'
+  | 'allergen'
+  | 'digestive'
+  | 'other';
 
 export interface ChronicCondition {
   id: string;
@@ -12,6 +27,20 @@ export interface ChronicCondition {
   description: string;
   targetNutrients: string[];
   defaultChecked: boolean;
+  /**
+   * 本機規則引擎是否有對應的判斷規則（**預設 true**）。
+   *
+   * 【為什麼需要這個欄位】
+   *   `scripts/verify-condition-keywords.ts` 會逐項驗證「每一項慢性病都能觸發
+   *   本機規則引擎並產生專屬提醒」。但「其他（自行填寫）」這一項的內容是
+   *   使用者自己打的字，本機引擎**不可能**預先寫好規則 ——
+   *   它天生過不了那道驗證。
+   *
+   * ⚠️ 所以這裡不是「偷懶的跳過開關」，而是把「本機無法把關」變成
+   *    **資料層的事實**：驗證腳本會跳過它，前端也會據此對使用者誠實說明
+   *    （見 App.tsx 的自填提示）。若日後真的為它寫了規則，把旗標拿掉即可。
+   */
+  localRule?: boolean;
 }
 
 export type RiskLevel = 'red' | 'yellow' | 'green';
