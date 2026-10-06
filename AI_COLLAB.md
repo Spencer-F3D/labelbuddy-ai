@@ -677,6 +677,38 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ---
 
+### [2026-10-06 13:35] 墨影（WorkBuddy）
+
+- **動了什麼**：應使用者要求做「專案精簡」。
+  - **刪除 15 支無引用腳本**（commit `771a5c9`）：
+    9 支孤兒檢查 —— `check-indicator-ui`／`check-local-ocr`／`check-mode-chip`／
+    `check-nonfood`／`check-ocr-langs`／`check-ocr-pipeline`／`check-pregnancy`／
+    `check-tts-speak`／`check-tts-voices`；
+    6 支一次性工具 —— `analyze-dead-code.py`／`verify-dead-code.py`／
+    `md-table-to-typst.mjs`／`typst-lint.py`／`make-app-icon.py`／`make-ocr-test-photos.py`。
+  - 同時把本機的 13 個 `shots-*/`、17 個 `.log`、`.tmp-*` 等約 32 MB 暫存檔送進資源回收筒。
+  - **修掉 `src/ocr/ocrBrowser.ts` 的註解**：它原本指向已刪的 `scripts/check-ocr-langs.mjs`。
+- **為什麼**：使用者說「有甚麼檔案對專案沒用或不用給評審的為我刪除，如一些檢查腳本等」。
+  每支都做過「是否有任何程式引用」的交叉檢查（package.json／`ship-all.mjs` 檢查清單／
+  `.bat`／其他腳本／`src/` 與 `server/` 的註解）。
+  ★ **`npm run ship` 只跑 5 支 `.ts` ＋ `check-consistency.ts`，所以不影響上線流程。**
+- **驗證方式**：`tsc --noEmit` → 0；`npm run ship` 全流程成功
+  （5 支檢查、build、deploy、APK 內容指紋 `b927b90b720a`）；合併 `origin/main` 21 個提交 → **零衝突**。
+- **還沒做／有疑問**：
+  - ⚠️ **我原本還要把 `.workbuddy-ai/memory/`、`AI_COLLAB.md`、`docs/` 移出版控，已撤回。**
+    原因：推送時發現**本專案有兩個 clone**（你我在不同資料夾、透過 GitHub 同步）。
+    把這些檔案移出版控＝你下一次 `git pull` 會把它們**從你的硬碟刪掉** → 你會直接失去專案記憶。
+    → 這兩個路徑**維持進版控**。若你認為該改，請先確認你那邊的 clone 狀態再動。
+  - ★ 被刪工具的**量測方式已抄錄在 `ARCHITECTURE.md` 附錄**（瀏覽器 OCR 端到端測法、
+    測試圖劣化方式、語言模型比較、死檔分析兩道做法），需要時可照著重建，
+    或 `git show 847dbd0:scripts/<檔名>` 取回原檔。
+  - ⚠️ `check-local-ocr.mjs` 與 `check-ocr-langs.mjs` 是**唯二的瀏覽器 OCR 量測工具**，
+    刪掉後若 OCR 行為再出問題，**這是第一個要重建的東西**。
+  - 我另外重寫了一份 `MEMORY.md`（→11.3 KB），但**合併時採用你的版本**（你已做過同一件事，
+    且實測 17,475 bytes 仍被完整注入）。我的版本留在備份分支 `backup-memory-rewrite-20261006`。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |

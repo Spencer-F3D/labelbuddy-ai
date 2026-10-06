@@ -834,3 +834,62 @@ false → **報告永遠說「本機 main 沒推上 GitHub」**，但 `git statu
 多大聲）。並排在同一區會讓人以為「選了粵語就等於開啟語音」。
 → 拆為 `TtsVoiceLangSection` 與 `TtsVolumeSection`，朗讀語言那區加一行說明
 「這三個是『唸出來的語言』，跟畫面上的文字語言無關」。
+
+---
+
+## 附錄：2026-10-06 移除的 15 支腳本（與救回方式）
+
+**判斷方式**：對每支腳本做「是否有任何程式引用」的交叉檢查 ——
+`package.json` scripts、`ship-all.mjs` 的檢查清單、6 個 `.bat` 啟動器、其他腳本、
+`src/` 與 `server/` 的註解。
+★ **`npm run ship` 實際只跑 5 支 `.ts` 檢查 ＋ `check-consistency.ts`**，所以這次移除
+**不影響上線流程**。
+
+### 移除的 9 支「孤兒檢查腳本」（沒有任何程式引用）
+`check-indicator-ui`／`check-local-ocr`／`check-mode-chip`／`check-nonfood`／`check-ocr-langs`／
+`check-ocr-pipeline`／`check-pregnancy`／`check-tts-speak`／`check-tts-voices`
+
+### 移除的 6 支「一次性工具」
+`analyze-dead-code.py`／`verify-dead-code.py`（死檔分析）／
+`md-table-to-typst.mjs`／`typst-lint.py`（Typst 文件流程）／
+`make-app-icon.py`（產生 App 圖示）／`make-ocr-test-photos.py`（產生 OCR 測試圖）
+
+### 救回方式
+檔案在移除前的 commit（`847dbd0`）裡：
+```
+git show 847dbd0:scripts/<檔名> > scripts/<檔名>
+```
+
+### ⚠️ 代價（已知並接受）
+- `check-local-ocr.mjs` 是**唯一「端到端驅動真實瀏覽器 OCR」的檢查**。
+- `check-ocr-langs.mjs` 是**唯一能量測 OCR 語言模型**的工具。
+→ 兩者的量測方式抄錄在下方，但**腳本本身要重建**。若日後 OCR 行為再出問題，
+**這是第一個要重建的東西**。
+
+### 量測方式（不讓知識跟著檔案消失）
+
+**A. 端到端瀏覽器 OCR**
+跑 Vite dev server → 開真實瀏覽器 → 在頁面裡 `await import('/src/ocr/ocrBrowser.ts')` →
+選「只在本機」→ 餵照片 → 斷言輸出。
+⚠️ **不要載 UMD 版探針頁** —— 那會繞過 App 的 ESM 路徑，量到的不是 App 真正在跑的那份。
+
+**B. 測試圖**
+用 Pillow 產生「逐步劣化」的標籤圖（透視／旋轉／反光／模糊），
+確認失敗時 `errorKind` 分得出「引擎壞」與「照片爛」。
+
+**C. OCR 語言模型比較**
+`chi_tra+eng` vs `chi_tra`；`best` 模型在無 SIMD 的舊裝置會**直接崩潰**
+（`RuntimeError: Aborted(missing function: _ZN9tesseract13DotProductSSE...)`），
+所以維持 `fast`（詳見 `src/ocr/ocrBrowser.ts` 的註解）。
+
+**D. 死檔分析（兩道都要做）**
+① 從進入點走 import 圖（**只有它能分辨「被死檔連帶」**）
+② 字串交叉驗證（抓動態 import 與字串引用）。
+⚠️ 只做可達性分析會漏掉 `import('./x')`；只做 grep 會把連帶死檔當成活的。
+
+### ★★ 順帶發現：本專案有兩個 clone
+推送時發現本機落後 `origin/main` **21 個提交** —— 另一個 AI 在**另一個 clone** 工作。
+→ **任何「把檔案移出版控」的動作都要先確認對方 clone 的狀態**，否則等於遠端刪檔
+（對方 `git pull` 會把檔案從硬碟刪掉）。`.workbuddy-ai/memory/` 與 `AI_COLLAB.md`
+**因此維持進版控** —— 它們是兩個 clone 之間的共享記憶與溝通管道，不是普通的開發紀錄。
+
