@@ -26,6 +26,7 @@
     "check:mode": "tsx scripts/check-analysis-mode.ts",
     "check:lookup": "tsx scripts/check-lookup-keys.ts",
     "check:consistency": "tsx scripts/check-consistency.ts",
+    "check:pregnancy": "node scripts/check-pregnancy.mjs",
     "apk": "node scripts/build-apk.mjs",
     "ship": "node scripts/ship-all.mjs",
     "measure:onboarding": "node scripts/measure-onboarding.mjs",
