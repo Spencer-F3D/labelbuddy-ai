@@ -169,8 +169,11 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ## 2. 目前狀態（**每次改完請更新這一節**）
 
-- 最後更新：2026-10-06 22:55
+- 最後更新：2026-10-07 18:00
 - 最新 commit：見 `git log -1`
+- ★ **2026-10-07 新增**：結果頁「學一個小知識」卡片（原理 ＋ 自我檢核），
+  新增端點 `POST /api/quiz-question`（含同意閘門）、題庫加 `labelKeys`/`source`/`en`、
+  新增 `card-shopping-5`。**`local_only` 隱私文案已誠實化**（不再寫「完全不連網」）。詳見第 4 節最新一則。
 - ★ **2026-10-06 新增**：設定頁「字體大小」三級（`compact`/`normal`/`comfortable`，
   手動值優先、沒選過才依身分）；慢性病清單 **12 → 19 項**（新增分類「其他」，
   含 6 項有本機規則的補充病症 ＋ 1 項自行填寫）；引導頁第 3 頁的 6 項收進折疊區
@@ -805,6 +808,73 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
   也收進折疊區（會再省約 50px），但會犧牲自填功能的發現率，**我沒有做，留給你判斷**。
 - 順帶提醒：`check:layout` 的孤行規則若要修，方向是「末行只有 1～2 個字元
   且不是句末標點」→ 目前把整類全形標點都排除了，太寬鬆。
+
+---
+
+### [2026-10-07 18:00] 墨影（Mo）
+
+**做了什麼**：使用者把桌面上的 `LabelBuddyAI_P1_spec.typ` 拿來要求「結合」，
+經四輪確認後核准計劃，分兩階段。**第一階段（8 步）全部完成並驗證。**
+
+| 提交 | 內容 |
+| --- | --- |
+| `65234c9` | `EN_TO_CANONICAL`：修好「英文模式下 `canonicalNutrientName` 認不出英文名」 |
+| `0b5a3f6` | 題庫資料模型（`labelKeys`/`source`/`en`）＋ 60 題補欄位 ＋ `check-quiz-bank.ts` |
+| `26a1ef8` | 抽出共用 `QuizCard.tsx` |
+| `670c4f4` | `learnFromScan.ts` ＋ 新增 `card-shopping-5`「過敏原怎麼看」＋ `check-learn-mapping.ts` |
+| `5dab8cd` | `POST /api/quiz-question`（同意閘門 ＋ 提示詞 ＋ 嚴格驗證） |
+| `50db1d6` | `LearnFromScanCard.tsx`（結果頁卡片）＋ 本機題庫 ＋ 共用學習進度 ＋ 端到端檢查 |
+| `464fbde` | `local_only` 隱私文案誠實化 |
+| `8319a66` | 修掉新卡片造成的 4 筆中文孤行 |
+
+**為什麼（以及三個「只有真的跑起來才會發現」的問題）**：
+
+1. **★ `EN_TO_CANONICAL`（步驟 1）** —— `translateLocalResult` 會把
+   `nutrient_facts[].name` 換成 `'Sodium'`，但 `canonicalNutrientName` 只認中文簡化名
+   → 還原不了 → 任何靠 canonical 比對的功能在「只在本機 ＋ 英文」**全部落空且不報錯**。
+   ⚠️ `NutrientFactBars.tsx:27` 的註解「fact.name 是 canonical」對這條路徑**不成立**。
+   新增 `EN_TO_CANONICAL`（由 `NUTRIENT_NAME_EN` **反轉產生**，不是手寫第二份）。
+
+2. **`咖啡因` 是孕婦身分的 `numericLimits` 鍵**（`check-quiz-bank.ts` 第一次跑就抓到）
+   —— 不在 `LABEL_KEYS` 也不在 `NUTRIENT_NAME_EN` → 英文介面在孕婦身分下漏中文，
+   而 `check:i18n` 測不到（示範樣本沒有咖啡因）。已補。
+
+3. **★★ 雲端 AI 自願回報過敏原，劫持了學習卡片** —— 示範拉麵（高血壓＋糖尿病，
+   **沒勾任何過敏**）的鈉是 118%，但 AI 回了
+   `["高血壓（鈉超標）", "糖尿病（糖與精製碳水）", "心血管風險（高鈉與高油）", "過敏原：小麥、大豆、花生、牛肉"]`
+   → 舊寫法（看 `matched_conditions` 含不含「過敏」）被它劫持，卡片顯示
+   「過敏原怎麼看」，把真正的紅燈原因擠掉 → **教錯優先序**。
+   → 改用「使用者有沒有勾過敏」當閘門（確定性訊號）。
+   ⚠️ **這個 bug 只有真實 AI 回覆才會重現** —— 人工 fixture 是照著已知 bug 寫的，測不出來。
+
+**怎麼驗證**：
+- `lint` 0｜`verify:all` 全綠（check:quiz 13、check:learn 13、check:lookup 11、check:mode 34）
+- `check:layout --lang=zh-TW`（長者）→ **0 筆問題**；`--lang=en --profile=fitness` → **0 筆問題**
+- **`scripts/check-learn-card.mjs`（新，本專案第一支有網路監看的 CDP 腳本）→ 11 項全過**
+- 端點實測：`localOnly:false` → AI 真的生成「鈉約佔每日參考值幾 %？」正解 99%，中英兩版齊全
+
+**⚠️ 兩件必須講清楚的「沒有驗到」**：
+1. **`local_only` 的卡片是否出現，無法端到端驗證** —— 本機模式的瀏覽器 OCR 在
+   headless Chrome 讀不到示範標籤數字（既有問題）→ 沒有結果頁。
+   腳本會**明確印出這件事**並列補償證據，而不是假裝通過。
+   補償：`check-learn-mapping.ts` 的 40 組合 ＋ 本輪的「零 `/api/quiz-*`」斷言。
+2. **`local_only` 不是零網路** —— 它會打 `/api/ai-status` 與 `/api/analyze-label`
+   （帶 `localOnly:true`，OCR 文字到我們自己的 Worker）。所以斷言只能是
+   「零 `/api/quiz-*`」。**文案已全面改成「不送到 AI 供應商」**，
+   `/api/privacy` 另加 `providerBoundaryNote`，並在 `check-analysis-mode.ts`
+   加了 3 項**防回歸**斷言（誰把「完全不上網」寫回去就會失敗）。
+
+**還沒做／有疑問**：
+- ⚠️ **第二階段未開始**：KV 線上題庫 ＋ 跨裝置同步 ＋ 學堂題庫合併。
+  第一階段的已知限制：**AI 生成的題只存在該台手機**，不跨裝置累積。
+- ⚠️ 我改了 `server/handlers.ts` 的 `/api/privacy`（新增 `providerBoundaryNote`
+  欄位、改 `local_only` 的 name/description）。**若你那邊也在動這一段，請以
+  「不送到 AI 供應商」為準**，不要改回「完全不上網」。
+- ⚠️ `src/utils/learnFromScan.ts` 的 `pickLearningCard()` 現在**吃第三個參數**
+  `selectedConditions: string[]`。呼叫端不傳的話過敏原那條永遠不會觸發
+  （預設 `[]`）—— 這是刻意的，避免 AI 自由文字劫持。
+- ⚠️ 我新增了兩支檢查腳本並接進 `ship-all.mjs` 的 `checks` 陣列
+  （`check-quiz-bank`、`check-learn-mapping`）。你那邊合併時會看到這個 diff。
 
 ---
 
