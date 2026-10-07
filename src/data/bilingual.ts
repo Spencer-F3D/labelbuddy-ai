@@ -147,11 +147,44 @@ export const SIMPLE_TO_CANONICAL: Record<string, string> = Object.fromEntries(
 );
 
 /**
+ * ★ 2026-10-07 新增：**英文 → canonical 名稱**。
+ *
+ * 【為什麼需要 —— 這是一個「不會報錯」的既有 bug】
+ *   進邊界時 `canonicalNutrientName()` 原本只認中文簡化名（鹽分／纖維／動物油／糖）。
+ *   但英文模式下，名稱**真的會以英文出現**在兩個地方：
+ *     ① `translateLocalResult()` 會把 `nutrient_facts[].name` 換成
+ *        `nutrientName(name,'en')` → `'Sodium'`／`'Added sugar'`…
+ *        （所以 `NutrientFactBars.tsx:27` 的註解「fact.name 是 canonical」
+ *          對「只在本機 ＋ 英文」這條路徑**並不成立**。）
+ *     ② 英文提示詞下，模型可能直接回 `name: "Sodium"`。
+ *
+ *   兩種情況原本都會**靜默失敗**：
+ *     - `normalizeNutrientFacts()` 查 `numericLimits['Sodium']` 查不到
+ *       → 該項被整項略過 → 使用者少看到一個警示。
+ *     - 任何靠 canonical 名稱比對的功能（例如「學一個小知識」挑知識卡與題目）
+ *       會全部落空，而且畫面上完全看不出原因。
+ *
+ * ⚠️ 由 `NUTRIENT_NAME_EN` **反轉產生**，不是另外手寫一份 ——
+ *    兩份表遲早會漂移，而漂移的後果就是上面那種靜默失敗。
+ *    以英文為鍵，一律轉小寫比對（模型可能寫 `sodium` 或 `Sodium`）。
+ */
+export const EN_TO_CANONICAL: Record<string, string> = Object.fromEntries(
+  Object.entries(NUTRIENT_NAME_EN).map(([canonical, en]) => [en.toLowerCase(), canonical])
+);
+
+/**
  * 把使用者／模型看到的說法還原成內部 canonical 名稱。
- * 查不到就原樣回傳（可能本來就是 canonical，或是新名稱）。
+ *
+ * 查表順序：canonical 原名 → 中文簡化名 → 英文名。
+ * 都查不到就原樣回傳（可能本來就是 canonical，或是新名稱）。
  */
 export function canonicalNutrientName(name: string): string {
-  return SIMPLE_TO_CANONICAL[name] ?? name;
+  if (typeof name !== 'string' || !name) return name;
+  return (
+    SIMPLE_TO_CANONICAL[name] ??
+    EN_TO_CANONICAL[name.toLowerCase()] ??
+    name
+  );
 }
 
 /**

@@ -27,6 +27,16 @@
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+/**
+ * 附加檢查（2026-10-07）需要**實際執行**對照表，不能只做字串掃描 ——
+ * 因為 `EN_TO_CANONICAL` 是反轉產生的，原始碼裡沒有它的字面鍵。
+ */
+import {
+  NUTRIENT_NAME_EN,
+  NUTRIENT_NAME_SIMPLE,
+  EN_TO_CANONICAL,
+  canonicalNutrientName,
+} from '../src/data/bilingual';
 
 const ROOT = path.resolve('.');
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
@@ -218,8 +228,73 @@ for (const spec of TABLES) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * 附加檢查：`EN_TO_CANONICAL` 的推導是否真的可用（2026-10-07 新增）
+ * --------------------------------------------------------------------------
+ * 【為什麼不能只靠上面的「孤兒鍵」檢查】
+ *   `EN_TO_CANONICAL` 是由 `NUTRIENT_NAME_EN` **反轉產生**的，
+ *   原始碼裡不會出現 `sodium: '鈉'` 這種字面鍵 ——
+ *   所以孤兒鍵檢查對它沒有意義（它不可能漂移）。
+ *
+ *   真正會壞的是「推導本身」：例如有人把某個英文名改成重複的值，
+ *   `Object.fromEntries` 會**靜默覆蓋**，於是某個 canonical 名稱永遠還原不回來。
+ *   而那個後果是本專案最怕的形狀：**不報錯，只是少一個警示**。
+ *
+ *   → 所以這裡改用「行為斷言」：拿英文名去還原，必須回到正確的 canonical。
+ * ══════════════════════════════════════════════════════════════════════════ */
 console.log('\n' + '='.repeat(60));
-console.log(`結果：${pass} 張表通過 / ${fail} 張表有問題`);
+console.log('附加檢查：EN_TO_CANONICAL 推導');
+console.log('='.repeat(60));
+
+{
+  const enKeys = Object.keys(NUTRIENT_NAME_EN);
+  const reverseKeys = Object.keys(EN_TO_CANONICAL);
+
+  // ① 反轉後不得少於原表 —— 少於就代表有兩個 canonical 共用同一個英文名（靜默覆蓋）
+  if (reverseKeys.length !== enKeys.length) {
+    fail++;
+    console.log(
+      `❌ EN_TO_CANONICAL 只有 ${reverseKeys.length} 個鍵，` +
+        `但 NUTRIENT_NAME_EN 有 ${enKeys.length} 個 —— 有英文名重複，反轉時被靜默覆蓋。`
+    );
+  } else {
+    console.log(`✅ 反轉無碰撞（${reverseKeys.length} 個鍵）`);
+    pass++;
+  }
+
+  // ② 行為斷言：每個 canonical 都要能從「英文名」還原回來
+  const bad: string[] = [];
+  for (const canonical of enKeys) {
+    const en = NUTRIENT_NAME_EN[canonical];
+    if (canonicalNutrientName(en) !== canonical) {
+      bad.push(`${en} → ${canonicalNutrientName(en)}（應為 ${canonical}）`);
+    }
+    // 大小寫都要吃得下（模型可能寫 'sodium' 或 'SODIUM'）
+    if (canonicalNutrientName(en.toLowerCase()) !== canonical) {
+      bad.push(`${en.toLowerCase()} → ${canonicalNutrientName(en.toLowerCase())}（應為 ${canonical}）`);
+    }
+  }
+  // ③ 中文簡化名的舊行為不能壞
+  for (const canonical of Object.keys(NUTRIENT_NAME_SIMPLE)) {
+    const simple = NUTRIENT_NAME_SIMPLE[canonical];
+    if (canonicalNutrientName(simple) !== canonical) {
+      bad.push(`${simple} → ${canonicalNutrientName(simple)}（應為 ${canonical}）`);
+    }
+  }
+
+  if (bad.length === 0) {
+    console.log('✅ 英文名與中文簡化名都能正確還原成 canonical');
+    pass++;
+  } else {
+    fail++;
+    console.log(`❌ ${bad.length} 個名稱還原失敗（會導致該營養素被靜默略過）：`);
+    for (const b of bad) console.log(`   • ${b}`);
+  }
+}
+
+console.log('\n' + '='.repeat(60));
+// ⚠️ 用「項」不是「張表」—— 後面的附加檢查不是對照表，混在一起講會誤導
+console.log(`結果：${pass} 項通過 / ${fail} 項有問題`);
 if (allOrphans.length > 0) {
   console.log(
     `\n⚠️ 共 ${allOrphans.length} 個孤兒鍵。\n` +
