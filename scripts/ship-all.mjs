@@ -172,6 +172,9 @@ if (!SKIP_CHECKS) {
     'check-diet-record-lang',
     'check-lookup-keys',
     'check-analysis-mode',
+    // 食育題庫完整性（2026-10-07）：labelKeys 值域、中英兩版齊全、
+    // LABEL_KEYS 與各身分 numericLimits 一致 —— 三種都是「不報錯但功能少一半」
+    'check-quiz-bank',
   ];
   for (const c of checks) {
     run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]) === 0

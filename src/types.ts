@@ -410,6 +410,50 @@ export interface KnowledgeCard {
   voiceScript: string;
 }
 
+/**
+ * 標籤上可能出現的營養素（**封閉值域**，2026-10-07 新增）。
+ *
+ * ⚠️ 必須與 `NutrientFact.name` 的 canonical 名稱一致。
+ *    來源＝所有身分 `numericLimits` 鍵的聯集（實測正好這 6 個），
+ *    也正好等於 `NUTRIENT_NAME_EN` 的 6 個鍵（`src/data/bilingual.ts`）。
+ *    不在這個集合的名稱不會出現在 `nutrient_facts`
+ *    （`normalizeNutrientFacts()` 會把查不到 `numericLimits` 的項目濾掉）。
+ *
+ * ★ 用途：「學一個小知識」要靠它把「這張標籤」和「知識卡／測驗題」接起來。
+ *   封閉值域是刻意的 —— 本專案踩過 4 次「對照表鍵對不上」的靜默 bug，
+ *   開放字串會讓那種錯再度發生（而且不會報錯）。
+ */
+export type LabelKey =
+  | '鈉'
+  | '添加糖'
+  | '飽和脂肪'
+  | '膳食纖維'
+  | '蛋白質'
+  | '鈣'
+  /**
+   * ⚠️ 2026-10-07 由 `scripts/check-quiz-bank.ts` 抓出來的缺口：
+   *    只有**孕婦**身分的 `numericLimits` 有這一項（200 毫克／日），
+   *    所以 `nutrient_facts` 真的會出現「咖啡因」。
+   *    沒加進值域的話，孕婦的咖啡因永遠挑不到知識卡與題目 —— 而且不會報錯。
+   */
+  | '咖啡因';
+
+/** 題目來源：內建題庫 或 AI 即時生成 */
+export type QuizSource = 'builtin' | 'ai';
+
+/**
+ * 題目的「可翻譯欄位」。
+ *
+ * ⚠️ 原本定義在 `src/data/educationContentEn.ts`，2026-10-07 移到 `types.ts` ——
+ *    因為 AI 生成的題目要**自帶英文版**（見 `QuizQuestion.en`），
+ *    這個型別不再是「英文對照表專用」。
+ */
+export interface QuizQuestionText {
+  question: string;
+  options: string[];
+  explanation: string;
+}
+
 /** 測驗題目 */
 export interface QuizQuestion {
   id: string;
@@ -423,6 +467,32 @@ export interface QuizQuestion {
   correctIndex: number;
   /** 答題後的詳解 */
   explanation: string;
+
+  /* ── 2026-10-07 新增：支撐「學一個小知識」 ── */
+
+  /**
+   * 這題對應標籤上的哪些營養素。
+   * `[]` ＝**通用題**（任何標籤都可出）。
+   *
+   * ⚠️ 通用題**不算**「題庫有對應的題」——
+   *    只有 `labelKeys` 與本次標籤有交集，才算命中；
+   *    否則 AI 生成永遠不會被觸發，功能會退化成「固定 60 題輪播」。
+   */
+  labelKeys: LabelKey[];
+  /** 來源。內建 60 題一律 `'builtin'`；AI 生成的是 `'ai'`。 */
+  source: QuizSource;
+  /**
+   * 英文版。
+   *
+   * ★ 這是解掉「AI 新題在英文介面漏中文」的關鍵：
+   *   `localizeQuestion()` 原本是「以 id 查 `QUIZ_QUESTIONS_EN`」的**白名單**，
+   *   AI 生成的新題沒有 id 在表裡 → **靜默退回中文**（而且不會報錯）。
+   *   改成「題目自帶 `en`，查表只是內建題的後備」之後，新題天生帶雙語。
+   *
+   * ⚠️ 內建 60 題可留空（靠 id 查表）；AI 生成的題**必須有**，
+   *    否則 `normalizeQuizQuestion()` 會把它整題丟棄。
+   */
+  en?: QuizQuestionText;
 }
 
 /** 使用者在某次測驗的作答紀錄 */

@@ -354,6 +354,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q1',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '一包餅乾標示「每一份 20 公克，本包裝含 3 份」。你整包吃完，等於吃了幾份？',
     options: ['1 份', '3 份', '不一定，要看餅乾大小'],
     correctIndex: 1,
@@ -363,6 +365,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q2',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '成分表上的排列順序是按照什麼？',
     options: ['按照字母順序', '按照含量重量，多的排前面', '按照加入的先後順序'],
     correctIndex: 1,
@@ -372,6 +376,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q3',
     topic: 'basics',
+    labelKeys: ['飽和脂肪'],
+    source: 'builtin',
     question: '營養標示寫「反式脂肪 0 公克」，代表完全沒有反式脂肪嗎？',
     options: [
       '是，標 0 就是完全沒有',
@@ -385,6 +391,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q4',
     topic: 'basics',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '包裝上寫鈉 400 毫克，大約等於多少鹽？',
     options: ['約 1 公克鹽', '約 400 公克鹽', '兩者不能換算'],
     correctIndex: 0,
@@ -394,6 +402,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q5',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '營養標示上的「每日參考值百分比」，是以多少熱量為基準？',
     options: ['1500 大卡', '2000 大卡', '依照每個人的體重'],
     correctIndex: 1,
@@ -403,6 +413,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q6',
     topic: 'dangers',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '一包泡麵的鈉大部分藏在哪裡？',
     options: ['麵條本身', '調味粉和湯裡', '包裝材料'],
     correctIndex: 1,
@@ -412,6 +424,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q7',
     topic: 'dangers',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '下列哪一項「不是」添加糖？',
     options: ['高果糖玉米糖漿', '麥芽糊精', '糙米裡的澱粉'],
     correctIndex: 2,
@@ -421,6 +435,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q8',
     topic: 'dangers',
+    labelKeys: ['飽和脂肪'],
+    source: 'builtin',
     question: '想避開反式脂肪，成分表上要特別注意哪個字眼？',
     options: ['「氫化」', '「天然」', '「植物」'],
     correctIndex: 0,
@@ -430,6 +446,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q9',
     topic: 'dangers',
+    labelKeys: [],
+    source: 'builtin',
     question: '成分表上看到「磷酸」兩個字，代表這個食品？',
     options: ['含有添加的磷', '含有很多鈣', '是天然食品'],
     correctIndex: 0,
@@ -439,6 +457,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q10',
     topic: 'dangers',
+    labelKeys: ['膳食纖維'],
+    source: 'builtin',
     question: '外食族最常攝取不足的營養素是哪一項？',
     options: ['鈉', '膳食纖維', '飽和脂肪'],
     correctIndex: 1,
@@ -448,6 +468,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q11',
     topic: 'profiles',
+    labelKeys: ['蛋白質'],
+    source: 'builtin',
     question: '產品正面寫「高蛋白」，你應該看背面哪個數字來判斷？',
     options: ['只看蛋白質的公克數', '看蛋白質佔總熱量的比例', '看包裝大小'],
     correctIndex: 1,
@@ -457,6 +479,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q12',
     topic: 'profiles',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '飲料標示糖 40 公克，大約等於幾顆方糖？',
     options: ['4 顆', '8 顆', '40 顆'],
     correctIndex: 1,
@@ -466,6 +490,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q13',
     topic: 'shopping',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '比較兩瓶飲料哪個糖分高，應該用哪個基準？',
     options: ['每一份', '每 100 公克（或 100 毫升）', '整瓶總量'],
     correctIndex: 1,
@@ -475,6 +501,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'q14',
     topic: 'shopping',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '「無糖」和「減糖」有什麼差別？',
     options: [
       '兩個意思完全一樣',
@@ -488,6 +516,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'b6',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '包裝上同時有「每 100 公克」和「每一份量」兩欄，該看哪一個？',
     options: [
       '只看每一份量就好',
@@ -501,6 +531,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'b7',
     topic: 'basics',
+    labelKeys: ['飽和脂肪'],
+    source: 'builtin',
     question: '包裝寫「零反式脂肪」，就一定沒有反式脂肪嗎？',
     options: [
       '一定沒有',
@@ -514,6 +546,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'b8',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '「有效日期」和「保存期限」有什麼不同？',
     options: [
       '完全一樣',
@@ -527,6 +561,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'b9',
     topic: 'basics',
+    labelKeys: [],
+    source: 'builtin',
     question: '一包零食標示「每一份量 25 公克，本包裝含 4 份，熱量 130 大卡」。整包吃完是多少大卡？',
     options: [
       '130 大卡',
@@ -540,6 +576,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'b10',
     topic: 'basics',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '同樣是蘇打餅乾，A 牌每 100 公克鈉 300 毫克、B 牌 620 毫克。這代表什麼？',
     options: [
       '兩牌差不多，包裝不同而已',
@@ -553,6 +591,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r1',
     topic: 'reading',
+    labelKeys: [],
+    source: 'builtin',
     question: '營養標示右邊的「每日參考值百分比（%）」代表什麼？',
     options: [
       '這包食品佔一天建議量的比例',
@@ -566,6 +606,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r2',
     topic: 'reading',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '標示「鈉 800 毫克，每日參考值 40%」。這個 40% 是怎麼算出來的？',
     options: [
       '隨機給的',
@@ -579,6 +621,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r3',
     topic: 'reading',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '一份食品標示「糖 5 公克」。以每日添加糖上限 50 公克來說，這代表什麼？',
     options: [
       '很少，可以忽略',
@@ -592,6 +636,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r4',
     topic: 'reading',
+    labelKeys: [],
+    source: 'builtin',
     question: '要比較兩款不同份量定義的食品，應該看哪一欄？',
     options: [
       '每一份量',
@@ -605,6 +651,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r5',
     topic: 'reading',
+    labelKeys: [],
+    source: 'builtin',
     question: '標示寫「熱量 2100 千焦（kJ）」，大約等於多少大卡？',
     options: [
       '2100 大卡',
@@ -618,6 +666,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r6',
     topic: 'reading',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '標示「碳水化合物 60 公克」，這裡面包含「糖 8 公克」嗎？',
     options: [
       '不包含，是兩回事',
@@ -631,6 +681,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r7',
     topic: 'reading',
+    labelKeys: ['飽和脂肪'],
+    source: 'builtin',
     question: '「飽和脂肪」和「反式脂肪」，哪一個對心血管的傷害比較直接？',
     options: [
       '飽和脂肪',
@@ -644,6 +696,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r8',
     topic: 'reading',
+    labelKeys: [],
+    source: 'builtin',
     question: '包裝上的百分比，是以「一份」還是「整包」計算？',
     options: [
       '整包',
@@ -657,6 +711,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r9',
     topic: 'reading',
+    labelKeys: ['膳食纖維'],
+    source: 'builtin',
     question: '膳食纖維標示「0 公克」，代表完全沒有嗎？',
     options: [
       '完全沒有',
@@ -670,6 +726,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'r10',
     topic: 'reading',
+    labelKeys: ['蛋白質'],
+    source: 'builtin',
     question: '為什麼多數包裝的蛋白質沒有標「每日參考值百分比」？',
     options: [
       '法規不要求',
@@ -683,6 +741,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'd6',
     topic: 'dangers',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '成分表出現「高果糖玉米糖漿」，你該怎麼理解？',
     options: [
       '天然的，沒關係',
@@ -696,6 +756,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'd7',
     topic: 'dangers',
+    labelKeys: ['飽和脂肪'],
+    source: 'builtin',
     question: '成分表寫「氫化植物油」，這通常代表什麼？',
     options: [
       '比較健康的油',
@@ -709,6 +771,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'd8',
     topic: 'dangers',
+    labelKeys: [],
+    source: 'builtin',
     question: '成分表越短越好嗎？',
     options: [
       '越短越天然，是很好的參考指標',
@@ -722,6 +786,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'd9',
     topic: 'dangers',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '看到「L-麩酸鈉（味精）」需要擔心嗎？',
     options: [
       '要完全避開',
@@ -735,6 +801,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'd10',
     topic: 'dangers',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '包裝寫「無添加蔗糖」，但吃起來很甜。可能的原因是？',
     options: [
       '一定是騙人的',
@@ -748,6 +816,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n1',
     topic: 'sodium_sugar',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '一包泡麵的鈉常常接近或超過一天建議量，主要來自哪裡？',
     options: [
       '麵條本身',
@@ -761,6 +831,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n2',
     topic: 'sodium_sugar',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '每日鈉建議上限 2000 毫克，大約等於多少食鹽？',
     options: [
       '5 公克（約一小匙）',
@@ -774,6 +846,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n3',
     topic: 'sodium_sugar',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '為什麼「湯不要喝」是減鈉最有效的動作之一？',
     options: [
       '湯沒有營養',
@@ -787,6 +861,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n4',
     topic: 'sodium_sugar',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '標示「低鈉」的食品，代表什麼？',
     options: [
       '完全沒有鈉',
@@ -800,6 +876,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n5',
     topic: 'sodium_sugar',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '一罐 330 毫升的含糖飲料，糖量大約多少？',
     options: [
       '約 3 公克',
@@ -813,6 +891,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n6',
     topic: 'sodium_sugar',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '「無糖」和「零糖」有什麼不同？',
     options: [
       '完全一樣',
@@ -826,6 +906,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n7',
     topic: 'sodium_sugar',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '純果汁也要注意糖嗎？',
     options: [
       '不用，天然的',
@@ -839,6 +921,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n8',
     topic: 'sodium_sugar',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '運動飲料什麼時候才真的需要喝？',
     options: [
       '每天都可以喝',
@@ -852,6 +936,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n9',
     topic: 'sodium_sugar',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '糖對牙齒和對血糖的影響，有什麼不同？',
     options: [
       '完全一樣',
@@ -865,6 +951,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'n10',
     topic: 'sodium_sugar',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '想減鈉，最容易被忽略的來源是什麼？',
     options: [
       '家裡煮菜的鹽',
@@ -878,6 +966,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf3',
     topic: 'profiles',
+    labelKeys: ['鈉', '添加糖'],
+    source: 'builtin',
     question: '長者看標籤時，最該優先看哪兩項？',
     options: [
       '熱量和蛋白質',
@@ -891,6 +981,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf4',
     topic: 'profiles',
+    labelKeys: ['鈉', '添加糖'],
+    source: 'builtin',
     question: '兒童的鈉與糖建議上限為什麼比成人低？',
     options: [
       '因為兒童體重較輕、代謝的份量不同',
@@ -904,6 +996,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf5',
     topic: 'profiles',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '青少年活動量大，看標籤時最該注意什麼？',
     options: [
       '不用注意，吃就對了',
@@ -917,6 +1011,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf6',
     topic: 'profiles',
+    labelKeys: ['蛋白質'],
+    source: 'builtin',
     question: '健身人士看標籤時，最該優先確認哪一項？',
     options: [
       '蛋白質與總熱量',
@@ -930,6 +1026,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf7',
     topic: 'profiles',
+    labelKeys: [],
+    source: 'builtin',
     question: '學生外食時，最實用的看標方法是？',
     options: [
       '記住所有營養素的上限數字',
@@ -943,6 +1041,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf8',
     topic: 'profiles',
+    labelKeys: ['飽和脂肪', '鈉'],
+    source: 'builtin',
     question: '中年之後，哪一項數值的「長期累積」最需要留意？',
     options: [
       '鈉與飽和脂肪',
@@ -956,6 +1056,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf9',
     topic: 'profiles',
+    labelKeys: [],
+    source: 'builtin',
     question: '同一個食品，對不同身分的建議會不一樣嗎？',
     options: [
       '完全一樣',
@@ -969,6 +1071,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'pf10',
     topic: 'profiles',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '有高血壓的人，買東西時最實用的一句話原則是什麼？',
     options: [
       '什麼都不能吃',
@@ -982,6 +1086,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh3',
     topic: 'shopping',
+    labelKeys: [],
+    source: 'builtin',
     question: '同一類食品有兩款，一款便宜、一款貴。該怎麼選？',
     options: [
       '選便宜的',
@@ -995,6 +1101,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh4',
     topic: 'shopping',
+    labelKeys: [],
+    source: 'builtin',
     question: '買大包裝一定比較划算嗎？',
     options: [
       '一定比較划算',
@@ -1008,6 +1116,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh5',
     topic: 'shopping',
+    labelKeys: ['鈉'],
+    source: 'builtin',
     question: '罐頭與冷凍調理食品，通常哪一項比較高？',
     options: [
       '鈉',
@@ -1021,6 +1131,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh6',
     topic: 'shopping',
+    labelKeys: ['膳食纖維'],
+    source: 'builtin',
     question: '包裝寫「含全穀」和「100% 全穀」，差別在哪？',
     options: [
       '完全一樣',
@@ -1034,6 +1146,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh7',
     topic: 'shopping',
+    labelKeys: ['添加糖'],
+    source: 'builtin',
     question: '買飲料時最快、最實用的判斷動作是什麼？',
     options: [
       '看包裝正面的大字',
@@ -1047,6 +1161,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh8',
     topic: 'shopping',
+    labelKeys: [],
+    source: 'builtin',
     question: '為什麼建議優先選「成分表短」的食品？',
     options: [
       '短的代表便宜',
@@ -1060,6 +1176,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh9',
     topic: 'shopping',
+    labelKeys: [],
+    source: 'builtin',
     question: '先買生鮮還是先買零食，對採買有什麼影響？',
     options: [
       '沒有影響',
@@ -1073,6 +1191,8 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 'sh10',
     topic: 'shopping',
+    labelKeys: [],
+    source: 'builtin',
     question: '遇到「買一送一」時，最理性的判斷是什麼？',
     options: [
       '很划算，一定要買',

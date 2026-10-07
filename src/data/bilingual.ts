@@ -41,6 +41,20 @@ export const NUTRIENT_NAME_EN: Record<string, string> = {
   飽和脂肪: 'Saturated fat',
   添加糖: 'Added sugar',
   膳食纖維: 'Dietary fiber',
+  /**
+   * ★ 2026-10-07 補上。
+   *
+   * 【為什麼原本沒有它是個 bug】
+   *   只有**孕婦**身分的 `numericLimits` 有「咖啡因」，
+   *   所以它會出現在 `nutrient_facts`，而 `NutrientFactBars` 會呼叫
+   *   `nutrientName('咖啡因','en')` —— 查不到就**安全退回中文**，
+   *   於是英文介面在孕婦身分下會出現中文的「咖啡因」。
+   *
+   *   `check:i18n` 測不到：三個示範樣本都沒有含咖啡因的成分。
+   *   這正是本專案最怕的形狀 —— **不報錯，只在特定身分才看得到**。
+   *   （補上它同時讓 `EN_TO_CANONICAL` 的往返斷言涵蓋這一項。）
+   */
+  咖啡因: 'Caffeine',
 };
 
 /** 單位（中文 → 英文）。營養標示的慣用縮寫。 */

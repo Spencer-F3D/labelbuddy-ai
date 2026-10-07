@@ -19,8 +19,17 @@
  *   不得引入瀏覽器或 Node 專屬 API。
  */
 
-import type { KnowledgeCard, QuizQuestion } from '../types';
+import type { KnowledgeCard, QuizQuestion, QuizQuestionText } from '../types';
 import type { Language } from '../i18n/translations';
+
+/**
+ * ⚠️ `QuizQuestionText` 已於 2026-10-07 **移到 `src/types.ts`** ——
+ *    因為 AI 生成的題目要**自帶英文版**（`QuizQuestion.en`），
+ *    那個型別不再是「本檔的英文對照表專用」。
+ *    這裡保留 re-export，讓既有的 `import { QuizQuestionText } from './educationContentEn'`
+ *    不會壞掉（本專案有多個地方從這裡拿它）。
+ */
+export type { QuizQuestionText };
 
 /** 知識卡的可翻譯欄位 */
 export interface KnowledgeCardText {
@@ -30,13 +39,6 @@ export interface KnowledgeCardText {
   tip: string;
   /** 語音朗讀稿。英文模式會用英文語音念，所以必須是英文。 */
   voiceScript: string;
-}
-
-/** 測驗題的可翻譯欄位 */
-export interface QuizQuestionText {
-  question: string;
-  options: string[];
-  explanation: string;
 }
 
 /* ===========================================================================
@@ -943,7 +945,22 @@ export function localizeQuestion(
   language: Language
 ): QuizQuestion {
   if (language !== 'en') return question;
-  const text = QUIZ_QUESTIONS_EN[question.id];
+  /**
+   * ★ 2026-10-07：**優先採用題目自帶的 `en`**。
+   *
+   * 【為什麼要改】
+   *   原本只有「以 id 查 `QUIZ_QUESTIONS_EN`」這一條路 ——
+   *   那是一份**白名單**：id 不在表裡就查不到 → `return question` → 原樣回中文。
+   *   內建 60 題都有 id 在表裡，所以看不出問題；
+   *   但 **AI 生成的新題沒有 id 在表裡** → 英文介面會**靜默顯示中文題目**，
+   *   而且不會報錯、不會當掉。
+   *
+   * 【現在的順序】
+   *   ① `question.en`（AI 生成題一定有，且 `normalizeQuizQuestion` 強制要求）
+   *   ② `QUIZ_QUESTIONS_EN[question.id]`（內建 60 題走這條）
+   *   ③ 都沒有 → 安全退回中文原文（寧可顯示中文，也不要空白）
+   */
+  const text = question.en ?? QUIZ_QUESTIONS_EN[question.id];
   if (!text) return question;
   return {
     ...question,
