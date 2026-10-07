@@ -28,6 +28,7 @@
     "check:quiz": "tsx scripts/check-quiz-bank.ts",
     "check:learn": "tsx scripts/check-learn-mapping.ts",
     "check:privacy": "tsx scripts/check-prompt-privacy.ts",
+    "check:conditions-ui": "node scripts/check-custom-condition.mjs",
     "check:consistency": "tsx scripts/check-consistency.ts",
     "check:pregnancy": "node scripts/check-pregnancy.mjs",
     "apk": "node scripts/build-apk.mjs",
