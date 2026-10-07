@@ -42,7 +42,7 @@ export interface KnowledgeCardText {
 }
 
 /* ===========================================================================
- * 知識卡（21 張）
+ * 知識卡（22 張）
  * =========================================================================*/
 
 export const KNOWLEDGE_CARDS_EN: Record<string, KnowledgeCardText> = {
@@ -305,10 +305,30 @@ export const KNOWLEDGE_CARDS_EN: Record<string, KnowledgeCardText> = {
     voiceScript:
       'Big packs are not always better value. The unit price is lower, but if you eat more, your total intake goes up. Snacks are the clearest case, because a big pack is often finished at once. Ask yourself how many sittings the pack will take. If the answer is one, buy the small pack.',
   },
+  /**
+   * ★ 2026-10-07 新增，對應 `educationContent.ts` 的 `card-shopping-5`。
+   * ⚠️ 兩邊的 id 必須一致 —— `localizeCard()` 是**以 id 查這張表**，
+   *    漏了就會安全退回中文（英文介面出現中文卡片），而且不會報錯。
+   *    `scripts/check-learn-mapping.ts` 會守住「每張卡都有英文對照」。
+   *
+   * 用字遵守既有規則：**不寫後果斷言**（不寫 "can cause anaphylaxis" 之類）。
+   */
+  'card-shopping-5': {
+    title: 'How to read allergens',
+    headline: 'Treat "may contain" as containing it',
+    body: [
+      'The allergen statement usually sits just below the ingredient list, in bold or underlined. Find that line first.',
+      '"Contains: peanuts" means it is definitely there. "Made on a line that also handles peanuts" is a cross-contamination risk. For someone with a serious allergy, it is best to avoid both.',
+      'The names in the ingredient list often hide it: lecithin can come from soy, casein is milk, gluten is wheat.',
+    ],
+    tip: 'If you are not sure, do not buy it. If you really want it, photograph the label and ask a doctor or pharmacist.',
+    voiceScript:
+      'The allergen statement usually sits just below the ingredient list, in bold or underlined. Find that line first. Contains means it is definitely there. Made on a line that also handles it is a cross-contamination risk, and it is best to avoid both. The names in the ingredient list often hide it. Lecithin can come from soy, casein is milk, gluten is wheat. If you are not sure, do not buy it.',
+  },
 };
 
 /* ===========================================================================
- * 測驗題（14 題）
+ * 測驗題（60 題）
  * =========================================================================*/
 
 export const QUIZ_QUESTIONS_EN: Record<string, QuizQuestionText> = {

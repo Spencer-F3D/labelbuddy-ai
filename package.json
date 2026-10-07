@@ -26,6 +26,7 @@
     "check:mode": "tsx scripts/check-analysis-mode.ts",
     "check:lookup": "tsx scripts/check-lookup-keys.ts",
     "check:quiz": "tsx scripts/check-quiz-bank.ts",
+    "check:learn": "tsx scripts/check-learn-mapping.ts",
     "check:consistency": "tsx scripts/check-consistency.ts",
     "check:pregnancy": "node scripts/check-pregnancy.mjs",
     "apk": "node scripts/build-apk.mjs",
@@ -34,7 +35,7 @@
     "check:layout": "node scripts/check-layout-senior.mjs",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
-    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup && npm run check:quiz"
+    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup && npm run check:quiz && npm run check:learn"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

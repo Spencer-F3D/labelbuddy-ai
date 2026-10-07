@@ -175,6 +175,9 @@ if (!SKIP_CHECKS) {
     // 食育題庫完整性（2026-10-07）：labelKeys 值域、中英兩版齊全、
     // LABEL_KEYS 與各身分 numericLimits 一致 —— 三種都是「不報錯但功能少一半」
     'check-quiz-bank',
+    // 「學一個小知識」的知識卡映射（2026-10-07）：
+    // 映射到不存在的卡片 → 卡片靜默不出現，是 P1 規格踩過的 bug 類型
+    'check-learn-mapping',
   ];
   for (const c of checks) {
     run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]) === 0
