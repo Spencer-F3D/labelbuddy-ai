@@ -32,6 +32,7 @@ import {
   handleAskHealthQuestion,
   handleHealth,
   handlePrivacy,
+  handleQuizQuestion,
 } from './server/handlers';
 import { handleFitnessReport } from './server/fitnessReport';
 import type { ApiResult, CoreDeps } from './server/core';
@@ -54,6 +55,9 @@ const ROUTES: Record<string, { handler: Handler; method: 'GET' | 'POST' }> = {
   '/api/ask-health-question': { handler: handleAskHealthQuestion, method: 'POST' },
   // 健身週報（2026-10-02）：走 NVIDIA NIM，AI 失敗時自動回離線規則版
   '/api/fitness-report': { handler: handleFitnessReport, method: 'POST' },
+  // 出題（2026-10-07）：「學一個小知識」的測驗題。
+  // ⚠️ 含同意閘門：localOnly 時只回內建題，不呼叫任何外部服務。
+  '/api/quiz-question': { handler: handleQuizQuestion, method: 'POST' },
   '/api/privacy': { handler: handlePrivacy, method: 'GET' },
   '/api/ai-status': { handler: handleAiStatus, method: 'GET' },
   '/api/health': { handler: handleHealth, method: 'GET' },

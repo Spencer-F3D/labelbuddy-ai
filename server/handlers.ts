@@ -55,6 +55,11 @@ import { analyzeNutritionWithIndicators } from './smartNutritionAnalyzer';
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
+// 出題（2026-10-07）：「學一個小知識」的 AI 生成路徑。
+// ⚠️ 這是**會呼叫雲端**的功能，所以 handler 內必須有同意閘門（見 handleQuizQuestion）。
+import { SYSTEM_INSTRUCTION_QUIZ, buildQuizPrompt } from './quizPrompt';
+import { normalizeQuizQuestion, pickBuiltinFallback } from './quizValidate';
+import { isLabelKey } from '../src/data/labelKeys';
 import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
 import { nutrientName, profileName, conditionName } from '../src/data/bilingual';
@@ -748,6 +753,105 @@ ${contextInfo
   }
   // 走到這裡代表 handler 沒有提早 return（例如 GET 端點直接 res.json）
   return res.result();
+}
+
+/**
+ * 對應 `/api/quiz-question`
+ *
+ * 「學一個小知識」的測驗題來源。流程：
+ *   ① 同意閘門（`localOnly`）→ 只在本機時**絕不連雲端**，回確定性內建題
+ *   ② 呼叫雲端 AI 生成一題
+ *   ③ 嚴格驗證；不合格就整題丟棄
+ *   ④ 失敗／不合格 → 退回內建題（**卡片永遠有內容，絕不留空白**）
+ *
+ * ⚠️ 永遠回 HTTP 200 + `{success:true}`，連例外也一樣 ——
+ *    這是本專案既有慣例（見 `handleAskHealthQuestion`）：
+ *    回 500 會讓前端顯示「系統壞了」，而使用者其實只是拿不到一道題。
+ *
+ * ⚠️ 這裡是**唯一**會把「這張標籤的營養數字」送給 AI 的地方。
+ *    所以前端必須依 `analysisMode` 決定要不要帶 `localOnly: false`
+ *    （見 `LearnFromScanCard`），後端這裡是第二道防線。
+ */
+export async function handleQuizQuestion(body: any, headers: Headers, deps: CoreDeps): Promise<ApiResult> {
+  // 相容層：把平台請求包成 handler 認得的 req / res
+  const req: any = { body, headers: Object.fromEntries(headers) };
+  const res: any = makeRes();
+  try {
+    // ── 入參驗證（不合格就 400，不要浪費 AI 額度）──────────────────
+    const rawKeys = Array.isArray(req.body?.labelKeys) ? req.body.labelKeys : [];
+    const labelKeys = rawKeys.filter((k: unknown) => isLabelKey(k));
+    const ctx = req.body?.labelContext;
+    if (
+      labelKeys.length === 0 ||
+      !ctx ||
+      typeof ctx.name !== 'string' ||
+      !Number.isFinite(Number(ctx.value))
+    ) {
+      return res.status(400).json({
+        error: 'INVALID_REQUEST',
+        message: '缺少標籤資訊，無法出題。',
+      });
+    }
+
+    const excludeIds: string[] = (Array.isArray(req.body?.excludeIds) ? req.body.excludeIds : [])
+      .filter((x: unknown): x is string => typeof x === 'string')
+      .slice(0, 60);
+
+    // ── ★ 同意閘門（第二道防線）────────────────────────────────────
+    // 前端在 local_only 時不會送這個請求；這裡再擋一次，
+    // 確保「就算有人直接打這個 API」也不會把標籤數字送到雲端。
+    const localOnly = req.body?.localOnly === true;
+    if (localOnly) {
+      console.log('[LabelBuddy AI] 出題：只在本機模式 → 回內建題，不呼叫任何外部服務');
+      return res.json({
+        success: true,
+        data: pickBuiltinFallback(labelKeys, excludeIds),
+        fromBank: false,
+        localOnly: true,
+      });
+    }
+
+    // ── 呼叫雲端 AI 生成 ─────────────────────────────────────────
+    const aiResult = await callAiModel(req, {
+      systemInstruction: SYSTEM_INSTRUCTION_QUIZ,
+      userPrompt: buildQuizPrompt({
+        labelKeys,
+        context: {
+          name: ctx.name,
+          value: Number(ctx.value),
+          unit: typeof ctx.unit === 'string' ? ctx.unit : '',
+          dailyLimit: Number.isFinite(Number(ctx.dailyLimit)) ? Number(ctx.dailyLimit) : undefined,
+          percent: Number.isFinite(Number(ctx.percent)) ? Number(ctx.percent) : undefined,
+        },
+        excludeIds,
+      }),
+      // 溫度稍高（0.5）是刻意的：題目要有一點變化，
+      // 不像安全結論那樣必須完全確定（那是規則引擎的職責，不是 AI 的）。
+      temperature: 0.5,
+      maxTokens: 900,
+    });
+
+    const candidate = aiResult ? normalizeQuizQuestion(aiResult.data, labelKeys) : null;
+    if (candidate) {
+      return res.json({ success: true, data: candidate, fromBank: false });
+    }
+
+    // ── 降級：AI 不可用或輸出不合格 → 退回內建題 ──────────────────
+    console.log('[LabelBuddy AI] 出題：AI 不可用或輸出不合格，退回內建題');
+    return res.json({
+      success: true,
+      data: pickBuiltinFallback(labelKeys, excludeIds),
+      fromBank: false,
+    });
+  } catch (error: any) {
+    console.error('產生小知識題目時發生錯誤:', error);
+    // ⚠️ 連例外都要回一份可用的東西，不要讓畫面的卡片空著
+    try {
+      return res.json({ success: true, data: pickBuiltinFallback([], []) });
+    } catch {
+      return res.json({ success: true, data: null });
+    }
+  }
 }
 
 /** 對應 `/api/privacy` */

@@ -37,6 +37,7 @@ import {
   handleAskHealthQuestion,
   handleHealth,
   handlePrivacy,
+  handleQuizQuestion,
 } from './server/handlers';
 import { handleFitnessReport } from './server/fitnessReport';
 import type { ApiResult, CoreDeps, PlatformRequest } from './server/core';
@@ -93,6 +94,8 @@ app.post('/api/analyze-label', route(handleAnalyzeLabel));
 app.post('/api/analyze-indicators', route(handleAnalyzeIndicators));
 app.post('/api/ask-health-question', route(handleAskHealthQuestion));
 app.post('/api/fitness-report', route(handleFitnessReport));
+// 出題（2026-10-07）：「學一個小知識」的測驗題
+app.post('/api/quiz-question', route(handleQuizQuestion));
 app.get('/api/privacy', route(handlePrivacy));
 app.get('/api/ai-status', route(handleAiStatus));
 app.get('/api/health', route(handleHealth));

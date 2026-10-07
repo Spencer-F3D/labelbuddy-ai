@@ -189,6 +189,38 @@ try {
     `→ ${fit.json?.data?.source}`
   );
 
+  // ── 出題端點的同意閘門（2026-10-07 補上）────────────────────────────
+  // ⚠️ 這裡用兩個判準，缺一不可：
+  //    ① 耗時 —— 分辨「沒去碰雲端」與「碰了但失敗」。
+  //       本機路徑是純 CPU 的 `pickBuiltinFallback()`，遠低於 500ms；
+  //       而真的呼叫 AI 最快也要好幾秒（實測免費模型 13.5s）。
+  //    ② `source !== 'ai'` —— 這一道擋的是**另一種失敗**：
+  //       就算閘門漏了、AI 真的被呼叫，只要它失敗退回內建題，
+  //       回應看起來仍與「有閘門」一模一樣（source 都是 'builtin'）。
+  //       → 所以兩個一起看：快 ＋ 不是 AI 題。
+  const quiz = await postTimed('/api/quiz-question', {
+    labelKeys: ['鈉'],
+    labelContext: { name: '鈉', value: 1980, unit: '毫克', dailyLimit: 2000, percent: 99 },
+    language: 'zh-TW',
+    profileId: 'senior',
+    excludeIds: [],
+    localOnly: true,
+  });
+  check(
+    '出題：★ localOnly: true 時在碰雲端「之前」就返回（< 500ms）',
+    quiz.ms < 500,
+    `→ ${quiz.ms}ms（真的呼叫 AI 要數秒）`
+  );
+  check(
+    '出題：★ localOnly 時不得回 AI 題（source 必須是 builtin）',
+    quiz.json?.data?.source === 'builtin',
+    `→ ${quiz.json?.data?.source}`
+  );
+  check(
+    '出題：localOnly 時仍要回得出題目（卡片不能空著）',
+    typeof quiz.json?.data?.question === 'string' && quiz.json?.data?.question.length > 0
+  );
+
   console.log('\n── 2. /api/privacy 必須誠實描述三模式 ──');
   const privacy = await (await fetch(`${BASE}/api/privacy`)).json();
   const modes = privacy?.modes ?? {};
