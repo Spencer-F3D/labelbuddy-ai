@@ -50,10 +50,14 @@ import {
   type ProviderName,
   NVIDIA_MODEL_CHAIN_FOR_STATUS,
 } from './core';
-import { buildRecognitionResult } from './labelParser';
-import { analyzeNutritionWithIndicators } from './smartNutritionAnalyzer';
+// ⚠️ 2026-10-07：`buildRecognitionResult`（labelParser）與
+//    `analyzeNutritionWithIndicators`（smartNutritionAnalyzer）的匯入已移除 ——
+//    它們原本只服務本機路徑，而那條路徑現在由 `./localAnalysis` 統一呼叫。
+//    直接匯入會變成「兩份實作入口」，正是這次要消除的東西。
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
-import { answerSeniorHealthQuestion } from './smartHealthQA';
+// ⚠️ 2026-10-07：`answerSeniorHealthQuestion` 的直接匯入已移除 ——
+//    本機路徑改由 `./localAnalysis` 的 `answerHealthQuestionLocally()` 統一呼叫
+//    （前端也匯入同一支，才能零網路）。雲端路徑不需要它。
 import { buildConditionReminders } from './conditionAdvice';
 // ★ 2026-10-07：送給 AI 的是**中性成分約束**，不是病名（見 handleAnalyzeLabel 的說明）。
 import { buildUserConstraintLine } from './conditionConstraint';
@@ -63,6 +67,9 @@ import { SYSTEM_INSTRUCTION_QUIZ, buildQuizPrompt } from './quizPrompt';
 import { normalizeQuizQuestion, pickBuiltinFallback } from './quizValidate';
 // 線上題庫（2026-10-07 第二階段）：只認介面，不認 KV（見 server/quizBank.ts）
 import { findBankMatch, listQuestionsSince, writeQuestionsToBank } from './quizBank';
+// 離線分析路徑（2026-10-07）：與前端**共用同一支純函式**。
+// ⚠️ 這個模組不含任何 Node 依賴，所以前端也能打包它 —— 那正是它能被共用的原因。
+import { analyzeLabelLocally, answerHealthQuestionLocally } from './localAnalysis';
 import { isLabelKey } from '../src/data/labelKeys';
 import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
@@ -75,8 +82,7 @@ import { simplifyNutrientWordingInFields } from '../src/data/bilingual';
 // ⚠️ 2026-10-07：`PHYSICAL_INDICATORS` 的匯入已移除 ——
 //    它原本只用於「把病名轉成提示詞那一行」，那段已由
 //    `expandConditionsToNutrients()` 取代（展開成中性成分）。
-// 本機引擎的英文對照（2026-09-28）：引擎本身維持中文，這裡只轉換輸出欄位。
-import { translateLocalResult } from './localEngineEn';
+// ⚠️ 2026-10-07：`translateLocalResult` 的匯入已移除（同上，改由 ./localAnalysis 呼叫）。
 import type { DataHandling, SeniorPhysicalIndicators } from '../src/types';
 
 /** 極薄的 Express 相容層。只實作 handler 實際用到的兩個方法。 */
@@ -461,68 +467,54 @@ ${promptContext}`;
     //   讀不到就誠實請使用者重拍，絕不用預設值湊出結論。
     // ======================================================================
     console.log('[LabelBuddy AI] 啟動本機離線辨識引擎');
-    // 文字模式：前端已經讀好文字，直接解析（不碰圖片，也沒有圖片可碰）。
-    // 圖片模式：伺服器端 OCR（舊客戶端 / 命令列實測用）。
-    // 文字模式：前端已經讀好文字，直接解析（不碰圖片，也沒有圖片可碰）。
-    // 圖片模式：需要伺服器端 OCR —— 由呼叫端注入（Node 提供，Worker 不提供）。
-    let ocr;
-    if (isTextMode) {
-      ocr = buildRecognitionResult(ocrText);
-    } else if (deps.recognizeImage) {
-      ocr = await deps.recognizeImage(cleanBase64);
-    } else {
-      // Cloudflare Worker 沒有 tesseract.js，也不該有 —— OCR 已經在瀏覽器做完了。
-      // 走到這裡代表客戶端太舊（送圖片）或有人直接呼叫 API，明確回報比默默失敗好。
-      return {
-        status: 400,
-        json: {
-          error: 'OCR_NOT_AVAILABLE',
-          message: '此伺服器不接受圖片，請使用支援前端辨識的版本。',
-        },
-      };
+    /**
+     * ★ 2026-10-07：本機路徑改為呼叫**共用**的 `analyzeLabelLocally()`。
+     *
+     * 【為什麼要共用同一支函式】
+     *   「只在本機」模式現在在前端**直接呼叫它**（零網路請求、斷網可用）。
+     *   如果後端自己留一份實作，兩份遲早會分岔 —— 而且分岔時**不會報錯**，
+     *   只會變成「同一張標籤，線上和離線得到不同結論」。
+     *   有一條 parity 檢查（`check-offline-parity.ts`）在逐欄位比對兩條路徑。
+     *
+     * 【為什麼這裡還需要伺服器端 OCR】
+     *   舊客戶端會直接送圖片，命令列實測也會。但 Worker 沒有 tesseract.js，
+     *   所以只有 Node（本機 `server.ts`）提供 `deps.recognizeImage`。
+     *   Worker 拿不到時明確回 OCR_NOT_AVAILABLE —— 明確回報比默默失敗好。
+     *
+     * ⚠️ 圖片模式要先拿到**原始文字**再交給共用函式（它會自己重新解析）。
+     *    `OcrRecognitionResult.rawText` 就是為此保留的。
+     */
+    let localOcrText: string = ocrText;
+    if (!isTextMode) {
+      if (!deps.recognizeImage) {
+        // Cloudflare Worker 沒有 tesseract.js，也不該有 —— OCR 已經在瀏覽器做完了。
+        // 走到這裡代表客戶端太舊（送圖片）或有人直接呼叫 API，明確回報比默默失敗好。
+        return {
+          status: 400,
+          json: {
+            error: 'OCR_NOT_AVAILABLE',
+            message: '此伺服器不接受圖片，請使用支援前端辨識的版本。',
+          },
+        };
+      }
+      const recognized = await deps.recognizeImage(cleanBase64);
+      localOcrText = recognized.rawText;
+      console.log(
+        `[LabelBuddy AI] 離線 OCR：讀到 ${recognized.matchedFields} 個營養欄位` +
+          (recognized.ok ? '（採用）' : `（不足，${recognized.error}）`)
+      );
     }
-    console.log(
-      `[LabelBuddy AI] 離線 OCR：讀到 ${ocr.matchedFields} 個營養欄位` +
-        (ocr.ok ? '（採用）' : `（不足，${ocr.error}）`)
-    );
-
-    if (!ocr.ok || !ocr.profile) {
-      const failed = buildOcrFailedResult(learnerProfile, ocr, language);
-      simplifyNutrientWordingInFields(failed, NUTRIENT_WORDING_FIELDS);
-      return res.json({
-        success: true,
-        data: attachReminders({
-          ...failed,
-          data_handling: dataHandling,
-        }),
-      });
-    }
-
-    // 帶入該身分的每日上限，讓本機引擎也能產生 nutrient_facts（前端百分比長條圖用）
-    // 語言也要傳進去：本機引擎是預設路徑（cloudConsent 預設 false），
-    // 不傳的話切到英文仍會拿到中文結論。
-    const smartResult = analyzeNutritionWithIndicators(
-      ocr.profile,
-      conditions,
-      learnerProfile.numericLimits,
-      language,
-      // ⚠️ 一定要傳身分 —— 孕婦的危險成分把關靠這個參數決定要不要執行
-      learnerProfile.id
-    );
-    // 引擎內部的比對關鍵字維持中文，這裡只把**輸出欄位**轉成英文。
-    const localizedResult = translateLocalResult(smartResult, language);
-    simplifyNutrientWordingInFields(localizedResult, NUTRIENT_WORDING_FIELDS);
 
     return res.json({
       success: true,
-      data: attachReminders({
-        ...localizedResult,
-        ocr_used: true,
-        ocr_matched_fields: ocr.matchedFields,
-        analysis_mode: 'local_fallback',
-        data_handling: dataHandling,
-        learner_profile_id: learnerProfile.id,
-        learner_profile_name: profileName(learnerProfile.id, learnerProfile.name, language),
+      data: analyzeLabelLocally({
+        ocrText: localOcrText,
+        conditions,
+        profileId: learnerProfile.id,
+        language,
+        // ⚠️ 一定要傳 —— 這個值是閘門（allowCloud）算出來的，
+        //    讓共用函式自己猜會變成「回應的隱私標記與閘門的實際判斷不一致」。
+        dataHandling,
       }),
     });
   } catch (error: any) {
@@ -746,13 +738,14 @@ ${contextInfo
      *   只在本機模式的使用者是**主動選擇**不送給 AI（他是有連線的），
      *   回覆寫「連不上 AI」是假的，也會讓他以為「網路好一點就有 AI 回答」。
      */
-    const fallbackAnswer = answerSeniorHealthQuestion(
-      cleanQuestion,
+    // ★ 2026-10-07：改呼叫**共用**的離線函式（前端也匯入它）。
+    //   這樣「只在本機」時前端能直接算出同一份答案，不必發這個請求。
+    const fallbackAnswer = answerHealthQuestionLocally({
+      question: cleanQuestion,
       indicators,
       language,
-      localOnly ? 'user_choice' : 'unreachable'
-    );
-    simplifyNutrientWordingInFields(fallbackAnswer as any, QA_TEXT_FIELDS);
+      reason: localOnly ? 'user_choice' : 'unreachable',
+    });
     return res.json({
       success: true,
       data: fallbackAnswer,
@@ -763,12 +756,12 @@ ${contextInfo
     const qaFallbackLanguage: 'zh-TW' | 'en' = req.body?.language === 'en' ? 'en' : 'zh-TW';
     // ⚠️ localOnly 同理（也在 try 內宣告）→ 重算，否則後備文案會把「使用者選擇」講成「連不上」
     const qaLocalOnly = req.body?.localOnly === true;
-    const fallbackAnswer = answerSeniorHealthQuestion(
-      req.body?.question || '常見健康保養',
-      req.body?.indicators,
-      qaFallbackLanguage,
-      qaLocalOnly ? 'user_choice' : 'unreachable'
-    );
+    const fallbackAnswer = answerHealthQuestionLocally({
+      question: req.body?.question || '常見健康保養',
+      indicators: req.body?.indicators,
+      language: qaFallbackLanguage,
+      reason: qaLocalOnly ? 'user_choice' : 'unreachable',
+    });
     return res.json({
       success: true,
       data: fallbackAnswer,
@@ -1027,29 +1020,31 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
         uploadsHealthInfo: false,
         requiresConsent: false,
         engine: '瀏覽器內建 OCR（tesseract.js）+ 本機食育規則引擎',
+        // ★ 2026-10-07：這一句現在是**字面事實**（在那之前不是，見下方說明）。
         description:
-          '照片不會離開裝置。讀出的文字會送到本服務的伺服器，由離線規則引擎判斷後回傳結果 —— 不經過任何 AI 供應商，伺服器也不保存內容。身體指標與健康問答同樣不會送到 AI。',
+          '照片不會離開裝置，讀出的文字也在同一支手機上由規則引擎判斷。這個模式不會發出任何網路請求 —— 在沒有訊號的地方（例如超市地下室）也能使用。身體指標與健康問答同樣完全在本機處理。',
       },
     },
     /**
-     * ★ 2026-10-07 新增：「上傳」這個詞的邊界，一次講清楚。
+     * ★ 2026-10-07：「上傳」這個詞的邊界，一次講清楚。
      *
      * 【為什麼一定要寫這一段】
      *   上面三個 `uploads*` 旗標指的是「有沒有送到 **AI 供應商**」，
-     *   **不是**「有沒有離開裝置」。原本的文案把兩者混為一談，
-     *   於是 `local_only` 被寫成「完全不上網」——
-     *   但實際上它會發兩個請求到**我們自己的伺服器**：
-     *     · `GET /api/ai-status`（App 掛載時，判斷雲端 AI 是否可用）
-     *     · `POST /api/analyze-label`（帶 `localOnly: true`，OCR 文字由此送入本機引擎）
-     *   兩者都不會轉送到任何 AI 供應商，所以隱私承諾本身成立；
-     *   但「完全不上網」這句話**與程式行為不符**。
+     *   **不是**「有沒有離開裝置」。把兩者混為一談，就會寫出
+     *   「完全不上網」這種聽起來很強、但一實測就破的保證。
      *
-     *   ⚠️ 這種不一致比單純寫得不夠詳細更危險：
-     *      它是可以被實測推翻的敘述。寧可把邊界講清楚，
-     *      也不要留一句聽起來很強、但一驗就破的保證。
+     * 【這一天發生了兩件事，順序很重要】
+     *   ① 上午：發現 `local_only` 其實仍會發兩個請求到**我們自己的伺服器**
+     *      （`/api/ai-status` 與 `/api/analyze-label`）→ 先把文案改準，
+     *      寫成「不送到 AI 供應商」，而不是急著宣稱「不上網」。
+     *   ② 稍後：把規則引擎抽成前後端共用的純函式，前端直接呼叫
+     *      → 那個模式**真的零網路請求**了，「只在本機」成為字面事實。
+     *
+     *   ⚠️ 教訓：**先把話改準，再把事做對。** 反過來做，
+     *      中間那段時間留下的就是可被評審當場推翻的文案。
      */
     providerBoundaryNote:
-      '本頁的「上傳」一律指**送到 AI 供應商**（Gemini／OpenRouter）。三種模式的請求都會先經過本服務的伺服器；「只在本機」模式由伺服器的離線規則引擎判斷，不轉送任何 AI 供應商，也不保存內容。',
+      '本頁的「上傳」一律指**送到 AI 供應商**（Gemini／OpenRouter）。雲端模式的請求會經過本服務的伺服器；「只在本機」模式則完全不發出網路請求 —— 照片與文字都在您的裝置上處理，不經過本服務，也不經過任何 AI 供應商。',
     serverPolicy: {
       storesImages: false,
       storesResults: false,

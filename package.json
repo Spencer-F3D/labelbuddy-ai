@@ -29,6 +29,7 @@
     "check:learn": "tsx scripts/check-learn-mapping.ts",
     "check:privacy": "tsx scripts/check-prompt-privacy.ts",
     "check:bank": "tsx scripts/check-quiz-sync.ts",
+    "check:parity": "tsx scripts/check-offline-parity.ts",
     "check:conditions-ui": "node scripts/check-custom-condition.mjs",
     "check:consistency": "tsx scripts/check-consistency.ts",
     "check:pregnancy": "node scripts/check-pregnancy.mjs",
@@ -38,7 +39,7 @@
     "check:layout": "node scripts/check-layout-senior.mjs",
     "check:ui": "node scripts/check-ui-cjk.mjs",
     "preview:labels": "node scripts/preview-sample-labels.mjs",
-    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup && npm run check:quiz && npm run check:learn && npm run check:privacy && npm run check:bank"
+    "verify:all": "npm run lint && npm run verify:conditions && npm run check:i18n && npm run check:cache && npm run check:diet && npm run check:mode && npm run check:lookup && npm run check:quiz && npm run check:learn && npm run check:privacy && npm run check:bank && npm run check:parity"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",

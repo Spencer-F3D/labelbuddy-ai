@@ -249,12 +249,13 @@ const zhTW = {
   'mode.cloudTextNote': '手機先把照片讀成文字，只把文字送給 AI。',
   'mode.cloudTextData': '上傳：標籤與病史',
   'mode.localOnly': '只在本機',
-  /* ★ 2026-10-07 修正：原本寫「完全不上網」「不上傳任何資料」——
-     但實測它會發兩個請求到**我們自己的伺服器**（/api/ai-status 與 /api/analyze-label）。
-     兩者都不轉送到 AI 供應商，所以承諾成立；但「完全不上網」是可被實測推翻的敘述。
-     → 改成把邊界講清楚：**不送到 AI 供應商**。 */
-  'mode.localOnlyNote': '不會送到 AI 供應商，最快也最私密，但建議比較簡單。',
-  'mode.localOnlyData': '不會送到 AI 供應商（文字在本服務伺服器上判斷）',
+  /* ★ 2026-10-07 的演進：
+     ① 原本寫「完全不上網」——但實測它會發兩個請求到**我們自己的伺服器**，
+        那是可被實測推翻的敘述 → 先改成「不送到 AI 供應商」。
+     ② 同日稍後把規則引擎搬到裝置上 → 這個模式**真的零網路請求**了。
+     → 現在可以直接說「完全不上網」，因為它已經是事實。 */
+  'mode.localOnlyNote': '完全不上網，斷網也能用。最快也最私密，但建議比較簡單。',
+  'mode.localOnlyData': '完全不上網（文字在這支手機上判斷）',
   'mode.changeLater': '之後可以在設定裡隨時改，不用重來。',
   'mode.savedVoice': '已切換為「{mode}」',
   'mode.currentLabel': '目前的方式',
@@ -303,6 +304,8 @@ const zhTW = {
   'dev.close': '關閉',
   'dev.loading': '載入中…',
   'dev.cannotReach': '連不上 /api/ai-status',
+  // ★ 2026-10-07：「只在本機」不查雲端狀態（那個模式零網路請求）。
+  'dev.localOnlyNote': '「只在本機」模式不查雲端狀態 —— 這個模式不會發出任何網路請求。',
   'dev.rawTitle': '上次標籤原文',
   'dev.rawOcr': '本機 OCR 讀到的原始文字',
   'dev.rawAi': 'AI 回傳的原始內容',
@@ -1032,8 +1035,9 @@ const en: Record<TranslationKey, string> = {
   'mode.cloudTextNote': 'Your phone turns the photo into text first; only the text is sent.',
   'mode.cloudTextData': 'Uploads: text + health info',
   'mode.localOnly': 'On-device only',
-  'mode.localOnlyNote': 'Nothing reaches an AI provider — fastest and most private, but simpler advice.',
-  'mode.localOnlyData': 'Nothing is sent to an AI provider (text is judged on our own server)',
+  // ★ 2026-10-07: this is now literally true — the mode makes no network requests at all.
+  'mode.localOnlyNote': 'No internet at all — works offline. Fastest and most private, but simpler advice.',
+  'mode.localOnlyData': 'No network requests (text is judged on this phone)',
   'mode.changeLater': 'You can change this in Settings later — no need to start over.',
   'mode.savedVoice': 'Switched to {mode}',
   'mode.currentLabel': 'Current mode',
@@ -1076,6 +1080,8 @@ const en: Record<TranslationKey, string> = {
   'dev.close': 'Close',
   'dev.loading': 'Loading…',
   'dev.cannotReach': 'Cannot reach /api/ai-status',
+  // ★ 2026-10-07：On-device mode makes no network requests at all.
+  'dev.localOnlyNote': 'On-device mode does not check cloud status — it makes no network requests at all.',
   'dev.rawTitle': 'Last label raw text',
   'dev.rawOcr': 'Raw text from on-device OCR',
   'dev.rawAi': 'Raw AI response',

@@ -105,7 +105,28 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
   const [failed, setFailed] = useState(false);
   const [fetchedAt, setFetchedAt] = useState<string>('');
 
+  /**
+   * ★ 2026-10-07：「只在本機」時**不查雲端狀態**。
+   *
+   * 【為什麼】
+   *   這個面板是連點標題 7 下才會開的診斷工具，它會打 `/api/ai-status`。
+   *   但「只在本機」的定義是**零網路請求** —— 留這個例外，
+   *   那句話就不是事實了（而且這個面板剛好是使用者最容易拿來「驗證」
+   *   有沒有連線的地方，留例外反而最容易被誤解）。
+   *
+   * 【為什麼不是顯示「連不上」】
+   *   那不是錯誤，是那個模式**應有的行為**。顯示紅色的「連不上」
+   *   會讓人以為壞了，還會誘導他去換模式。所以另外給一句說明。
+   */
+  const isLocalOnly = context.analysisMode === 'local_only';
+
   const load = async () => {
+    if (isLocalOnly) {
+      setStatus(null);
+      setFailed(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setFailed(false);
     try {
@@ -184,7 +205,16 @@ export const DeveloperPanel: React.FC<DeveloperPanelProps> = ({ onClose, context
               {t('dev.aiUsage')}
             </h3>
 
-            {loading && !status && <p className="text-[16px] font-bold text-slate-500">{t('dev.loading')}</p>}
+            {/* ★ 2026-10-07：只在本機時顯示「本來就不查」，不是「連不上」 */}
+            {isLocalOnly && (
+              <p className="text-[16px] font-bold text-emerald-800 bg-emerald-50 rounded-lg px-[10px] py-[8px]">
+                {t('dev.localOnlyNote')}
+              </p>
+            )}
+
+            {loading && !status && !isLocalOnly && (
+              <p className="text-[16px] font-bold text-slate-500">{t('dev.loading')}</p>
+            )}
             {failed && (
               <p className="text-[16px] font-bold text-rose-800 bg-rose-50 rounded-lg px-[10px] py-[8px]">
                 {t('dev.cannotReach')}

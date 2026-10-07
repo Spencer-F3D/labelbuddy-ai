@@ -94,6 +94,23 @@ import { TRANSLATIONS } from './i18n/translations';
 import { buildRecognitionResult } from '../server/labelParser';
 import { analyzeNutritionWithIndicators } from '../server/smartNutritionAnalyzer';
 import { translateLocalResult } from '../server/localEngineEn';
+/**
+ * ★ 2026-10-07：「只在本機」模式的完整分析路徑。
+ *
+ * 【為什麼是這一支，而不是上面的三個模組】
+ *   上面三個是**零件**（解析、判斷、英文化）。真正「跑完一次分析」
+ *   還包含三條分支、難字簡化、慢性病提醒、回應欄位組裝 ——
+ *   那些原本寫在後端 `handlers.ts` 裡。
+ *   如果前端自己再拼一次，就會變成**兩份實作**，而它們遲早會分岔。
+ *
+ *   `analyzeLabelLocally()` 是那一整段被抽出來的**同一份程式碼**，
+ *   後端也匯入它。所以「線上算」與「離線算」在構造上就是同一件事。
+ *
+ * ⚠️ 它會被打包進瀏覽器，所以那個模組**不含任何 Node 依賴**
+ *    （這也是 `buildOcrFailedResult` 要從 `core.ts` 搬出來的原因 ——
+ *      `core.ts` 開頭有 `node:crypto`）。
+ */
+import { analyzeLabelLocally } from '../server/localAnalysis';
 import { detectLabelLanguage as detectLabelLanguageImpl } from './utils/labelLanguage';
 import {
   ANALYSIS_MODES,
@@ -1124,16 +1141,40 @@ export default function App() {
   // 【重要】必須以 hasKey 為判斷依據：/api/ai-status 只要伺服器存活就會回 status: 'ok'，
   // 若誤用 status 判斷，會在沒有金鑰、實際走本機備援引擎時仍顯示「已連線」，對長者形成誤導。
   useEffect(() => {
+    /**
+     * ★★ 2026-10-07：「只在本機」時**完全不發這個請求**。
+     *
+     * 【為什麼這個請求在該模式下是多餘的】
+     *   `geminiConnected` 全 App 只有一個消費端：標題列晶片的**圓點顏色**。
+     *   而那個圓點在 `local_only` 時**恆為綠色**（見下方 render），
+     *   根本不讀這個值。也就是說：請求發了，結果被丟掉。
+     *
+     *   對一個叫「只在本機」的模式來說，這是最不該留的東西 ——
+     *   使用者選它就是為了不要連出去。
+     *
+     * 【為什麼依賴陣列從 [] 改成 [analysisMode]】
+     *   加了 gate 之後，如果依賴還是 `[]`，那麼「啟動時是 local_only、
+     *   之後切回雲端模式」就**永遠不會重查**，圓點會一直是灰的。
+     *   把 `analysisMode` 放進依賴，切換模式時會重新執行 —— 正確。
+     *
+     * ⚠️ `cancelled` 是必要的：使用者可能在請求還沒回來時就切換模式，
+     *    那時舊請求的結果不該再寫進 state。
+     */
+    if (analysisMode === 'local_only') return;
+    let cancelled = false;
     fetch(apiUrl('/api/ai-status'))
       .then((res) => res.json())
       .then((data) => {
         // 唯有伺服器確實讀取到 OPENROUTER_API_KEY 時，才算雲端 AI 已就緒
-        setGeminiConnected(!!(data && data.status === 'ok' && data.hasKey));
+        if (!cancelled) setGeminiConnected(!!(data && data.status === 'ok' && data.hasKey));
       })
       .catch(() => {
-        setGeminiConnected(false);
+        if (!cancelled) setGeminiConnected(false);
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisMode]);
 
   /**
    * 線上題庫同步（2026-10-07 第二階段）。
@@ -1477,11 +1518,13 @@ export default function App() {
     //   cloud_image → **不做 OCR**，直接把照片交給雲端視覺模型判讀。
     //                 OCR 從「必經之路」變成「後備方案」。
     //   cloud_text  → 先在本機 OCR，只把文字送給雲端文字模型。
-    //   local_only  → 先在本機 OCR，文字交給本服務 Worker 的離線規則引擎判斷。
-    //                 ⚠️ 2026-10-07 更正：原本這裡寫「完全不連網」，那是**錯的**。
-    //                    實際上仍會發兩個請求到我們自己的伺服器
-    //                    （`/api/ai-status` 與本請求本身），只是**不會轉送到任何
-    //                    AI 供應商**。承諾成立，但那句話一實測就會被推翻。
+    //   local_only  → 先在本機 OCR，然後**完全在本機**跑規則引擎。
+    //                 ★ 2026-10-07：現在真的是「完全不連網」了。
+    //                    這一天把規則引擎抽成前後端共用的純函式
+    //                    （`server/localAnalysis.ts`），前端直接呼叫它，
+    //                    所以這個模式**零網路請求**、斷網也能算出紅黃綠。
+    //                    ⚠️ 在那之前它是靠 `POST /api/analyze-label` 請伺服器算的，
+    //                       「完全不上網」當時是可被實測推翻的敘述。
     // ══════════════════════════════════════════════════════════════════
 
     /**
@@ -1564,6 +1607,40 @@ export default function App() {
       return resultJson.data as LabelAnalysisResult;
     };
 
+    /**
+     * ★★ 2026-10-07：按模式分流 —— 「只在本機」走**完全離線**的純函式。
+     *
+     * 【為什麼不能在 `postAnalyzeLabel` 裡面判斷】
+     *   那個函式是**三個模式共用**的，而且 `cloud_image` 失敗降級時
+     *   也會用它（此時 `mode` 仍是 `cloud_image`，但送的是 OCR 文字）。
+     *   把判斷塞進去，就會讓「雲端降級」不小心走到離線引擎。
+     *   → 分流留在**呼叫端**，`postAnalyzeLabel` 一個字都不改。
+     *
+     * 【為什麼要 await 一個同步函式】
+     *   為了讓兩個分支的回傳型別一致（都是 Promise），
+     *   呼叫端的 `await`、loading 狀態、`finally` 就完全不用改。
+     *   實際差異只是：`local_only` 的分析階段幾乎瞬間完成。
+     *
+     * ⚠️ `analysisMode` 是這個元件的 state，但 `mode` 是這次掃描**鎖定**的模式
+     *    （見上方 `const mode = ...`）—— 要用 `mode`，不是 `analysisMode`。
+     *    使用者在分析途中改設定不該影響正在跑的那一次。
+     */
+    const runAnalysis = async (payload: {
+      imageBase64?: string;
+      ocrText?: string;
+      ocrError?: string;
+    }): Promise<LabelAnalysisResult> => {
+      if (mode === 'local_only') {
+        return analyzeLabelLocally({
+          ocrText: payload.ocrText ?? '',
+          conditions: conditionNames,
+          profileId: learnerProfileId,
+          language,
+        });
+      }
+      return postAnalyzeLabel(payload);
+    };
+
     /** 網路變慢時主動語音安撫（只有真的會連網的模式才需要） */
     const armLatencyTimer = () => {
       if (latencyTimerRef.current) clearTimeout(latencyTimerRef.current);
@@ -1641,7 +1718,9 @@ export default function App() {
 
         // 【只送文字，不送照片】`ocrText` 是空的代表沒讀到字，
         // 後端會回「請重拍」，我們不在前端自行捏造結果。
-        data = await postAnalyzeLabel({
+        // ⚠️ 用 `runAnalysis` 而不是 `postAnalyzeLabel` ——
+        //    「只在本機」在這裡走本機純函式，**完全不發請求**。
+        data = await runAnalysis({
           ocrText: ocr?.ok ? ocr.text : '',
           // OCR 失敗的原因只在瀏覽器 console 留紀錄，不打擾使用者
           ocrError: ocr?.ok ? undefined : ocr?.error,
@@ -1661,7 +1740,7 @@ export default function App() {
         if (data?.ocr_failed) {
           const second = await runBrowserOcr(2);
           if (second?.ok && second.text.trim().length > (ocr?.text.trim().length ?? 0)) {
-            const retried = await postAnalyzeLabel({ ocrText: second.text });
+            const retried = await runAnalysis({ ocrText: second.text });
             // 只有真的變好才採用（避免重試反而把結果弄差）
             if (retried && !retried.ocr_failed) {
               data = retried;

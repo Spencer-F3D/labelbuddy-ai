@@ -1,0 +1,1122 @@
+{
+  "zh-TW|high-sodium|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：這一項已經超標",
+      "plain_summary": "您好！這款【這包食品】的「鈉」每份就有 2350 毫克，已經佔了整天上限的 118%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。",
+      "alternative_advice": "想吃的話，份量減半、多喝開水，也可以分給家人一起吃。",
+      "knowledge_point": "包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包這包食品的鹽分是 2350 毫克，等於您一天上限的 118%。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "各項營養指標未發現嚴重超標情況，成分相對單純健康。"
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [
+        {
+          "name": "鈉",
+          "value": 2350,
+          "unit": "毫克",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "添加糖",
+          "value": 28,
+          "unit": "公克",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        },
+        {
+          "name": "飽和脂肪",
+          "value": 9,
+          "unit": "公克",
+          "dailyLimit": 20,
+          "percent": 45,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|high-sodium|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "red",
+      "warning_title": "⚠️ 紅燈警報！這包對身體負擔很大，不要買！",
+      "plain_summary": "您好！這款【這包食品】油鹽糖放得太多了。特別是您注意的【高血壓 (太鹹危險)、糖尿病 (高糖危險)】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。建議您放回架上，不要買回家喔！",
+      "alternative_advice": "建議在超市改買：新鮮豆腐、綠色蔬菜、清蒸魚、燕麥片或無糖豆漿，清淡又顧健康！",
+      "knowledge_point": "包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包這包食品的鹽分是 2350 毫克，等於您一天上限的 118%。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，吃了血壓會一下子飆高、頭會暈！",
+        "🔴 白糖放得很多（太甜！）：吃了血糖會急速衝上去，容易口渴想喝水、人會疲倦！"
+      ],
+      "matched_conditions": [
+        "高血壓 (太鹹危險)",
+        "糖尿病 (高糖危險)"
+      ],
+      "nutrient_facts": [
+        {
+          "name": "鈉",
+          "value": 2350,
+          "unit": "毫克",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "添加糖",
+          "value": 28,
+          "unit": "公克",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        },
+        {
+          "name": "飽和脂肪",
+          "value": 9,
+          "unit": "公克",
+          "dailyLimit": 20,
+          "percent": 45,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|high-sodium|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：這一項已經超標",
+      "plain_summary": "您好！這款【這包食品】的「鈉」每份就有 2350 毫克，已經佔了整天上限的 118%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。",
+      "alternative_advice": "想吃的話，份量減半、多喝開水，也可以分給家人一起吃。",
+      "knowledge_point": "包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包這包食品的鹽分是 2350 毫克，等於您一天上限的 118%。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "各項營養指標未發現嚴重超標情況，成分相對單純健康。"
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [
+        {
+          "name": "鈉",
+          "value": 2350,
+          "unit": "毫克",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "添加糖",
+          "value": 28,
+          "unit": "公克",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|high-sodium|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "red",
+      "warning_title": "⚠️ 紅燈警報！這包對身體負擔很大，不要買！",
+      "plain_summary": "您好！這款【這包食品】油鹽糖放得太多了。特別是您注意的【高血壓 (太鹹危險)、糖尿病 (高糖危險)】，這包吃下去對身體不好，容易讓血壓飆高或血糖亂跳。建議您放回架上，不要買回家喔！",
+      "alternative_advice": "建議在超市改買：新鮮豆腐、綠色蔬菜、清蒸魚、燕麥片或無糖豆漿，清淡又顧健康！",
+      "knowledge_point": "包裝上寫的「鈉」，就是我們平常說的鹽分。一包泡麵的鹽分常常就等於一整天的上限，所以不能天天當正餐。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包這包食品的鹽分是 2350 毫克，等於您一天上限的 118%。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🔴 鹽巴放太多了（太鹹！）：吃這一份就超過整天上限，吃了血壓會一下子飆高、頭會暈！",
+        "🔴 白糖放得很多（太甜！）：吃了血糖會急速衝上去，容易口渴想喝水、人會疲倦！"
+      ],
+      "matched_conditions": [
+        "高血壓 (太鹹危險)",
+        "糖尿病 (高糖危險)"
+      ],
+      "nutrient_facts": [
+        {
+          "name": "鈉",
+          "value": 2350,
+          "unit": "毫克",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "添加糖",
+          "value": 28,
+          "unit": "公克",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|typical|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "green",
+      "warning_title": "✅ 綠燈安心！沒有太鹹太甜，很適合您",
+      "plain_summary": "請放心！這款【這包食品】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！",
+      "alternative_advice": "平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！",
+      "knowledge_point": "標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包的營養數字都還在您每日上限的三成以內，正常份量吃沒有問題。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "各項營養指標未發現嚴重超標情況，成分相對單純健康。"
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|typical|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：嚐一兩口就好，不要吃太多",
+      "plain_summary": "您好！這款【這包食品】味道雖然香，但對您的身體（糖尿病 (含糖注意)）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！",
+      "alternative_advice": "吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。",
+      "knowledge_point": "標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包的營養數字都還在您每日上限的三成以內，正常份量吃沒有問題。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🟡 有加糖分：吃起來有甜味，如果想嚐味道吃一小口就好，不要整包吃光。"
+      ],
+      "matched_conditions": [
+        "糖尿病 (含糖注意)"
+      ],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|typical|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "green",
+      "warning_title": "✅ 綠燈安心！沒有太鹹太甜，很適合您",
+      "plain_summary": "請放心！這款【這包食品】沒有亂加太多鹽巴、糖和壞油脂，很符合您勾選的健康指標，可以安心放進購物車買回家享用！",
+      "alternative_advice": "平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！",
+      "knowledge_point": "標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包的營養數字都還在您每日上限的三成以內，正常份量吃沒有問題。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "各項營養指標未發現嚴重超標情況，成分相對單純健康。"
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|typical|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：嚐一兩口就好，不要吃太多",
+      "plain_summary": "您好！這款【這包食品】味道雖然香，但對您的身體（糖尿病 (含糖注意)）還是稍微有點油鹽糖，嚐一點點味道可以，千萬不要整包吃光喔！",
+      "alternative_advice": "吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。",
+      "knowledge_point": "標籤上的「營養標示」表格，每一列都是一個數字。只要讀得出「鈉」和「糖」這兩列，就能判斷一大半。",
+      "label_reading_tip": "先找標籤上寫「鈉」的那一列，看是幾毫克；再找「糖」那一列，看是幾公克。這兩列就能判斷一大半。",
+      "daily_limit_context": "這包的營養數字都還在您每日上限的三成以內，正常份量吃沒有問題。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🟡 有加糖分：吃起來有甜味，如果想嚐味道吃一小口就好，不要整包吃光。"
+      ],
+      "matched_conditions": [
+        "糖尿病 (含糖注意)"
+      ],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|junk|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|junk|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|junk|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|junk|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|empty|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|empty|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "長者",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "zh-TW|empty|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "zh-TW|empty|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 看不清楚標籤數字",
+      "plain_summary": "不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？",
+      "alternative_advice": "拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "健身人士",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "高血壓",
+          "icon": "🫀",
+          "advice": "鈉就是鹽分。先看包裝上的「鈉」那一列，一天不要超過 2000 毫克，湯汁和醬料要少碰。"
+        },
+        {
+          "condition": "糖尿病",
+          "icon": "🩸",
+          "advice": "先看「糖」那一列，一天不要超過 50 公克。成分表裡越前面出現糖、糖漿、糊精就越要小心。"
+        }
+      ]
+    }
+  },
+  "en|high-sodium|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：這一項已經超標",
+      "plain_summary": "您好！這款【這包食品】的「鈉」每份就有 2350 毫克，已經佔了整天上限的 118%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。",
+      "alternative_advice": "想吃的話，份量減半、多喝開水，也可以分給家人一起吃。",
+      "knowledge_point": "The \"sodium\" on the label is salt. One pack of instant noodles often equals a whole day's limit, so it should not be a daily meal.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "This product has 2350 mg of Sodium — that is 118% of your daily limit.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "No nutrient is seriously over the limit. The ingredients are relatively simple and healthy."
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [
+        {
+          "name": "Sodium",
+          "value": 2350,
+          "unit": "mg",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "Added sugar",
+          "value": 28,
+          "unit": "g",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        },
+        {
+          "name": "Saturated fat",
+          "value": 9,
+          "unit": "g",
+          "dailyLimit": 20,
+          "percent": 45,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "condition_reminders": []
+    }
+  },
+  "en|high-sodium|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "red",
+      "warning_title": "⚠️ Red alert! This product is a heavy burden for you — do not buy it.",
+      "plain_summary": "Hello! This product has far too much oil, salt and sugar. Especially for the conditions you selected — Hypertension (too salty — risky), Diabetes (high sugar — risky) — it is not good for you: it can spike your blood pressure or blood sugar. Best to put it back on the shelf and not take it home.",
+      "alternative_advice": "Better choices at the supermarket: fresh tofu, green vegetables, steamed fish, oatmeal or unsweetened soy milk — light and good for you!",
+      "knowledge_point": "The \"sodium\" on the label is salt. One pack of instant noodles often equals a whole day's limit, so it should not be a daily meal.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "This product has 2350 mg of Sodium — that is 118% of your daily limit.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🔴 Far too much salt: one serving already exceeds the whole day's limit. Blood pressure can spike and cause dizziness.",
+        "🔴 Far too much sugar: blood sugar can shoot up quickly, leaving you thirsty and tired."
+      ],
+      "matched_conditions": [
+        "Hypertension (too salty — risky)",
+        "Diabetes (high sugar — risky)"
+      ],
+      "nutrient_facts": [
+        {
+          "name": "Sodium",
+          "value": 2350,
+          "unit": "mg",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "Added sugar",
+          "value": 28,
+          "unit": "g",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        },
+        {
+          "name": "Saturated fat",
+          "value": 9,
+          "unit": "g",
+          "dailyLimit": 20,
+          "percent": 45,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|high-sodium|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 黃燈提醒：這一項已經超標",
+      "plain_summary": "您好！這款【這包食品】的「鈉」每份就有 2350 毫克，已經佔了整天上限的 118%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。",
+      "alternative_advice": "想吃的話，份量減半、多喝開水，也可以分給家人一起吃。",
+      "knowledge_point": "The \"sodium\" on the label is salt. One pack of instant noodles often equals a whole day's limit, so it should not be a daily meal.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "This product has 2350 mg of Sodium — that is 118% of your daily limit.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "No nutrient is seriously over the limit. The ingredients are relatively simple and healthy."
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [
+        {
+          "name": "Sodium",
+          "value": 2350,
+          "unit": "mg",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "Added sugar",
+          "value": 28,
+          "unit": "g",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "condition_reminders": []
+    }
+  },
+  "en|high-sodium|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "red",
+      "warning_title": "⚠️ Red alert! This product is a heavy burden for you — do not buy it.",
+      "plain_summary": "Hello! This product has far too much oil, salt and sugar. Especially for the conditions you selected — Hypertension (too salty — risky), Diabetes (high sugar — risky) — it is not good for you: it can spike your blood pressure or blood sugar. Best to put it back on the shelf and not take it home.",
+      "alternative_advice": "Better choices at the supermarket: fresh tofu, green vegetables, steamed fish, oatmeal or unsweetened soy milk — light and good for you!",
+      "knowledge_point": "The \"sodium\" on the label is salt. One pack of instant noodles often equals a whole day's limit, so it should not be a daily meal.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "This product has 2350 mg of Sodium — that is 118% of your daily limit.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🔴 Far too much salt: one serving already exceeds the whole day's limit. Blood pressure can spike and cause dizziness.",
+        "🔴 Far too much sugar: blood sugar can shoot up quickly, leaving you thirsty and tired."
+      ],
+      "matched_conditions": [
+        "Hypertension (too salty — risky)",
+        "Diabetes (high sugar — risky)"
+      ],
+      "nutrient_facts": [
+        {
+          "name": "Sodium",
+          "value": 2350,
+          "unit": "mg",
+          "dailyLimit": 2000,
+          "percent": 118,
+          "direction": "limit"
+        },
+        {
+          "name": "Added sugar",
+          "value": 28,
+          "unit": "g",
+          "dailyLimit": 50,
+          "percent": 56,
+          "direction": "limit"
+        }
+      ],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|typical|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "green",
+      "warning_title": "✅ All clear! Not too salty or sweet — a good choice for you.",
+      "plain_summary": "Rest easy! This product does not add too much salt, sugar or bad fats, and it matches the health conditions you selected. You can safely put it in your basket and enjoy it at home.",
+      "alternative_advice": "Perfect for breakfast or a snack — light and easy to digest. Wishing you good health every day!",
+      "knowledge_point": "Every row in the nutrition table is one number. If you can read just the \"sodium\" and \"sugar\" rows, you can judge most products.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "Every nutrient in this pack is still within 30% of your daily limit — fine to eat in a normal portion.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "No nutrient is seriously over the limit. The ingredients are relatively simple and healthy."
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "condition_reminders": []
+    }
+  },
+  "en|typical|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 Caution: a taste or two is fine — do not eat much.",
+      "plain_summary": "Hello! This product smells good, but it still has a fair amount of oil, salt and sugar for your conditions (Diabetes (watch the sugar)). A small taste is fine — do not finish the whole pack.",
+      "alternative_advice": "Have a glass of warm water with it, and share it with family — do not eat it all at once.",
+      "knowledge_point": "Every row in the nutrition table is one number. If you can read just the \"sodium\" and \"sugar\" rows, you can judge most products.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "Every nutrient in this pack is still within 30% of your daily limit — fine to eat in a normal portion.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🟡 Contains added sugar: a small taste is fine — do not finish the whole pack."
+      ],
+      "matched_conditions": [
+        "Diabetes (watch the sugar)"
+      ],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|typical|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "green",
+      "warning_title": "✅ All clear! Not too salty or sweet — a good choice for you.",
+      "plain_summary": "Rest easy! This product does not add too much salt, sugar or bad fats, and it matches the health conditions you selected. You can safely put it in your basket and enjoy it at home.",
+      "alternative_advice": "Perfect for breakfast or a snack — light and easy to digest. Wishing you good health every day!",
+      "knowledge_point": "Every row in the nutrition table is one number. If you can read just the \"sodium\" and \"sugar\" rows, you can judge most products.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "Every nutrient in this pack is still within 30% of your daily limit — fine to eat in a normal portion.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "No nutrient is seriously over the limit. The ingredients are relatively simple and healthy."
+      ],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "condition_reminders": []
+    }
+  },
+  "en|typical|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🟡 Caution: a taste or two is fine — do not eat much.",
+      "plain_summary": "Hello! This product smells good, but it still has a fair amount of oil, salt and sugar for your conditions (Diabetes (watch the sugar)). A small taste is fine — do not finish the whole pack.",
+      "alternative_advice": "Have a glass of warm water with it, and share it with family — do not eat it all at once.",
+      "knowledge_point": "Every row in the nutrition table is one number. If you can read just the \"sodium\" and \"sugar\" rows, you can judge most products.",
+      "label_reading_tip": "First find the \"sodium\" row and read the milligrams, then find the \"sugar\" row and read the grams. Those two rows tell you most of what you need.",
+      "daily_limit_context": "Every nutrient in this pack is still within 30% of your daily limit — fine to eat in a normal portion.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [
+        "🟡 Contains added sugar: a small taste is fine — do not finish the whole pack."
+      ],
+      "matched_conditions": [
+        "Diabetes (watch the sugar)"
+      ],
+      "nutrient_facts": [],
+      "analysis_mode": "local_fallback",
+      "ocr_used": true,
+      "ocr_matched_fields": 6,
+      "data_handling": "local_only",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|junk|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "en|junk|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|junk|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "en|junk|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|empty|senior|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "en|empty|senior|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "senior",
+      "learner_profile_name": "Older adult",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  },
+  "en|empty|fitness|none": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "data_handling": "local_only",
+      "condition_reminders": []
+    }
+  },
+  "en|empty|fitness|hypertension+diabetes": {
+    "status": 200,
+    "success": true,
+    "data": {
+      "risk_level": "yellow",
+      "warning_title": "🔍 Cannot read the label numbers",
+      "plain_summary": "Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the \"Nutrition Facts\" table, and take another photo in better light?",
+      "alternative_advice": "Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.",
+      "ingredients_detected": [],
+      "nutrition_concerns": [],
+      "matched_conditions": [],
+      "nutrient_facts": [],
+      "ocr_failed": true,
+      "ocr_matched_fields": 0,
+      "analysis_mode": "local_fallback",
+      "learner_profile_id": "fitness",
+      "learner_profile_name": "Adult training for muscle gain",
+      "data_handling": "local_only",
+      "condition_reminders": [
+        {
+          "condition": "Hypertension",
+          "icon": "🫀",
+          "advice": "Sodium is salt. Start with the \"sodium\" row — keep it under 2,000 mg a day, and go easy on soups and sauces."
+        },
+        {
+          "condition": "Diabetes",
+          "icon": "🩸",
+          "advice": "Start with the \"sugar\" row — keep it under 50 g a day. The earlier sugar, syrup or dextrin appears in the ingredient list, the more careful you should be."
+        }
+      ]
+    }
+  }
+}

@@ -25,6 +25,9 @@ import { MessageCircleQuestion, Volume2 } from 'lucide-react';
 import { AnalysisMode, HealthQuestionAnswer } from '../types';
 import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 import { useI18n } from '../i18n/I18nContext';
+// ★ 2026-10-07：「只在本機」時直接在裝置上回答（零網路）。
+//   與後端 `handleAskHealthQuestion` 的 localOnly 分支是**同一支引擎**。
+import { answerHealthQuestionLocally } from '../../server/localAnalysis';
 
 interface HealthQASectionProps {
   /**
@@ -49,17 +52,56 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }
     setBusy(true);
     setError(false);
     try {
+      /**
+       * ★★ 2026-10-07：「只在本機」時**完全不發請求**。
+       *
+       * 【為什麼這個模式要連這一條都離線】
+       *   使用者打的健康問題往往比標籤文字更私密 ——
+       *   例如「我這樣是不是快中風了」。原本即使在「只在本機」，
+       *   這句問題仍然會 POST 到我們的伺服器（只是後端不轉送給 AI）。
+       *   「只在本機」應該是真的不連出去，而不是「連出去但我們說不會轉送」。
+       *
+       * 【為什麼可以這樣做】
+       *   後端在 `localOnly` 時**本來就**跳過 AI、走 `smartHealthQA` 那支
+       *   確定性引擎。我們只是把**同一支引擎**搬到裝置上跑
+       *   （`server/localAnalysis.ts` 的 `answerHealthQuestionLocally`），
+       *   所以答案與原本伺服器回的完全一樣。
+       *
+       * ⚠️ `reason` 固定是 `'user_choice'`：使用者是有連線的、
+       *    是**主動選擇**不送給 AI。回覆寫「連不上 AI」是假的，
+       *    而且會讓他以為「網路好一點就會有 AI 回答」。
+       */
+      if (analysisMode === 'local_only') {
+        setAnswer(
+          answerHealthQuestionLocally({ question: q, language, reason: 'user_choice' })
+        );
+        return;
+      }
+
       const response = await fetch(apiUrl('/api/ask-health-question'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // ⚠️ 一定要帶 language，否則英文介面會拿到中文回答
-        // localOnly 是同意閘門：只在本機時後端不呼叫雲端
         // ⚠️ 不再送 indicators（血壓／心跳／血糖）—— 見檔頭說明。
         // ⚠️ 不再送 gender（性別與稱謂機制已於 2026-10-02 移除）。
         body: JSON.stringify({
           question: q,
           language,
-          localOnly: analysisMode === 'local_only',
+          /**
+           * ★ 2026-10-07：這裡**一定是 false**。
+           *
+           * 因為上面 `analysisMode === 'local_only'` 已經提早 return 了 ——
+           * 走到這裡就代表不是那個模式。
+           *
+           * ⚠️ 原本寫的是 `analysisMode === 'local_only'`，而 TypeScript
+           *    **直接把它標成錯誤**（「這兩個型別沒有交集」）：型別系統幫我們
+           *    證明了那個判斷在執行時永遠不成立。
+           *    留著它會讓下一個讀的人以為「這個分支還可能帶 true」。
+           *
+           * ★ 後端的閘門（`handlers.ts` 的 `localOnly` 檢查）**完全沒有動** ——
+           *   前端不再送這個請求，不等於後端可以鬆懈。
+           */
+          localOnly: false,
         }),
       });
       const payload = await response.json();

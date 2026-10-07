@@ -14,13 +14,21 @@
  *   ③ 尤其重要：本專案完全沒有 CDP 網路監看。
  *   所以這支腳本自己實作 `Network.enable` ＋ `Network.requestWillBeSent`。
  *
- * 【⚠️ 範圍要講清楚：本專案不是「零網路」】
- *   `local_only` 模式**仍然會**打兩個既有端點：
- *     · `/api/ai-status`（App 掛載時無條件呼叫）
+ * 【★ 2026-10-07：斷言已從「零 quiz 請求」擴大成「零 `/api/*`」】
+ *
+ *   在那之前，`local_only` 仍然會打兩個端點：
+ *     · `/api/ai-status`（App 掛載時無條件呼叫 —— 但結果在那個模式下根本沒被讀取）
  *     · `/api/analyze-label`（帶 `localOnly: true`，OCR 文字會到我們自己的 Worker）
- *   所以斷言只能是「**零 `/api/quiz-*` 請求**」。
- *   腳本會把允許的既有請求一併印出來，讓「範圍界定」透明 ——
- *   避免讀者誤以為整支 App 零請求。
+ *   也就是說「只在本機」當時**不是字面事實**，斷言只能縮到「零 quiz 請求」。
+ *
+ *   2026-10-07 把規則引擎抽成前後端共用的純函式之後，那個模式真的完全不連網，
+ *   所以現在的斷言是**整個 `/api/` 都沒有請求**。
+ *
+ * 【兩條斷言必須成對，否則會假通過】
+ *   · 第二輪（local_only）：零 `/api/*`      ← 負向
+ *   · 第一輪（雲端）：**必須**看到 analyze-label ← 正向對照
+ *   只驗負向的話，「監看器壞掉」也會讓它通過。
+ *   另外還會檢查第二輪**真的跑到某個狀態**（不是逾時什麼都沒發生）。
  *
  * 用法：
  *   node scripts/check-learn-card.mjs [http://127.0.0.1:3100]
@@ -105,7 +113,17 @@ class CDP {
       awaitPromise: true,
     });
     if (r.exceptionDetails) {
-      throw new Error(`頁面執行錯誤: ${r.exceptionDetails.text}`);
+      /**
+       * ⚠️ `exceptionDetails.text` 常常只有 "Uncaught" 三個字，
+       *    真正的訊息在 `exception.description`。
+       *    不把它一起印出來的話，除錯時只會看到「頁面執行錯誤: Uncaught」——
+       *    等於沒有訊息（2026-10-07 實際卡在這裡一次）。
+       */
+      const detail =
+        r.exceptionDetails.exception?.description ??
+        r.exceptionDetails.exception?.value ??
+        JSON.stringify(r.exceptionDetails);
+      throw new Error(`頁面執行錯誤: ${detail}\n  運算式：${expression.slice(0, 120)}`);
     }
     return r.result.value;
   }
@@ -124,7 +142,41 @@ let exitCode = 0;
 async function runResultFlow(mode) {
   // 先到 origin 設 localStorage（設完要重新載入才會生效）
   await cdp.send('Page.navigate', { url: BASE });
-  await sleep(3000);
+
+  /**
+   * ★★ 2026-10-07：**一定要等到頁面真的在那個 origin 上**才能碰 localStorage。
+   *
+   * 【踩到的情況】
+   *   原本這裡是 `await sleep(3000)`。開發伺服器第一次要現編 App.tsx
+   *   （很大，改了檔案之後尤其慢），3 秒不夠 → 頁面還停在 `about:blank`
+   *   → `localStorage.setItem` 直接丟
+   *   `SecurityError: Access is denied for this document`。
+   *
+   *   ⚠️ 那個錯誤訊息**完全指不到真正的原因**（看起來像權限問題），
+   *      而 `exceptionDetails.text` 還只回 "Uncaught" 三個字。
+   *      兩層資訊不足疊在一起，會讓人往錯的方向查很久。
+   *
+   * 【修法】用「條件」等，不要猜秒數 —— 與本檔下方 `waitFor()` 同一個原則。
+   *   `location.origin` 對得上，代表導覽真的完成了。
+   */
+  {
+    const t0 = Date.now();
+    let onOrigin = false;
+    while (Date.now() - t0 < 40000) {
+      try {
+        const origin = await cdp.eval(`location.origin`);
+        if (origin && origin !== 'null' && BASE.startsWith(origin)) {
+          onOrigin = true;
+          break;
+        }
+      } catch {
+        /* 頁面還在換，繼續等 */
+      }
+      await sleep(500);
+    }
+    if (!onOrigin) throw new Error(`等不到頁面載入 ${BASE}（一直停在 about:blank？）`);
+  }
+
   await cdp.eval(`
     (() => {
       localStorage.setItem('labelbuddy-language', 'zh-TW');
@@ -230,6 +282,22 @@ async function runResultFlow(mode) {
    *   → 所以這裡回報 `reached` 讓呼叫端自己決定怎麼解讀。
    */
   let reached = false;
+  /**
+   * ★ 2026-10-07：把「最後停在什麼狀態」回報給呼叫端。
+   *
+   * 【為什麼需要它 —— 防一種很隱蔽的假通過】
+   *   第二輪（local_only）要斷言「零 `/api/*` 請求」。
+   *   但如果**分析流程根本沒跑到**（例如 OCR 引擎沒載入、App 提早 return、
+   *   或者選單沒點到），那也會是零請求 —— 於是斷言照樣通過，
+   *   而它其實什麼都沒驗到。
+   *
+   *   `finalState` 讓呼叫端能區分：
+   *     · `'result'`      → 真的走到結果頁（最好）
+   *     · `'ocr-failed'`  → 本機分析**真的跑了**，只是讀不到數字（可接受，
+   *                         而且此時零請求才真的證明「離線引擎連請重拍都自己算」）
+   *     · `'pending'`     → 逾時，什麼都沒發生 → **零請求是假通過**
+   */
+  let finalState = 'pending';
   for (let i = 0; i < 30; i++) {
     await sleep(1200);
     const state = await cdp.eval(`
@@ -242,16 +310,22 @@ async function runResultFlow(mode) {
     `);
     if (state === 'result') {
       reached = true;
+      finalState = 'result';
       break;
     }
-    if (state === 'ocr-failed') break;
+    if (state === 'ocr-failed') {
+      finalState = 'ocr-failed';
+      break;
+    }
   }
   await sleep(1500);
 
   return {
     reached,
+    finalState,
     apiRequests: apiRequests.slice(),
     quizRequests: apiRequests.filter((u) => /\/api\/quiz-/.test(u)),
+    analyzeRequests: apiRequests.filter((u) => /\/api\/analyze-label/.test(u)),
   };
 }
 
@@ -442,6 +516,26 @@ try {
     `→ ${cloud.apiRequests.join(', ')}`
   );
 
+  /**
+   * ★★ 2026-10-07：**正向對照** —— 雲端模式一定要看得到 `/api/analyze-label`。
+   *
+   * 【為什麼非有這條不可】
+   *   第二輪要斷言「local_only 零 `/api/*` 請求」。那是**負向**斷言：
+   *   如果網路監看壞掉（`Network.enable` 失敗、事件沒收到、計數重置錯位），
+   *   它會**照樣通過** —— 而且通過得理直氣壯。
+   *
+   *   有了這條正向對照，同一個監看器必須在雲端那一輪**看得到**請求。
+   *   兩條一起看，才排得掉「監看器根本沒在工作」這個可能。
+   *
+   * ⚠️ 這條同時也守住「雲端模式沒有被這次改動弄壞」——
+   *    我們把 local_only 改成不發請求，最怕的就是手滑讓雲端也不發了。
+   */
+  check(
+    '★★ 雲端模式仍會打 /api/analyze-label（正向對照：證明網路監看真的在工作）',
+    cloud.analyzeRequests.length > 0,
+    `→ 這一輪的 /api/ 請求：${cloud.apiRequests.join(', ') || '（一個都沒有！監看器可能壞了）'}`
+  );
+
   const local = await runResultFlow('local_only');
 
   await shot('02-local-result');
@@ -449,18 +543,119 @@ try {
   // ★ 這條是本輪真正的重點，而且**與 OCR 無關** ——
   //   不管有沒有到結果頁，只要卡片真的渲染，它就有可能去呼叫出題端點。
   //   零請求 ＝ 閘門有效。
+  /**
+   * ★★ 2026-10-07：斷言從「零 `/api/quiz-*`」**擴大成「零 `/api/*`」**。
+   *
+   * 【為什麼範圍變大】
+   *   以前 local_only 仍然會打兩個端點（`/api/ai-status` 與
+   *   `/api/analyze-label`），所以只能斷言「零 quiz 請求」。
+   *   2026-10-07 起那個模式真的完全不連網（規則引擎搬到裝置上，
+   *   `ai-status` 也不再查），所以斷言可以是**整個 `/api/` 都沒有**。
+   *
+   * ★ 這是「只在本機」這個名字能不能當事實講的分界線。
+   */
   check(
-    '★ local_only 時零 /api/quiz-* 請求（同意閘門有效）',
-    local.quizRequests.length === 0,
-    local.quizRequests.join(', ')
+    '★★ local_only 時零 /api/* 請求（整個模式完全不連網）',
+    local.apiRequests.length === 0,
+    local.apiRequests.join(', ')
   );
 
-  // 把允許的既有請求印出來，讓「範圍界定」透明（見檔頭說明）
+  /**
+   * ★★ 防「零請求是假通過」：分析流程必須**真的跑過**。
+   *
+   * 若停在 `'pending'`（逾時、引擎沒載入、選單沒點到），
+   * 那零請求只是「什麼都沒發生」的同義詞，不代表離線引擎可用。
+   */
+  check(
+    '★★ local_only 的分析流程真的跑過（不是因為什麼都沒發生才零請求）',
+    local.finalState !== 'pending',
+    `finalState = ${local.finalState}（'pending' ＝ 逾時，零請求是假通過）`
+  );
+  console.log(`   ℹ️  local_only 那一輪最後停在：${local.finalState}`);
+
+  // 把這一輪的請求印出來（預期是空的，不是空的就是上面那條斷言會抓）
   console.log(
-    `   ℹ️  這一輪的 /api/ 請求（既有、非本功能）：${
+    `   ℹ️  這一輪的 /api/ 請求：${
       local.apiRequests.length ? local.apiRequests.join(', ') : '（無）'
     }`
   );
+
+  /* ══════════════════════════════════════════════════════════════════════
+   * ★★★ 斷網實測：把網路真的切掉，再跑一次離線引擎
+   * ══════════════════════════════════════════════════════════════════════
+   * 【為什麼這一條比前面所有斷言都重要】
+   *   「零請求」只證明**沒有發出去**；它不證明「斷網時還算得出來」。
+   *   這兩件事不一樣 —— 例如把整個分析功能刪掉，也是零請求。
+   *
+   *   而「只在本機」真正的承諾是：**在沒有訊號的地下超市也能用**。
+   *   所以這裡用 CDP 把網路設成 offline，然後直接呼叫那條路徑。
+   *
+   * ⚠️ 先驗「網路真的斷了」（對照組）—— 否則如果 offline 沒生效，
+   *    這條測試會在「其實有網路」的情況下通過，變成假通過。
+   */
+  console.log('\n── ★★★ 斷網實測（CDP 把網路設成 offline）──');
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: true,
+    latency: 0,
+    downloadThroughput: 0,
+    uploadThroughput: 0,
+  });
+  try {
+    const netState = await cdp.eval(`
+      (async () => {
+        try {
+          await fetch(${JSON.stringify(BASE)} + '/api/health', { cache: 'no-store' });
+          return 'still-online';
+        } catch { return 'offline'; }
+      })()
+    `);
+    check('★ 對照組：網路確實已斷（offline 有生效）', netState === 'offline', `實際 ${netState}`);
+
+    /**
+     * 直接呼叫「只在本機」走的那一支函式 —— 與 APK 裡完全同一條路徑。
+     * ⚠️ 用高鈉標籤（2350mg）＋高血壓，期望**紅燈**：
+     *    這是「斷網下還能不能給出正確結論」的最小可證偽命題。
+     */
+    const raw = await cdp.eval(`
+      (async () => {
+        const mod = await import('/server/localAnalysis.ts');
+        const r = mod.analyzeLabelLocally({
+          ocrText: ${JSON.stringify(
+            '營養標示\n每一份量 100 公克\n本包裝含 1 份\n熱量 450 大卡\n蛋白質 9 公克\n' +
+              '脂肪 18 公克\n飽和脂肪 9 公克\n反式脂肪 0 公克\n碳水化合物 62 公克\n糖 28 公克\n鈉 2350 毫克'
+          )},
+          conditions: ['高血壓'],
+          profileId: 'senior',
+          language: 'zh-TW',
+        });
+        return JSON.stringify({
+          risk: r.risk_level,
+          mode: r.analysis_mode,
+          handling: r.data_handling,
+          reminders: (r.condition_reminders || []).length,
+          facts: (r.nutrient_facts || []).length,
+        });
+      })()
+    `);
+    const r = JSON.parse(raw);
+    check(
+      '★★★ 斷網下仍算出正確結論（高鈉 2350mg ＋ 高血壓 → 紅燈）',
+      r.risk === 'red',
+      `實際 risk_level = ${r.risk}`
+    );
+    check('★ 斷網下的結果標記為 local_fallback', r.mode === 'local_fallback', `實際 ${r.mode}`);
+    check('★ 斷網下的隱私標記為 local_only', r.handling === 'local_only', `實際 ${r.handling}`);
+    check('★ 斷網下慢性病提醒仍產生（1 條）', r.reminders === 1, `實際 ${r.reminders}`);
+    check('★ 斷網下百分比資料仍產生（長條圖用）', r.facts > 0, `實際 ${r.facts} 筆`);
+  } finally {
+    // 一定要還原，否則後面的檢查全部會因為「沒網路」而失敗
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
+  }
 
   if (local.reached) {
     const localExists = await cdp.eval(`!!document.getElementById('learn-card')`);

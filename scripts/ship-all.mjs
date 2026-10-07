@@ -182,6 +182,8 @@ if (!SKIP_CHECKS) {
     'check-prompt-privacy',
     // 線上題庫同步層（2026-10-07 第二階段）
     'check-quiz-sync',
+    // 離線分析三方差異（2026-10-07）
+    'check-offline-parity',
   ];
   for (const c of checks) {
     run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]) === 0

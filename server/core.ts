@@ -58,7 +58,9 @@ import {
   SeniorPhysicalIndicators,
   NutrientFact,
   NutrientBasis,
-  LabelAnalysisResult,
+  // ⚠️ 2026-10-07：`LabelAnalysisResult` 已移除 ——
+  //    它唯一的用途是 `buildOcrFailedResult` 的回傳型別，
+  //    而那個函式已搬到 `./localAnalysis`。
   DataHandling,
   LearnerProfile,
 } from '../src/types';
@@ -1402,21 +1404,20 @@ export function ensureEducationFields(
 export const ADDRESS_RULE = `\n\n【怎麼稱呼使用者 — 這是最優先規則】\n你不知道使用者的性別與稱謂，請用中性的「您好」，**不要加任何稱謂**（不要寫先生、小姐、阿公、阿婆）。\n絕對不可以使用 阿公、阿伯、爺爺、奶奶、阿婆、阿姨 等任何長輩稱呼。\n「你」一律寫成「您」。`;
 
 /**
- * 難字簡化要處理的欄位（2026-09-30）。
+ * ⚠️ 2026-10-07：`NUTRIENT_WORDING_FIELDS` 與 `buildOcrFailedResult` 已搬到
+ * `./localAnalysis`（本機離線分析路徑）。
  *
- * ⚠️ **刻意不含 `ingredients_detected`** —— 那是「標籤上的原文」，
- *    使用者要拿去和包裝對照，改了就不是原文了。
- *    而且它還被用來判斷標籤語言與取出食品品名，改動會連帶影響紀錄。
+ * 【為什麼要搬】
+ *   那個模組要能被**打包進瀏覽器**（讓「只在本機」模式真的零網路請求），
+ *   而這個檔案開頭有 `import { createHash } from 'node:crypto'` ——
+ *   整支檔案進不了前端。所以「前端也需要」的東西必須離開這裡。
+ *
+ * ★ 這裡保留**再匯出**，是為了不動既有的 import 圖
+ *   （`handlers.ts`、`scripts/check-i18n-leaks.ts`、`scripts/check-analysis-mode.ts`
+ *    都還是從 `./core` 取用）。搬檔案不該讓呼叫端跟著改 ——
+ *   那正是本專案反覆踩到的「改了 A 忘了 B」。
  */
-export const NUTRIENT_WORDING_FIELDS = [
-  'warning_title',
-  'plain_summary',
-  'alternative_advice',
-  'knowledge_point',
-  'label_reading_tip',
-  'daily_limit_context',
-  'nutrition_concerns',
-] as const;
+export { buildOcrFailedResult, NUTRIENT_WORDING_FIELDS, QA_TEXT_FIELDS } from './localAnalysis';
 
 /** 生理指標分析結果的文字欄位（不含巢狀的 supermarket_rules，另外處理） */
 export const INDICATOR_TEXT_FIELDS = [
@@ -1433,7 +1434,8 @@ export const INDICATOR_TEXT_FIELDS = [
  *    （原本這份清單是給「稱謂後處理」用的，2026-10-02 稱謂機制移除後
  *      只剩難字簡化在用，但這條排除規則依然成立：使用者的話一個字都不動。）
  */
-export const QA_TEXT_FIELDS = ['key_takeaway', 'answer', 'safe_tips', 'voice_script'] as const;
+// ⚠️ 2026-10-07：`QA_TEXT_FIELDS` 也搬到 `./localAnalysis` 了
+//    （前端要打包它，見該檔說明）。再匯出在上方，與其他兩個常數同一行。
 
 /**
  * 生理指標結果的後處理（含 supermarket_rules 的兩個陣列）。
@@ -1475,41 +1477,8 @@ export function applyIndicatorPostprocessing(
  *   誠實說「看不清楚、請重拍」遠比給一個憑空捏造的結論安全。
  *   這是本專案最重要的一條安全原則：**寧可說不知道，也不要說錯。**
  */
-export function buildOcrFailedResult(
-  learnerProfile: LearnerProfile,
-  ocr: Pick<OcrRecognitionResult, 'matchedFields'>,
-  /**
-   * 輸出語言。⚠️ 這條路徑**兩條模式都會走到**（雲端／本機），
-   * 而且它不經過 AI，是後端直接寫死的字串 ——
-   * 漏帶語言的話，英文介面會整段中文（這是實測抓到的洩漏）。
-   */
-  language: 'zh-TW' | 'en' = 'zh-TW'
-): LabelAnalysisResult {
-  const en = language === 'en';
-  return {
-    risk_level: 'yellow',
-    warning_title: en ? '🔍 Cannot read the label numbers' : '🔍 看不清楚標籤數字',
-    plain_summary: en
-      ? 'Sorry, this photo is too blurry to read the nutrition numbers on the label, so I cannot make a judgement. Could you hold the phone closer, fill the frame with the "Nutrition Facts" table, and take another photo in better light?'
-      : '不好意思，這張照片看不清楚標籤上的營養數字，我沒有辦法判斷。請把手機拿近一點，讓「營養標示」的表格填滿畫面，光線充足一點，再拍一次好嗎？',
-    alternative_advice: en
-      ? 'Photo tips: ① flatten the packaging ② hold the phone about 15 cm away ③ avoid glare from overhead lights.'
-      : '拍照小技巧：① 把包裝拉平 ② 手機距離約 15 公分 ③ 避開頭頂燈光的反光。',
-    ingredients_detected: [],
-    nutrition_concerns: [],
-    matched_conditions: [],
-    // 空陣列而不是省略：讓前端明確知道「沒有百分比資料」，不會誤畫長條圖
-    nutrient_facts: [],
-    ocr_failed: true,
-    ocr_matched_fields: ocr.matchedFields,
-    analysis_mode: 'local_fallback',
-    learner_profile_id: learnerProfile.id,
-    // ⚠️ 後端也要輸出對應語言的身分名稱。
-    //    前端目前用自己的 state 顯示（已本地化），但 API 回應本身
-    //    不該在中英文模式下都回中文 —— 那等於埋一顆地雷給下一個接手的人。
-    learner_profile_name: profileName(learnerProfile.id, learnerProfile.name, language),
-  };
-}
+// ⚠️ 2026-10-07：`buildOcrFailedResult` 已搬到 `./localAnalysis`（見上方說明）。
+//    它原本住在這裡，但「只在本機」模式要在瀏覽器裡直接呼叫它。
 
 // 核心食品標籤分析 API (中轉後端 Backend Proxy)
 //
