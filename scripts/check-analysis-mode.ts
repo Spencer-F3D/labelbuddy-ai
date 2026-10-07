@@ -239,6 +239,37 @@ try {
     privacy?.imageNeverLeavesDevice === undefined
   );
 
+  /**
+   * ★★ 2026-10-07 新增：`local_only` 不得再宣稱「完全不連網」。
+   *
+   * 【為什麼要驗這一條】
+   *   實測 `local_only` 仍會發兩個請求到**我們自己的 Worker**
+   *   （`/api/ai-status` 與 `/api/analyze-label`，後者帶 `localOnly: true`）。
+   *   兩者都不轉送到 AI 供應商 —— 隱私承諾本身成立 ——
+   *   但「完全不上網」是**可被實測推翻的敘述**，
+   *   而評審（與使用者）真的會去驗。
+   *
+   *   這一條是**防止文案回歸**：只要有人把「完全不上網」寫回去就會失敗。
+   */
+  const localName = String(modes.local_only?.name ?? '');
+  const localDesc = String(modes.local_only?.description ?? '');
+  check(
+    '★ local_only 的名稱不再宣稱「完全不上網」',
+    !/完全不上網|完全不上網|no internet at all/i.test(localName),
+    `→ ${localName}`
+  );
+  check(
+    '★ local_only 的描述不再宣稱「照片與文字都留在裝置上」',
+    !/照片與文字都留在裝置上/.test(localDesc),
+    `→ ${localDesc.slice(0, 60)}`
+  );
+  check(
+    '★ /api/privacy 有 providerBoundaryNote（說清「上傳」指送到 AI 供應商）',
+    typeof privacy?.providerBoundaryNote === 'string' &&
+      /AI 供應商/.test(privacy.providerBoundaryNote),
+    `→ ${String(privacy?.providerBoundaryNote ?? '').slice(0, 50)}`
+  );
+
   console.log('\n── 3. 難字簡化：片語要換，化學名稱不能動 ──');
   const { simplifyNutrientWording } = await import('../src/data/bilingual');
 

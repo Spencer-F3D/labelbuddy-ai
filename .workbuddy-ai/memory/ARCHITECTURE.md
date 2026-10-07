@@ -183,11 +183,19 @@ footer 的 CTA 分支（`activeTab === 'xxx' ? ... : ...` 鏈）。漏掉 footer
 
 `AnalysisMode = 'cloud_image' | 'cloud_text' | 'local_only'`（定義在 `src/types.ts`）
 
-| 模式 | 前端做什麼 | 送出去的內容 | 後端引擎 |
-| --- | --- | --- | --- |
-| `cloud_image`（預設） | 只壓縮，**不跑 OCR** | 照片 ＋ 慢性病清單 | 雲端視覺模型 |
-| `cloud_text` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | 雲端文字模型 |
-| `local_only` | 跑 OCR | **什麼都不送** | 本機規則引擎 |
+| 模式 | 前端做什麼 | 送到**本服務 Worker** | 轉送到 **AI 供應商** | 後端引擎 |
+| --- | --- | --- | --- | --- |
+| `cloud_image`（預設） | 只壓縮，**不跑 OCR** | 照片 ＋ 慢性病清單 | 照片 ＋ 慢性病清單 | 雲端視覺模型 |
+| `cloud_text` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | OCR 文字 ＋ 慢性病清單 | 雲端文字模型 |
+| `local_only` | 跑 OCR | OCR 文字 ＋ 慢性病清單 | **無** | 本機規則引擎（在 Worker 上跑） |
+
+★★ **2026-10-07 更正：`local_only` 不是「什麼都不送」。**
+它會發兩個請求到**我們自己的 Worker**：
+`GET /api/ai-status`（掛載時，判斷雲端 AI 是否可用）與
+`POST /api/analyze-label`（帶 `localOnly: true`，OCR 文字由此送入離線規則引擎）。
+**兩者都不會轉送到任何 AI 供應商** —— 隱私承諾本身成立，
+但「完全不連網」這句敘述是**可被實測推翻的**，所以全面改成
+「**不送到 AI 供應商**」。`/api/privacy` 另加 `providerBoundaryNote` 說明這個邊界。
 
 ★ 本機規則引擎 = `src/utils/smartNutritionAnalyzer.ts`（純函式、離線、不花額度）。
 

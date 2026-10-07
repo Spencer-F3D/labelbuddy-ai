@@ -39,7 +39,11 @@ export const MODE_LABEL_KEY: Record<AnalysisMode, TranslationKey> = {
  *   → 另外定義一組**四個字以內**的短標籤，語意維持一致。
  *
  * ★ 選字刻意對齊「隱私行為」而不是「技術名稱」：
- *   `只送文字` 直接說明照片留在本機；`只在本機` 說明完全不連網。
+ *   `只送文字` 直接說明照片留在本機；`只在本機` 說明**不會送到 AI 供應商**。
+ *
+ * ⚠️ 2026-10-07 更正：`只在本機` 原本寫「完全不連網」——那是錯的。
+ *    它仍會發兩個請求到**我們自己的伺服器**（`/api/ai-status` 與 `/api/analyze-label`），
+ *    只是不轉送到任何 AI 供應商。文案改成「不會送到 AI 供應商」才與程式行為相符。
  *   使用者看這個標籤是在確認「我的照片有沒有被傳出去」。
  */
 export const MODE_CHIP_KEY: Record<AnalysisMode, TranslationKey> = {

@@ -903,16 +903,35 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
       },
       local_only: {
         id: 'local_only',
-        name: '只在本機（完全不上網）',
+        name: '只在本機（不送到 AI 供應商）',
         uploadsImage: false,
         uploadsOcrText: false,
         uploadsHealthInfo: false,
         requiresConsent: false,
         engine: '瀏覽器內建 OCR（tesseract.js）+ 本機食育規則引擎',
         description:
-          '照片與文字都留在裝置上，由本機規則引擎判斷，不呼叫任何外部服務。身體指標與健康問答同樣不會上傳。',
+          '照片不會離開裝置。讀出的文字會送到本服務的伺服器，由離線規則引擎判斷後回傳結果 —— 不經過任何 AI 供應商，伺服器也不保存內容。身體指標與健康問答同樣不會送到 AI。',
       },
     },
+    /**
+     * ★ 2026-10-07 新增：「上傳」這個詞的邊界，一次講清楚。
+     *
+     * 【為什麼一定要寫這一段】
+     *   上面三個 `uploads*` 旗標指的是「有沒有送到 **AI 供應商**」，
+     *   **不是**「有沒有離開裝置」。原本的文案把兩者混為一談，
+     *   於是 `local_only` 被寫成「完全不上網」——
+     *   但實際上它會發兩個請求到**我們自己的伺服器**：
+     *     · `GET /api/ai-status`（App 掛載時，判斷雲端 AI 是否可用）
+     *     · `POST /api/analyze-label`（帶 `localOnly: true`，OCR 文字由此送入本機引擎）
+     *   兩者都不會轉送到任何 AI 供應商，所以隱私承諾本身成立；
+     *   但「完全不上網」這句話**與程式行為不符**。
+     *
+     *   ⚠️ 這種不一致比單純寫得不夠詳細更危險：
+     *      它是可以被實測推翻的敘述。寧可把邊界講清楚，
+     *      也不要留一句聽起來很強、但一驗就破的保證。
+     */
+    providerBoundaryNote:
+      '本頁的「上傳」一律指**送到 AI 供應商**（Gemini／OpenRouter）。三種模式的請求都會先經過本服務的伺服器；「只在本機」模式由伺服器的離線規則引擎判斷，不轉送任何 AI 供應商，也不保存內容。',
     serverPolicy: {
       storesImages: false,
       storesResults: false,

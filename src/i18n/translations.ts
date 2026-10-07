@@ -249,8 +249,12 @@ const zhTW = {
   'mode.cloudTextNote': '手機先把照片讀成文字，只把文字送給 AI。',
   'mode.cloudTextData': '上傳：標籤與病史',
   'mode.localOnly': '只在本機',
-  'mode.localOnlyNote': '完全不上網，最快也最私密，但建議比較簡單。',
-  'mode.localOnlyData': '不上傳任何資料',
+  /* ★ 2026-10-07 修正：原本寫「完全不上網」「不上傳任何資料」——
+     但實測它會發兩個請求到**我們自己的伺服器**（/api/ai-status 與 /api/analyze-label）。
+     兩者都不轉送到 AI 供應商，所以承諾成立；但「完全不上網」是可被實測推翻的敘述。
+     → 改成把邊界講清楚：**不送到 AI 供應商**。 */
+  'mode.localOnlyNote': '不會送到 AI 供應商，最快也最私密，但建議比較簡單。',
+  'mode.localOnlyData': '不會送到 AI 供應商（文字在本服務伺服器上判斷）',
   'mode.changeLater': '之後可以在設定裡隨時改，不用重來。',
   'mode.savedVoice': '已切換為「{mode}」',
   'mode.currentLabel': '目前的方式',
@@ -1002,8 +1006,8 @@ const en: Record<TranslationKey, string> = {
   'mode.cloudTextNote': 'Your phone turns the photo into text first; only the text is sent.',
   'mode.cloudTextData': 'Uploads: text + health info',
   'mode.localOnly': 'On-device only',
-  'mode.localOnlyNote': 'No internet at all — fastest and most private, but simpler advice.',
-  'mode.localOnlyData': 'Uploads nothing',
+  'mode.localOnlyNote': 'Nothing reaches an AI provider — fastest and most private, but simpler advice.',
+  'mode.localOnlyData': 'Nothing is sent to an AI provider (text is judged on our own server)',
   'mode.changeLater': 'You can change this in Settings later — no need to start over.',
   'mode.savedVoice': 'Switched to {mode}',
   'mode.currentLabel': 'Current mode',

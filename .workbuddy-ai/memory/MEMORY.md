@@ -63,8 +63,12 @@
 文案）→ 先排除明確拒絕字眼再判斷正向字眼。
 
 ## 🔒 隱私架構與 AI 三模式
-`cloud_image` 照片上傳／`cloud_text` 只送 OCR 文字／`local_only` 完全不連網（資料流見
-`ARCHITECTURE.md`）。★ 文案一律**逐模式陳述**（「照片永遠不離開裝置」已不是通則）。
+`cloud_image` 照片上傳／`cloud_text` 只送 OCR 文字／`local_only` **不送到 AI 供應商**
+（資料流見 `ARCHITECTURE.md`）。★ 文案一律**逐模式陳述**（「照片永遠不離開裝置」已不是通則）。
+★★ **「上傳」一律指「送到 AI 供應商」** —— 三種模式的請求都會先經過**我們自己的 Worker**；
+`local_only` 仍會打 `/api/ai-status` 與 `/api/analyze-label`（帶 `localOnly:true`）。
+**不要再寫「完全不連網」**（2026-10-07 更正）：那是可被實測推翻的敘述。
+`/api/privacy` 新增 `providerBoundaryNote` 把這個邊界講清楚。
 ★★ **任何「會呼叫雲端」的功能都要有同意閘門**（**兩道防線**：前端傳 `localOnly`、後端真的檢查）
 —— 現有 `/api/analyze-label`、`/api/ask-health-question`、`/api/fitness-report`。
 **新增雲端端點時務必回頭檢查這一條。**
