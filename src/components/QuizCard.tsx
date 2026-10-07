@@ -122,7 +122,13 @@ export function QuizCard({
                   ['A', 'B', 'C'][i] ?? i + 1
                 )}
               </span>
-              <span className="text-[18px] font-bold text-slate-800 leading-snug">{opt}</span>
+              {/* ⚠️ `flex-1 min-w-0` 讓文字**用滿剩餘寬度**（預設的 flex item 會依內容
+                  寬度排版，在窄容器裡更容易斷出孤行）；`[text-wrap:balance]` 再把兩行
+                  拉平均 —— 實測結果頁的「約 400 公克鹽」在 22px 下會斷成「鹽」單獨一行。
+                  ⚠️ 這兩個 class 是成對的：只加 balance 而沒有 flex-1，可用寬度不變。 */}
+              <span className="flex-1 min-w-0 text-[18px] font-bold text-slate-800 leading-snug [text-wrap:balance]">
+                {opt}
+              </span>
             </button>
           );
         })}

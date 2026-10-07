@@ -242,7 +242,14 @@ export const LearnFromScanCard: React.FC<LearnFromScanCardProps> = ({
             <p className={`${TYPE.body} ${WEIGHT.strong}`} style={{ color: TONES.action.text }}>
               {knowledgeCard.title}
             </p>
-            <p className={`${TYPE.body} ${WEIGHT.normal} leading-snug`} style={{ color: TONES.action.text }}>
+            {/* ⚠️ `[text-wrap:balance]` 是必要的，不是裝飾：
+                實測（`npm run check:layout --lang=zh-TW`）「泡麵一整包，常常就是一整天的鹽」
+                在長者字級（19px）＋這個框寬下會斷成「…的鹽」——末行只剩 2 字，是孤行。
+                本專案的既有規則：**中文孤行要用 `balance`，`text-wrap:pretty` 對中文無效**。 */}
+            <p
+              className={`${TYPE.body} ${WEIGHT.normal} leading-snug [text-wrap:balance]`}
+              style={{ color: TONES.action.text }}
+            >
               {knowledgeCard.headline}
             </p>
             <div className="flex flex-col gap-[6px]">
