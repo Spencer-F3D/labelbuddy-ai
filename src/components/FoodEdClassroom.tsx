@@ -53,6 +53,9 @@ import { speakText, stopSpeech, ttsLanguageFor } from '../utils/tts';
 // ⚠️ 教材與外框必須一起雙語，否則會變成「英文外殼 + 中文內容」
 import { useI18n } from '../i18n/I18nContext';
 import { localizeCard, localizeQuestion } from '../data/educationContentEn';
+// 單題測驗卡（2026-10-07 抽出）：結果頁的「學一個小知識」也用它，
+// 兩邊共用同一份，避免答題介面在兩個地方長得不一樣。
+import { QuizCard } from './QuizCard';
 import { topicLabel, profileDisplayName } from '../data/bilingualContent';
 
 export const LEARNING_PROGRESS_KEY = 'labelbuddy_learning_progress_v1';
@@ -208,111 +211,6 @@ function KnowledgeCardView({
         </div>
       )}
     </article>
-  );
-}
-
-/* ---------------------------------------------------------------------------
- * 單題測驗
- * ------------------------------------------------------------------------- */
-
-function QuizCard({
-  question,
-  index,
-  total,
-  onAnswer,
-}: {
-  question: QuizQuestion;
-  index: number;
-  total: number;
-  onAnswer: (selectedIndex: number) => void;
-}) {
-  const { t, language } = useI18n();
-  const [selected, setSelected] = useState<number | null>(null);
-  const answered = selected !== null;
-  const isCorrect = answered && selected === question.correctIndex;
-
-  return (
-    <div className="rounded-2xl bg-white border-3 border-slate-300 p-4">
-      {/* 題號 */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="bg-blue-900 text-white text-[16px] font-black px-3 py-1 rounded-full">
-          {t('classroom.questionOf', { i: index + 1, n: total })}
-        </span>
-        <span className="text-[16px] font-bold text-slate-500">
-          {topicLabel(question.topic, TOPIC_LABELS[question.topic], language)}
-        </span>
-      </div>
-
-      {/* 題目 */}
-      <p className="text-[20px] font-bold text-slate-900 leading-relaxed mb-4">
-        {question.question}
-      </p>
-
-      {/* 選項 */}
-      <div className="space-y-2.5">
-        {question.options.map((opt, i) => {
-          const isThis = selected === i;
-          const isAnswer = i === question.correctIndex;
-
-          let style = 'bg-slate-50 border-slate-300 hover:bg-slate-100';
-          if (answered) {
-            if (isAnswer) {
-              style = 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-400';
-            } else if (isThis) {
-              style = 'bg-rose-50 border-rose-600 ring-2 ring-rose-400';
-            } else {
-              style = 'bg-slate-50 border-slate-200 opacity-60';
-            }
-          }
-
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={answered}
-              onClick={() => {
-                setSelected(i);
-                onAnswer(i);
-              }}
-              className={`w-full min-h-[64px] text-left rounded-xl border-3 px-4 py-3 flex items-center gap-3 transition-all ${
-                answered ? '' : 'cursor-pointer active:scale-[0.98]'
-              } ${style}`}
-            >
-              <span className="w-9 h-9 rounded-full bg-white border-2 border-slate-400 flex items-center justify-center text-[18px] font-black shrink-0">
-                {answered && isAnswer ? (
-                  <Check className="w-5 h-5 text-emerald-700" />
-                ) : answered && isThis ? (
-                  <X className="w-5 h-5 text-rose-700" />
-                ) : (
-                  ['A', 'B', 'C'][i] ?? i + 1
-                )}
-              </span>
-              <span className="text-[18px] font-bold text-slate-800 leading-snug">{opt}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 解說 */}
-      {answered && (
-        <div
-          className={`mt-3 rounded-xl border-2 p-3 ${
-            isCorrect
-              ? 'bg-emerald-50 border-emerald-500'
-              : 'bg-amber-50 border-amber-500'
-          }`}
-        >
-          <p
-            className={`text-[18px] font-black mb-1 ${
-              isCorrect ? 'text-emerald-800' : 'text-amber-800'
-            }`}
-          >
-            {isCorrect ? t('classroom.correct') : t('classroom.wrongHint')}
-          </p>
-          <p className="text-[16px] leading-relaxed text-slate-800">{question.explanation}</p>
-        </div>
-      )}
-    </div>
   );
 }
 
