@@ -39,7 +39,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '高血壓',
     category: 'cardio',
     description: '把關食品鈉含量與鹽分，預防血壓飆高及中風風險（少鹽、少味精）',
-    targetNutrients: ['鈉 (Sodium)', '食鹽', '味精 (L-麩酸鈉)', '高鈉醬油', '小蘇打'],
+    targetNutrients: ['鈉 (Sodium)', '食鹽 (Table salt)', '味精/L-麩酸鈉 (MSG)', '高鈉醬油 (High-sodium soy sauce)', '小蘇打 (Baking soda)'],
     defaultChecked: true,
   },
   {
@@ -47,7 +47,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '糖尿病',
     category: 'metabolic',
     description: '把關精緻糖、麥芽糊精與高 GI 碳水化合物，防止飯後血糖劇烈波動',
-    targetNutrients: ['添加糖 (Added Sugars)', '高果糖玉米糖漿', '麥芽糖', '葡萄糖', '精緻澱粉'],
+    targetNutrients: ['添加糖 (Added Sugars)', '高果糖玉米糖漿 (High-fructose corn syrup)', '麥芽糖 (Maltose)', '葡萄糖 (Glucose)', '精緻澱粉 (Refined starch)'],
     defaultChecked: true,
   },
   {
@@ -55,7 +55,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '高血脂',
     category: 'cardio',
     description: '把關飽和脂肪、反式脂肪與膽固醇，預防動脈硬化與心血管堵塞',
-    targetNutrients: ['飽和脂肪 (Saturated Fat)', '反式脂肪 (Trans Fat)', '棕櫚油', '人造奶油', '氫化植物油'],
+    targetNutrients: ['飽和脂肪 (Saturated Fat)', '反式脂肪 (Trans Fat)', '棕櫚油 (Palm oil)', '人造奶油 (Margarine)', '氫化植物油 (Hydrogenated vegetable oil)'],
     defaultChecked: true,
   },
   {
@@ -63,7 +63,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '痛風',
     category: 'metabolic',
     description: '把關高普林成分（濃縮高湯、動物內臟抽出物、酵母）與果糖，預防痛風發作',
-    targetNutrients: ['高普林 (Purine)', '果糖 (Fructose)', '酵母抽出物', '濃縮高湯粉', '肉精膏'],
+    targetNutrients: ['高普林 (Purine)', '果糖 (Fructose)', '酵母抽出物 (Yeast extract)', '濃縮高湯粉 (Concentrated stock powder)', '肉精膏 (Meat extract paste)'],
     defaultChecked: false,
   },
   {
@@ -71,7 +71,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '腎臟病',
     category: 'organ',
     description: '嚴格把關鈉、鉀、無機磷酸鹽（加工防腐劑/品質改良劑）與過量蛋白質負荷',
-    targetNutrients: ['多磷酸鹽/焦磷酸鈉', '高鉀鹽', '高鈉', '高蛋白負荷'],
+    targetNutrients: ['多磷酸鹽/焦磷酸鈉 (Polyphosphates / sodium pyrophosphate)', '高鉀鹽 (High-potassium salt)', '高鈉 (High sodium)', '高蛋白負荷 (High protein load)'],
     defaultChecked: false,
   },
   {
@@ -79,7 +79,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '心血管疾病',
     category: 'cardio',
     description: '排查反式脂肪酸、重油重鹽及加工紅肉亞硝酸鹽，維護心臟與微血管彈性',
-    targetNutrients: ['反式脂肪', '重度加工鹽', '亞硝酸鹽 (加工肉)', '精煉棕櫚油'],
+    targetNutrients: ['反式脂肪 (Trans fat)', '重度加工鹽 (Heavily processed salt)', '亞硝酸鹽 (Nitrite)', '精煉棕櫚油 (Refined palm oil)'],
     defaultChecked: false,
   },
   {
@@ -87,7 +87,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '胃食道逆流',
     category: 'digestive',
     description: '排查辛辣刺激（辣椒、黑胡椒）、高酸度（檸檬酸）、咖啡因、薄荷及油膩油炸',
-    targetNutrients: ['辣椒素 (Capsaicin)', '高濃度咖啡因', '濃檸檬酸', '薄荷腦', '重度油炸'],
+    targetNutrients: ['辣椒素 (Capsaicin)', '高濃度咖啡因 (High-dose caffeine)', '濃檸檬酸 (Concentrated citric acid)', '薄荷腦 (Menthol)', '重度油炸 (Deep-fried)'],
     defaultChecked: false,
   },
   {
@@ -95,7 +95,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '骨質疏鬆',
     category: 'organ',
     description: '評估鈣質成分，警示過量碳酸飲料、多磷酸鹽與重鹽加速體內鈣質流失',
-    targetNutrients: ['碳酸/磷酸 (Phosphoric Acid)', '超量鈉鹽 (加速排鈣)', '無機磷添加物'],
+    targetNutrients: ['碳酸/磷酸 (Phosphoric Acid)', '超量鈉鹽 (Excess salt)', '無機磷添加物 (Inorganic phosphate additives)'],
     defaultChecked: false,
   },
   {
@@ -103,7 +103,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '花生過敏',
     category: 'allergen',
     description: '清查花生、堅果與產線交叉污染警示',
-    targetNutrients: ['花生 (Peanuts)', '核桃/腰果/杏仁 (Tree Nuts)', '花生油脂'],
+    targetNutrients: ['花生 (Peanuts)', '核桃/腰果/杏仁 (Tree Nuts)', '花生油脂 (Peanut oil)'],
     defaultChecked: false,
   },
   {
@@ -111,7 +111,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '海鮮過敏',
     category: 'allergen',
     description: '清查蝦蟹、貝類、魚類及魚露蝦醬',
-    targetNutrients: ['蝦蟹甲殼類 (Crustacean)', '魚類 (Fish)', '貝類 (Mollusks)', '蝦醬/魚露'],
+    targetNutrients: ['蝦蟹甲殼類 (Crustacean)', '魚類 (Fish)', '貝類 (Mollusks)', '蝦醬/魚露 (Shrimp paste / fish sauce)'],
     defaultChecked: false,
   },
   {
@@ -119,7 +119,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '乳糖不耐',
     category: 'allergen',
     description: '清查牛奶、乳清蛋白、酪蛋白與奶油',
-    targetNutrients: ['乳糖 (Lactose)', '全脂/脫脂奶粉', '乳清蛋白 (Whey)', '酪蛋白 (Casein)'],
+    targetNutrients: ['乳糖 (Lactose)', '全脂/脫脂奶粉 (Whole / skim milk powder)', '乳清蛋白 (Whey)', '酪蛋白 (Casein)'],
     defaultChecked: false,
   },
   {
@@ -150,7 +150,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '脂肪肝',
     category: 'other',
     description: '把關精緻糖、果糖與飽和脂肪，避免肝臟堆積過多油脂',
-    targetNutrients: ['添加糖 (Added Sugars)', '高果糖玉米糖漿', '飽和脂肪 (Saturated Fat)'],
+    targetNutrients: ['添加糖 (Added Sugars)', '高果糖玉米糖漿 (High-fructose corn syrup)', '飽和脂肪 (Saturated Fat)'],
     defaultChecked: false,
   },
   {
@@ -158,7 +158,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '心臟衰竭',
     category: 'other',
     description: '嚴格把關鈉含量與湯汁，避免水分滯留加重心臟負擔',
-    targetNutrients: ['鈉 (Sodium)', '高鈉醬油', '濃縮湯汁'],
+    targetNutrients: ['鈉 (Sodium)', '高鈉醬油 (High-sodium soy sauce)', '濃縮湯汁 (Concentrated broth)'],
     defaultChecked: false,
   },
   {
@@ -190,7 +190,7 @@ export const PHYSICAL_INDICATORS: ChronicCondition[] = [
     name: '偏頭痛',
     category: 'other',
     description: '排查味精、酪胺酸（熟成起司、紅酒）與咖啡因等常見誘發因子',
-    targetNutrients: ['味精 (L-麩酸鈉)', '酪胺酸 (Tyramine)', '咖啡因 (Caffeine)'],
+    targetNutrients: ['味精/L-麩酸鈉 (MSG)', '酪胺酸 (Tyramine)', '咖啡因 (Caffeine)'],
     defaultChecked: false,
   },
   {

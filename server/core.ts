@@ -1061,6 +1061,10 @@ CRITICAL TONE AND COMMUNICATION RULES:
    - ingredients_detected: at most 5 items, each at most 12 Chinese characters
    - nutrition_concerns: at most 3 items, each at most 15 Chinese characters
    - matched_conditions: at most 4 items, each at most 15 Chinese characters
+     ⚠️ 寫「**哪個成分**造成疑慮」（例：「鈉含量偏高」「糖分偏高」「含花生」），
+        **絕對不要寫病名**（不可以出現高血壓、糖尿病、腎臟病…等）。
+        你收到的只有「要盯緊的成分」清單，不知道使用者的病名 ——
+        寫病名等於在猜，而猜錯會被使用者當真。
 7. Write in Traditional Chinese only. Do not mix in Simplified Chinese characters (e.g. write 適 not 适, 麥 not 麦).
 
 【食育教學欄位規則 — 這個 App 不只是判斷工具，是「看得懂標籤」的教學工具】
@@ -1159,6 +1163,10 @@ OUTPUT LANGUAGE: ENGLISH (this overrides rule 1 and rule 7 above)
    - ingredients_detected: at most 5 items, each at most 4 words
    - nutrition_concerns: at most 3 items, each at most 7 words
    - matched_conditions: at most 4 items, each at most 6 words
+     ⚠️ Name the **ingredient** that raised the concern (e.g. "High sodium",
+        "High sugar", "Contains peanuts"). NEVER name a disease or medical
+        condition — you are not told which ones the user has, so naming one
+        would be a guess that the user may take as fact.
 5. For nutrient_facts.name, use the ENGLISH names given in the daily-limit list above
    (for example "Sodium", "Added sugar", "Saturated fat", "Protein", "Calcium", "Dietary fiber").
    For nutrient_facts.unit, use the English unit given in that same list (mg, g, kcal).

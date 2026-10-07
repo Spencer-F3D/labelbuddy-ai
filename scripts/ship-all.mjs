@@ -178,6 +178,8 @@ if (!SKIP_CHECKS) {
     // 「學一個小知識」的知識卡映射（2026-10-07）：
     // 映射到不存在的卡片 → 卡片靜默不出現，是 P1 規格踩過的 bug 類型
     'check-learn-mapping',
+    // 提示詞隱私（2026-10-07）：送給 AI 的是中性成分，不是病名
+    'check-prompt-privacy',
   ];
   for (const c of checks) {
     run(NODE, [path.join(ROOT, 'node_modules/tsx/dist/cli.mjs'), `scripts/${c}.ts`]) === 0

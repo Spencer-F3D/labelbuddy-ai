@@ -55,6 +55,8 @@ import { analyzeNutritionWithIndicators } from './smartNutritionAnalyzer';
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
+// ★ 2026-10-07：送給 AI 的是**中性成分約束**，不是病名（見 handleAnalyzeLabel 的說明）。
+import { buildUserConstraintLine } from './conditionConstraint';
 // 出題（2026-10-07）：「學一個小知識」的 AI 生成路徑。
 // ⚠️ 這是**會呼叫雲端**的功能，所以 handler 內必須有同意閘門（見 handleQuizQuestion）。
 import { SYSTEM_INSTRUCTION_QUIZ, buildQuizPrompt } from './quizPrompt';
@@ -62,11 +64,15 @@ import { normalizeQuizQuestion, pickBuiltinFallback } from './quizValidate';
 import { isLabelKey } from '../src/data/labelKeys';
 import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
-import { nutrientName, profileName, conditionName } from '../src/data/bilingual';
+// ⚠️ 2026-10-07：`conditionName` 已不再需要 —— 提示詞裡不再出現病名
+//    （改送中性成分約束，見 `conditionConstraint.ts`）。
+import { nutrientName, profileName } from '../src/data/bilingual';
 // 難字簡化（2026-09-30）：把說明文字裡的「鈉含量」換成「鹽分含量」等。
 // 這是最後一道後處理 —— 補的是「模型沒照提示詞用簡化名稱」的情況。
 import { simplifyNutrientWordingInFields } from '../src/data/bilingual';
-import { PHYSICAL_INDICATORS } from '../src/data/conditions';
+// ⚠️ 2026-10-07：`PHYSICAL_INDICATORS` 的匯入已移除 ——
+//    它原本只用於「把病名轉成提示詞那一行」，那段已由
+//    `expandConditionsToNutrients()` 取代（展開成中性成分）。
 // 本機引擎的英文對照（2026-09-28）：引擎本身維持中文，這裡只轉換輸出欄位。
 import { translateLocalResult } from './localEngineEn';
 import type { DataHandling, SeniorPhysicalIndicators } from '../src/types';
@@ -178,33 +184,28 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
     const nutrientDirections = getNutrientDirections(profileId);
 
     /**
-     * 慢性病名稱要依語言輸出：提示詞說 "Hypertension" 而畫面顯示「高血壓」會不一致。
+     * ★★ 2026-10-07：**病名不再進入提示詞**（使用者指定）。
      *
-     * ★ 2026-10-06 修正一個**不會報錯的 bug**：
-     *   前端送來的 `conditions` 是**中文病名**（見 App.tsx 的 `conditionNames`，
-     *   那裡刻意不隨介面語言改變，因為它同時是快取鍵的一部分）。
-     *   但這裡原本只用 `c.id === id` 查表 —— 中文病名永遠查不到，
-     *   於是 `zh` 退回原字串、`conditionName()` 也查不到英文對照，
-     *   結果**英文提示詞裡一直是中文病名**（中文介面完全看不出來）。
-     *   修法：id 與 name 都比對，再把真正的 id 交給 `conditionName()`。
+     * 【原本這裡做什麼】
+     *   把 `conditions`（前端送來的中文病名）轉成提示詞的一行：
+     *     `【使用者的慢性病史】高血壓、糖尿病`
+     *   （2026-10-06 還修過一個 bug：英文模式會拿到中文病名。）
      *
-     * ⚠️ 自填病症（「其他：XXX」）本來就不在表裡，會原樣保留 ——
-     *    那是使用者自己的資料，不是我們漏翻的文案。
+     * 【為什麼整段拿掉】
+     *   那一行是**本 App 對 AI 供應商揭露最多的一筆健康資訊**，
+     *   但它其實不是必要的 —— AI 需要知道的是「要盯哪些成分」。
+     *   改用 `buildUserConstraintLine()`：由 `conditions.ts` 現成的
+     *   `targetNutrients` 展開成中性成分清單（鈉、添加糖、花生…），
+     *   AI 仍然知道要盯什麼，但不知道使用者有什麼病。
+     *
+     * ⚠️ 這裡**不是把 2026-10-06 的修正 revert 掉** ——
+     *    是那一整段（含那個 bug）都不再需要了：
+     *    提示詞裡已經沒有任何病名要翻譯。
+     *
+     * ⚠️ 使用者看到的提醒**不受影響**：`condition_reminders` 仍由
+     *    `buildConditionReminders(conditions, language)` 在後端產生、含真病名，
+     *    與送給 AI 的內容完全無關（見下方 `attachReminders`）。
      */
-    const resolveCondition = (raw: string) =>
-      PHYSICAL_INDICATORS.find((c) => c.id === raw || c.name === raw);
-
-    const conditionText =
-      conditions.length > 0
-        ? conditions
-            .map((raw: string) => {
-              const hit = resolveCondition(raw);
-              return conditionName(hit?.id ?? raw, hit?.name ?? raw, language);
-            })
-            .join(isEnglish ? ', ' : '、')
-        : isEnglish
-          ? 'No specific chronic conditions'
-          : '無特殊慢性病史';
 
     /**
      * 附加慢性病專屬提醒。
@@ -261,8 +262,12 @@ export async function handleAnalyzeLabel(body: any, headers: Headers, deps: Core
      */
     const promptContext = isEnglish
       ? `
-[User's medical conditions] ${conditionText}
+[Ingredients to watch for] ${buildUserConstraintLine(conditions, language)}
 ${vitalText}
+
+[★ Important] The list above is derived from the user's health settings. Judge ONLY these
+ingredients. Do NOT guess or name any disease or medical condition, and never write a
+condition name in any output field.
 
 [Judge specifically from this profile's angle]
 - Key ingredients for this profile: ${learnerProfile.aiFocus}
@@ -276,8 +281,11 @@ ${vitalText}
 [General condition checklist] Hypertension (sodium), high blood sugar / diabetes (sugar and refined carbs), heart and cardiovascular (trans fats and high caffeine), high cholesterol (saturated and trans fats), gout (purines and fructose), kidney disease (sodium, potassium, phosphorus), acid reflux (spicy, acidic, irritating foods), osteoporosis (phosphates and heavy salt), fatty liver (sugar, fructose, saturated fat), heart failure (strict sodium limit), iron-deficiency anaemia (tannins and calcium block iron), constipation (too little fibre), insomnia (caffeine), migraine (MSG and tyramine), plus food allergens (peanuts, tree nuts, seafood, dairy, wheat gluten).
 If the user added their own condition (shown as "其他：<name>" / "Other: <name>"), judge it too, using general nutrition principles — and say plainly that this item was not checked against a built-in rule.`
       : `
-【使用者的慢性病史】${conditionText}
+【要盯緊的成分】${buildUserConstraintLine(conditions, language)}
 ${vitalText}
+
+【★ 重要】上面這份清單是從使用者的健康設定推導出來的。**只針對這些成分判斷**，
+不要推測使用者有什麼疾病，也不要在任何輸出欄位裡寫出病名。
 
 【請以此身分的角度特別比對】
 - 這個身分的關鍵成分：${learnerProfile.aiFocus}

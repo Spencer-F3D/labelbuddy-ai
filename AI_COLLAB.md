@@ -878,6 +878,49 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ---
 
+### [2026-10-07 19:10] 墨影（Mo）
+
+**做了什麼**：使用者指定「**改送中性成分約束**」—— 提示詞不再寫病名。
+
+| 檔案 | 動作 |
+| --- | --- |
+| `src/data/conditionNutrients.ts` | **新增**：`expandConditionsToNutrients()`（用 `conditions.ts` 現成的 `targetNutrients`） |
+| `server/conditionConstraint.ts` | **新增**：`buildUserConstraintLine()` |
+| `server/handlers.ts` | 提示詞 `【使用者的慢性病史】${conditionText}` → `【要盯緊的成分】${constraintLine}` |
+| `server/core.ts` | schema 的 `matched_conditions` 改成「寫哪個**成分**造成疑慮，**不要寫病名**」 |
+| `src/data/conditions.ts` | 補齊 `targetNutrients` 的英文名（65/65） |
+| `scripts/check-prompt-privacy.ts` | **新增**（26 項），接進 `verify:all` 與 `ship-all` |
+
+**為什麼**：`【使用者的慢性病史】高血壓、糖尿病` 是**本 App 對 AI 供應商揭露最多的
+一筆健康資訊**，但它不是必要的 —— AI 需要知道「要盯哪些成分」，不是「你得了什麼病」。
+`condition_reminders`（含真病名、給使用者看）仍由後端規則產生，**完全不受影響**。
+
+**怎麼驗證**：
+- `check:privacy` 26 項：19 項有內建規則的條件都展開得出成分／展開結果不含病名／
+  **英文模式零中文**／自填病症原樣保留且標示「無內建規則」
+- `verify:all` 全綠；`check-learn-card.mjs` 端到端 11 項全過
+- **真實 AI 實測**：`matched_conditions` 從 `["高血壓（鈉超標）",…]` 變成
+  `["鈉含量偏高","糖分偏高","含花生油香料"]` —— 零病名，且仍正確抓到鈉與糖
+
+**⚠️ 三個跨工作目錄的提醒**：
+1. **我改了 `src/data/conditions.ts` 的 `targetNutrients`**（補英文名＋修 3 筆
+   括號內是中文的項目）。⚠️ 我查過：**在那之前全庫沒有任何地方消費這個欄位**
+   —— 但如果你正在用它，請注意格式統一成 `'中文 (English)'`。
+2. **`server/handlers.ts` 的 `conditionText` / `resolveCondition` 已被刪除**，
+   連帶 `PHYSICAL_INDICATORS` 與 `conditionName` 的匯入也移除。
+   那不是 revert 掉 2026-10-06 的病名翻譯修正 —— 是提示詞裡已經沒有病名要翻譯了。
+3. **不要在任何輸出欄位寫病名**（`matched_conditions` 已改成成分導向）。
+   若你要動 `matched_conditions` 的消費端，注意它現在的語意是「哪個成分造成疑慮」。
+
+**還沒做／有疑問**：
+- ⚠️ **自填病症（「其他：甲狀腺亢進」）無法展開成成分**，目前**原樣送出**並標示
+  「使用者自行填寫、沒有內建規則」。這是**已知的殘留揭露**，不是遺漏 ——
+  丟掉不送會變成「使用者填了卻沒被考慮，而且看不出來」，那更糟。
+  若你有更好的做法（例如在 UI 上讓使用者選擇「這項要不要送給 AI」），歡迎提出。
+- ⚠️ 第二階段（KV 線上題庫）仍未開始。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |
