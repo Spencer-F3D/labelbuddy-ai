@@ -372,6 +372,84 @@ try {
     `→ ${String(privacy?.providerBoundaryNote ?? '').slice(0, 50)}`
   );
 
+  /* ══════════════════════════════════════════════════════════════════════
+   * 2b. App 內的「私隱條款」也必須與實際行為一致（2026-10-07 新增）
+   * ══════════════════════════════════════════════════════════════════════
+   * 【為什麼要驗這一條 —— 這是一個真實發生過的漂移】
+   *   2026-10-07 把送給雲端的提示詞從「病名」改成「要盯緊的成分」
+   *   （見 `conditionNutrients.ts`）。程式改了，但**私隱條款沒改** ——
+   *   它仍然寫著「雲端模式只會把標籤內容與**慢性病史**送去判斷」。
+   *
+   *   那句話在使用者眼中是「我的病歷被上傳了」，而它已經不成立。
+   *   ★ 這正是本專案反覆踩到的「改了 A 忘了 B」：**而且不會報錯**。
+   *
+   * 【為什麼驗翻譯表而不是驗畫面】
+   *   條款是純文字，行為是程式；兩者最容易漂移。
+   *   驗翻譯表可以在**幾毫秒內**抓到，不必開瀏覽器。
+   */
+  console.log('\n── 2b. 私隱條款文字必須與實際行為一致 ──');
+  const { TRANSLATIONS } = await import('../src/i18n/translations');
+  const privacyText = (lang: 'zh-TW' | 'en') =>
+    [1, 2, 3, 4, 5]
+      .map((n) => String((TRANSLATIONS[lang] as Record<string, string>)[`legal.privacy.${n}`] ?? ''))
+      .join(' ');
+
+  const zhPrivacy = privacyText('zh-TW');
+  const enPrivacy = privacyText('en');
+
+  /**
+   * ★ 條款不得聲稱病名／慢性病史會被送到 AI。
+   *   現在送的是「成分約束」，病名不離開裝置。
+   */
+  check(
+    '★★ 私隱條款（中）不得聲稱「慢性病史／病名」會送給 AI',
+    !/(慢性病史|病名)[^。；]{0,12}(送|傳|上傳)/.test(zhPrivacy),
+    '條款若這樣寫，就與 conditionNutrients.ts 的實際行為不符'
+  );
+  check(
+    '★★ 私隱條款（英）不得聲稱 conditions 會送給 AI 判斷',
+    !/your conditions for judgement/i.test(enPrivacy),
+    'the cloud prompt carries ingredient constraints, not conditions'
+  );
+
+  /** ★ 條款要正面說出「只在本機＝完全不發出網路請求」（這是現在的事實） */
+  check(
+    '★ 私隱條款（中）寫明「只在本機」完全不發出網路請求',
+    /只在本機/.test(zhPrivacy) && /完全不發出網路請求/.test(zhPrivacy),
+    `→ ${zhPrivacy.slice(0, 60)}…`
+  );
+  check(
+    '★ 私隱條款（英）寫明 On-device 模式 no network requests',
+    /On-device mode/i.test(enPrivacy) && /no network requests at all/i.test(enPrivacy),
+    `→ ${enPrivacy.slice(0, 80)}…`
+  );
+
+  /**
+   * ★ 條款要說明雲端送的是「成分」而不是病名 —— 這句是**主動澄清**，
+   *   不是被動免責。少了它，使用者無從知道邊界在哪。
+   */
+  check(
+    '★ 私隱條款（中）說明雲端送的是「要盯緊的成分」',
+    /要盯緊的成分/.test(zhPrivacy) && /不會送出病名/.test(zhPrivacy),
+    `→ ${zhPrivacy.slice(0, 60)}…`
+  );
+  check(
+    '★ 私隱條款（英）說明雲端送的是 ingredients to watch for',
+    /ingredients to watch for/i.test(enPrivacy) && /never a diagnosis/i.test(enPrivacy),
+    `→ ${enPrivacy.slice(0, 80)}…`
+  );
+
+  /**
+   * ⚠️ 反向斷言：**不得**再出現「完全不上網」以外的舊敘述。
+   *    這裡驗的是「照片與文字都留在裝置上」這種**對雲端模式不成立**的概括保證
+   *    （它會讓 cloud_image 的使用者誤以為照片沒上傳）。
+   */
+  check(
+    '★ 私隱條款不得概括保證「照片永遠不離開裝置」',
+    !/照片永遠不離開裝置/.test(zhPrivacy) && !/the photo never leaves/i.test(enPrivacy),
+    '那對 cloud_image 模式不成立'
+  );
+
   console.log('\n── 3. 難字簡化：片語要換，化學名稱不能動 ──');
   const { simplifyNutrientWording } = await import('../src/data/bilingual');
 

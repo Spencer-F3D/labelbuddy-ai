@@ -504,9 +504,14 @@ const zhTW = {
    * ⚠️ 這一段的字級刻意用 12px，是全站唯一的例外。
    *    理由與風險見 src/components/LegalNotice.tsx 的檔頭註解。 */
   'legal.privacy.title': '私隱條款',
-  'legal.privacy.1': '照片會不會離開裝置，取決於你在上面選的分析模式 —— 每一個模式都寫明了「什麼會離開手機」。',
+  /* ★ 2026-10-07：「只在本機」現在真的零網路請求（規則引擎搬到裝置上了），
+     所以這條可以寫得比以前強 —— 而且是可以當場實測的。 */
+  'legal.privacy.1': '照片會不會離開裝置，取決於你在上面選的分析模式 —— 每一個模式都寫明了「什麼會離開手機」。選「只在本機」時，App 完全不發出網路請求，開飛航模式也能用。',
   'legal.privacy.2': '伺服器不保存任何照片：不落地儲存、不寫入資料庫，處理完就丟棄。',
-  'legal.privacy.3': '飲食紀錄與身分設定只存在這台裝置；雲端模式只會把標籤內容與慢性病史送去判斷，不會保存，也不會與任何人共享。',
+  /* ★ 2026-10-07 修正：原本寫「把標籤內容與慢性病史送去判斷」——
+     但提示詞現在送的是「要盯緊的成分」（見 conditionNutrients.ts），
+     病名根本不會離開裝置。條款沒跟著改，就會變成一條可被實測推翻的敘述。 */
+  'legal.privacy.3': '飲食紀錄與身分設定只存在這台裝置。雲端模式只會把標籤內容與「要盯緊的成分」送去判斷 —— 不會送出病名，也不會保存或與任何人共享。',
   'legal.privacy.4': '本 App 沒有帳號、沒有廣告、沒有第三方追蹤，也不收集任何個人身分資料。',
   'legal.privacy.5': '你隨時可以在設定中改回「只在本機分析」，或按「清除所有資料」把一切刪除。',
   'legal.disclaimer.title': '免責聲明',
@@ -1245,12 +1250,15 @@ const en: Record<TranslationKey, string> = {
    * ⚠️ Deliberately 12px — the only exception to the 16px font-size floor.
    *    See the header comment in src/components/LegalNotice.tsx. */
   'legal.privacy.title': 'Privacy notice',
+  // ★ 2026-10-07: on-device mode now makes no network requests at all (the rule
+  //   engine runs in the browser), so this claim is testable on the spot.
   'legal.privacy.1':
-    'Whether your photo leaves the phone depends on the analysis mode you choose above \u2014 each mode states exactly what leaves your phone.',
+    'Whether your photo leaves the phone depends on the analysis mode you choose above \u2014 each mode states exactly what leaves your phone. In On-device mode the app makes no network requests at all, so it also works in flight mode.',
   'legal.privacy.2':
     'The server never stores photos: no disk, no database, discarded after processing.',
+  // ★ 2026-10-07: the cloud prompt carries ingredient constraints, not diagnoses.
   'legal.privacy.3':
-    'Diet records and your profile stay on this device. Cloud modes send only the label content and your conditions for judgement \u2014 never stored, never shared.',
+    'Diet records and your profile stay on this device. Cloud modes send only the label content and the ingredients to watch for \u2014 never a diagnosis, never stored, never shared.',
   'legal.privacy.4':
     'This app has no accounts, no ads, no third-party tracking, and collects no personally identifying data.',
   'legal.privacy.5':
