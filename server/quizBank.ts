@@ -196,8 +196,32 @@ export function makeQuizBankStore(kv: KvLike): QuizBankStore {
  *
  * 步驟（順序不能換）：
  *   ① 逐題寫 `q:<id>`
- *   ② **`list('q:')` 問 KV 現在真的有哪些** ← 權威來源
- *   ③ 用 ② 的結果 ＋ 舊索引的 createdAt 重建索引
+ *   ② 索引 = **舊索引 ∪ 剛寫入的 id ∪ `list('q:')` 的結果**
+ *   ③ 寫回索引
+ *
+ * 【★★ 為什麼是「聯集」而不是「以 list 為權威」—— 2026-10-07 線上實測抓到的 bug】
+ *
+ *   原本寫的是「以 `list('q:')` 為權威來源」。那在**假 KV 與記憶體版都正確**
+ *   （它們是強一致的），所以本機測試全綠。
+ *
+ *   但**真實的 Cloudflare KV 是最終一致的**：`put()` 之後**立刻** `list()`，
+ *   不保證看得到剛寫進去的 key。
+ *   線上實測：連續生成 3 題 → KV 裡真的有 3 個 `q:` key，
+ *   但索引只認得 **1 題** → 另外 2 題變成**孤兒**
+ *   （本體在 KV 裡，但沒有任何東西指向它們 → 永遠不會被同步，
+ *     而且**不會有任何錯誤訊息**）。
+ *
+ *   → 改成聯集之後，**我們自己剛寫的 id 一定在索引裡**，
+ *     不必等 KV 的最終一致性。
+ *     `list()` 仍然保留 —— 它負責把**別台裝置寫的** id 撿回來。
+ *     舊索引也保留 —— 讓索引對 id 是**單調遞增**的，不會因為一次 stale list 而倒退。
+ *
+ * 【殘留風險（誠實揭露）】
+ *   兩台裝置**極接近同時**寫入時，仍有一個窄窗：
+ *   B 讀到舊索引（還沒有 A 的 id）、B 的 list 也還沒看到 A →
+ *   B 寫回的索引就少了 A 那一題。
+ *   ⚠️ 但那是**可自癒的**：下一次任何人寫入時，`list()` 就會看到 A，
+ *      索引自動補回。孤兒不會永久存在，只要題庫還有人用。
  *
  * ⚠️ 回傳「實際寫入幾題」。達到 `MAX_BANK_SIZE` 之後**只回傳不寫入** ——
  *    保護 KV 免費層的 1000 writes/日（每次生成 3 writes）。
@@ -243,8 +267,19 @@ export async function writeQuestionsToBank(
   }
   if (written === 0) return { written: 0, skipped: false };
 
-  // ② 權威來源：KV 現在真的有哪些 id
-  existingIds = await store.listQuestionIds();
+  /**
+   * ② 索引 = 舊索引 ∪ 剛寫入的 id ∪ list 結果。
+   *
+   * ⚠️ 順序與來源都不能省：
+   *    · `justWritten` —— 唯一不依賴 KV 一致性的來源（見上方說明）
+   *    · `previous`    —— 讓索引單調遞增，一次 stale list 不會讓 id 倒退消失
+   *    · `listed`      —— 撿回別台裝置寫的 id
+   */
+  const justWritten = questions.slice(0, written).map((q) => q.id);
+  const listed = await store.listQuestionIds();
+  existingIds = [
+    ...new Set([...justWritten, ...(previous?.items ?? []).map((i) => i.id), ...listed]),
+  ];
 
   const index: QuizBankIndex = {
     version: (previous?.version ?? 0) + 1,

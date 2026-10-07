@@ -108,6 +108,48 @@ function makeFakeStore(pageSize: number): QuizBankStore {
   return makeQuizBankStore(makeFakeKv(pageSize));
 }
 
+/**
+ * ★★ **最終一致性**的假 KV —— `list()` 看不到剛寫進去的 key。
+ *
+ * 【為什麼一定要有這一支 —— 2026-10-07 線上實測抓到的 bug】
+ *   上面那個 `makeFakeKv` 是**強一致**的（put 完 list 立刻看得到）。
+ *   真實的 Cloudflare KV **不是**：`put()` 之後立刻 `list()`，
+ *   不保證看得到剛寫的 key。
+ *
+ *   線上實測：連續生成 3 題 → KV 裡真的有 3 個 `q:` key，
+ *   但索引只認得 1 題 → **另外 2 題變成孤兒**（永遠不會被同步，且不報錯）。
+ *
+ *   ⚠️ 也就是說：**舊的寫法在本機全綠、上線才壞**。
+ *      這支假 KV 的存在就是為了讓那個 bug 在**本機**就被抓到。
+ *
+ * 模型：`put` 只寫進 `store`（`get` 看得到）；要呼叫 `propagate()` 才會
+ *       進入 `visible`（`list` 看得到的集合）。
+ */
+function makeLaggingKv(): KvLike & { propagate(): void } {
+  const store = new Map<string, string>();
+  const visible = new Set<string>();
+  return {
+    propagate() {
+      for (const k of store.keys()) visible.add(k);
+    },
+    async get(key) {
+      return store.has(key) ? (store.get(key) as string) : null;
+    },
+    async put(key, value) {
+      store.set(key, value); // ⚠️ 刻意不進 visible
+    },
+    async list(options) {
+      const prefix = options?.prefix ?? '';
+      const all = [...visible].filter((k) => k.startsWith(prefix)).sort();
+      return {
+        keys: all.map((name) => ({ name })),
+        list_complete: true,
+        cursor: undefined,
+      };
+    },
+  };
+}
+
 (async () => {
   console.log('='.repeat(72));
   console.log('線上題庫同步層檢查（第二階段）');
@@ -165,6 +207,39 @@ function makeFakeStore(pageSize: number): QuizBankStore {
       ids.join(',') === 'c1,c2,c3',
       `實際 ${ids.join(',')}`
     );
+  }
+
+  /* ── 3b. ★★ 最終一致性：list 看不到剛寫的 key，索引仍不得漏題 ── */
+  console.log('\n── 3b. ★★ 最終一致性（list 落後）──');
+  {
+    const kv = makeLaggingKv();
+    const store = makeQuizBankStore(kv);
+
+    // 模擬真實情況：put 之後 list 還沒傳播
+    const r = await writeQuestionsToBank(store, [q('l1', ['鈉'])], 1000);
+    check('寫入回報成功', r.written === 1, `實際 ${r.written}`);
+
+    const index = await store.getIndex();
+    check(
+      '★★ list 看不到剛寫的 key 時，索引**仍然**要有那一題',
+      index?.items.some((i) => i.id === 'l1') === true,
+      `索引內容：${JSON.stringify(index?.items.map((i) => i.id))}`
+    );
+
+    // 再寫一題，list 仍然落後 → 兩題都要在
+    await writeQuestionsToBank(store, [q('l2', ['鈉'])], 2000);
+    const index2 = await store.getIndex();
+    const ids2 = (index2?.items ?? []).map((i) => i.id).sort();
+    check(
+      '★★ 連續寫入 2 題（list 全程落後）→ 索引仍保有 2 題',
+      ids2.join(',') === 'l1,l2',
+      `實際 ${ids2.join(',')}`
+    );
+
+    // 傳播之後，list 才看得到 —— 模擬「下一次寫入時 list 就正常了」
+    kv.propagate();
+    const listed = await store.listQuestionIds();
+    check('傳播後 list 才看得到（確認這支假 KV 真的在模擬落後）', listed.length === 2, `實際 ${listed.length}`);
   }
 
   /* ── 4. ★ 通用題不算命中 ──────────────────────────────────────── */
