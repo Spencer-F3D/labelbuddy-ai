@@ -136,6 +136,101 @@ try {
   );
   check('健康問答：仍有回答內容', !!qa?.data?.answer);
 
+  /**
+   * ★★ 2026-10-07 新增：**沒有血壓值時，不可以講「您的血壓」。**
+   *
+   * 【為什麼要驗這一條】
+   *   本機問答引擎原本寫 `const systolic = indicators?.systolicBp || 135;` ——
+   *   沒有資料時會變成 135，而 135 < 140 → 走到「您的血壓目前維持得還不錯」。
+   *
+   *   但問答區從 2026-09-30 起就**不再送出生理指標**，
+   *   所以每一位「只在本機」的使用者問咖啡問題，
+   *   都會被告知「您的血壓維持得還不錯」——
+   *   **一個我們完全沒有資料、憑預設值編出來的健康評估。**
+   *
+   *   這比不回答更危險：使用者會把它當成事實。
+   *   這一條斷言同時守住「不要把 `|| 135` 加回去」。
+   */
+  const qaNoVitals = await post('/api/ask-health-question', {
+    question: '我有高血壓，喝咖啡可以嗎',
+    language: 'zh-TW',
+    localOnly: true,
+    // ⚠️ 刻意**不帶 indicators** —— 模擬問答區真實的請求
+  });
+  const noVitalsAnswer = String(qaNoVitals?.data?.answer ?? '');
+  check(
+    '★★ 沒有血壓值時不得宣稱「您的血壓…」（那是捏造的健康評估）',
+    !/您的血壓/.test(noVitalsAnswer) && !/量到的上壓/.test(noVitalsAnswer),
+    `→ ${noVitalsAnswer.slice(0, 60)}`
+  );
+  check(
+    '沒有血壓值時仍要給得出咖啡的建議（不能因為缺資料就不回答）',
+    /咖啡/.test(noVitalsAnswer),
+    `→ ${noVitalsAnswer.slice(0, 60)}`
+  );
+
+  const qaNoVitalsEn = await post('/api/ask-health-question', {
+    question: 'I have high blood pressure, can I drink coffee',
+    language: 'en',
+    localOnly: true,
+  });
+  const noVitalsEn = String(qaNoVitalsEn?.data?.answer ?? '');
+  check(
+    '★★ 英文版同理：不得宣稱 "your blood pressure"',
+    !/your blood pressure/i.test(noVitalsEn),
+    `→ ${noVitalsEn.slice(0, 60)}`
+  );
+
+  /**
+   * ★★ 2026-10-07 新增：**後備文案不可以說「連不上 AI」**。
+   *
+   * 【為什麼要驗這一條】
+   *   本機問答引擎原本一律假設自己是「連不上 AI 的後備」，
+   *   所以通用回覆寫著「我目前連不上 AI 服務」。
+   *
+   *   但 `localOnly: true` 的使用者是**主動選擇**不把問題送給 AI ——
+   *   他是有連線的。告訴他「連不上 AI」是**假的**，
+   *   而且會讓他以為「網路好一點就能得到 AI 回答」，事實並非如此。
+   *
+   *   這一條用一個**不在內建知識庫裡**的問題（知識庫只涵蓋咖啡／香蕉／
+   *   豆腐／柚子／紅酒／水腫），強制走到通用後備，才驗得到那段文案。
+   *   （用已知問題會走到專屬規則，根本碰不到後備 —— 那是「假通過」。）
+   */
+  const qaUnknown = await post('/api/ask-health-question', {
+    question: '我可以吃人參嗎',
+    language: 'zh-TW',
+    localOnly: true,
+  });
+  const unknownAnswer = String(qaUnknown?.data?.answer ?? '');
+  check(
+    '★ 本機問答後備不得說「連不上 AI」（使用者是主動選擇離線）',
+    !/連不上/.test(unknownAnswer),
+    `→ ${unknownAnswer.slice(0, 60)}`
+  );
+  check(
+    '★ 本機問答後備要說明「您選擇了只在本機」',
+    /只在本機/.test(unknownAnswer),
+    `→ ${unknownAnswer.slice(0, 60)}`
+  );
+  check(
+    '★ 本機問答後備要承認「這一題不在內建知識庫裡」（不可假裝答了）',
+    /不在內建知識庫/.test(unknownAnswer),
+    `→ ${unknownAnswer.slice(0, 60)}`
+  );
+
+  const qaUnknownEn = await post('/api/ask-health-question', {
+    question: 'Can I take ginseng',
+    language: 'en',
+    localOnly: true,
+  });
+  const unknownEn = String(qaUnknownEn?.data?.answer ?? '');
+  check(
+    '★ 英文後備也不得說 "reach the AI"',
+    !/reach the AI/i.test(unknownEn),
+    `→ ${unknownEn.slice(0, 60)}`
+  );
+  check('★ 英文後備零中文殘留', !/[\u4e00-\u9fff]/.test(unknownEn), `→ ${unknownEn.slice(0, 60)}`);
+
   const label = await post('/api/analyze-label', {
     ocrText: LABEL_TEXT,
     conditions: ['高血壓'],

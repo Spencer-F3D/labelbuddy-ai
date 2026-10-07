@@ -391,7 +391,10 @@ const zhTW = {
   // ── 健康問答（2026-09-29 接回）────────────────────────────────
   'settings.qa.title': '問健康問題',
   'settings.qa.summary': '有問題就問，AI 用白話回答',
-  'qa.hint': '有健康或飲食的問題可以直接問。AI 會看您上面填的數字，用白話回答您。',
+  /* ⚠️ 2026-10-07 修掉「AI 會看您上面填的數字」——
+     生理指標輸入區早已移除，使用者沒有地方填數字。 */
+  'qa.hint': '有健康或飲食的問題可以直接問。AI 會用白話回答您。',
+  'qa.hintLocal': '有健康或飲食的問題可以直接問。這個模式用 App 內建的知識回答，涵蓋常見問題。',
   'qa.commonTitle': '大家常問的問題',
   'qa.suggestCoffee': '我有高血壓，喝咖啡可以嗎？',
   'qa.suggestBanana': '血糖高可以吃香蕉嗎？',
@@ -404,7 +407,15 @@ const zhTW = {
   'qa.readAloud': '唸給我聽',
   'qa.tips': '💡 安心小叮嚀',
   'qa.modeCloud': '☁️ 雲端 AI 回答',
-  'qa.modeLocal': '📴 離線回答（目前沒有連線，用內建知識回答）',
+  /* ★ 2026-10-07 修正：原本寫「目前沒有連線」——
+     但「只在本機」的使用者**是有連線的**，只是選擇不把問題送出去。
+     把兩種情況分開講，才不會誤導（見 qa.modeLocalByChoice）。 */
+  'qa.modeLocal': '📴 暫時連不上 AI，用內建知識回答',
+  'qa.modeLocalByChoice': '📴 只在本機（您選擇的），用內建知識回答',
+  /* ⚠️ 常駐顯示在**提問之前** —— 使用者在送出問題前就該知道這個模式的極限。
+     回答是內建知識庫的規則式答案，不是 AI 生成的：問法換一個字就可能對不上。 */
+  'qa.localLimitation':
+    '只在本機模式的限制：回答來自 App 內建的常見問題，不是 AI 生成 —— 只涵蓋常見問法，也不會針對您的個人狀況深入分析。重要問題請詢問醫師或藥師。',
   'qa.error': '目前連不上 AI，請稍後再試一次。',
 
   // ── 首次啟動引導頁（2026-09-29）──────────────────────────────
@@ -540,6 +551,17 @@ const zhTW = {
        否則他會以為填了就有人看（本專案最危險的失敗模式）。 */
   'conditions.customLabel': '請填寫您的病症名稱',
   'conditions.customPlaceholder': '例如：甲狀腺機能低下',
+  /* ── 自填病症對話框（2026-10-07 使用者指定：按「其他」立即彈出）────── */
+  'conditions.customPrefix': '其他：',
+  'conditions.customConfirm': '確定',
+  'conditions.customCancel': '取消',
+  'conditions.customEdit': '修改',
+  'conditions.customFillNow': '立即填寫',
+  'conditions.customEmptyHint': '請先填寫病症名稱，再按確定。',
+  /* ⚠️ 這一句是**警告**，不是說明：勾了卻沒填，送出時等於什麼都沒有。
+     不講清楚的話，使用者會以為有人在看他的病症 —— 而畫面上完全看不出來。 */
+  'conditions.customMissing':
+    '已勾選「其他」，但還沒填寫病症名稱 —— 這樣不會有任何把關。',
   'conditions.customHint': '填寫後會交給雲端 AI 一起判斷。',
   'conditions.customLocalOnly':
     '注意：「只在本機」模式下，這一項無法自動把關。要讓 AI 一起判斷，請改用「直接雲端」或「只送文字」模式。',
@@ -1122,8 +1144,9 @@ const en: Record<TranslationKey, string> = {
   // ── Health Q&A (restored 2026-09-29) ──────────────────────────
   'settings.qa.title': 'Ask a health question',
   'settings.qa.summary': 'Ask anything \u2014 the AI answers in plain words',
-  'qa.hint':
-    'Have a health or diet question? Just ask. The AI will look at the numbers you entered above and answer in plain words.',
+  'qa.hint': 'Have a health or diet question? Just ask. The AI will answer in plain words.',
+  'qa.hintLocal':
+    'Have a health or diet question? Just ask. This mode answers from the app\u2019s built-in knowledge, covering common questions.',
   'qa.commonTitle': 'Questions people often ask',
   'qa.suggestCoffee': 'I have high blood pressure \u2014 can I drink coffee?',
   'qa.suggestBanana': 'Can I eat bananas if my blood sugar is high?',
@@ -1136,7 +1159,10 @@ const en: Record<TranslationKey, string> = {
   'qa.readAloud': 'Read this to me',
   'qa.tips': '💡 Good to know',
   'qa.modeCloud': '☁️ Answered by cloud AI',
-  'qa.modeLocal': '📴 Offline answer (no connection right now, using built-in knowledge)',
+  'qa.modeLocal': '📴 Cannot reach the AI right now — answered from built-in knowledge',
+  'qa.modeLocalByChoice': '📴 On-device only (your choice) — answered from built-in knowledge',
+  'qa.localLimitation':
+    'Limits of on-device mode: answers come from the app\u2019s built-in FAQ, not from an AI. They cover common phrasings only and do not analyse your personal situation. For anything important, please ask a doctor or pharmacist.',
   'qa.error': 'Cannot reach the AI right now. Please try again in a moment.',
 
   // ── First-run onboarding (2026-09-29) ───────────────────────────
@@ -1269,6 +1295,14 @@ const en: Record<TranslationKey, string> = {
   /* ── "Other (self-described)" input (added 2026-10-06) ── */
   'conditions.customLabel': 'Type the name of your condition',
   'conditions.customPlaceholder': 'For example: hypothyroidism',
+  'conditions.customPrefix': 'Other: ',
+  'conditions.customConfirm': 'Confirm',
+  'conditions.customCancel': 'Cancel',
+  'conditions.customEdit': 'Edit',
+  'conditions.customFillNow': 'Fill in now',
+  'conditions.customEmptyHint': 'Please type your condition first, then press Confirm.',
+  'conditions.customMissing':
+    'You ticked "Other" but have not typed the condition name yet — this will not be checked at all.',
   'conditions.customHint': 'It will be passed to the cloud AI together with the other items.',
   'conditions.customLocalOnly':
     'Note: in "on-device only" mode this item cannot be checked automatically. Switch to "Direct cloud" or "Text only" mode so the AI can take it into account.',

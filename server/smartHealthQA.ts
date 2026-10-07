@@ -27,20 +27,73 @@ export function answerSeniorHealthQuestion(
    * 做法：英文走 `answerInEnglish()`，完全不動下面既有的中文邏輯
    *      （那條路徑已上線且經過驗證，不動它最安全）。
    */
-  language: 'zh-TW' | 'en' = 'zh-TW'
+  language: 'zh-TW' | 'en' = 'zh-TW',
+  /**
+   * ★ 2026-10-07 新增：**為什麼**走到這條路徑。
+   *
+   * 【為什麼需要這個參數】
+   *   這條路徑原本一律假設自己是「連不上 AI 的後備」，
+   *   所以英文的通用回覆寫著「I could not reach the AI right now」。
+   *
+   *   但「只在本機」模式的使用者是**主動選擇**不把問題送給 AI ——
+   *   他是有連線的。告訴他「連不上 AI」是**假的**，
+   *   而且會讓他以為「只要網路好一點就能得到 AI 回答」，事實並非如此。
+   *
+   *   'user_choice' = 使用者選了只在本機 → 文案要說「這個模式只用內建知識」
+   *   'unreachable' = 雲端失敗／沒金鑰 → 文案才說「暫時連不上」
+   *
+   * ⚠️ 預設 'unreachable' 是刻意的：舊呼叫端（以及雲端失敗那條路徑）
+   *    不改一行就維持原行為。
+   */
+  reason: 'user_choice' | 'unreachable' = 'unreachable'
 ): HealthQuestionAnswer {
-  if (language === 'en') return answerInEnglish(question, indicators);
+  if (language === 'en') return answerInEnglish(question, indicators, reason);
 
   const q = (question || '').trim().toLowerCase();
-  const systolic = indicators?.systolicBp || 135;
-  const isHighBp = systolic >= 140;
-  const bloodSugar = indicators?.bloodSugar || 6.5;
-  const isHighSugar = indicators?.bloodSugarUnit === 'mg/dL' ? bloodSugar >= 130 : bloodSugar >= 7.0;
-  const isGout = indicators?.uricAcidStatus === 'high' || indicators?.uricAcidStatus === 'gout_history';
+  /**
+   * ⚠️⚠️ **不要再用 `|| 135` 這種「預設值」**（2026-10-07 移除）。
+   *
+   *   預設值會把「沒有資料」悄悄變成「數值正常」，然後被寫進回覆裡 ——
+   *   使用者讀到的是「您的血壓維持得還不錯」，而我們根本沒有他的血壓。
+   *   那是**捏造健康數據**，比不回答更危險。
+   *
+   *   現在只有呼叫端真的給了血壓值，才允許出現「您的血壓」這種句子。
+   */
+  const hasBp = typeof indicators?.systolicBp === 'number' && indicators.systolicBp > 0;
+  const systolic = hasBp ? Number(indicators?.systolicBp) : 0;
+  const isHighBp = hasBp && systolic >= 140;
+  /**
+   * ⚠️ 順手移除 `bloodSugar` / `isHighSugar` / `isGout` —— 它們宣告了但**從來沒被用到**
+   *    （2026-10-07 用 `grep -c` 逐一確認：各只出現 1～2 次，都是宣告本身）。
+   *    死變數留著會讓人以為「這些指標有被納入判斷」，其實沒有。
+   */
 
   // 1. 高血壓與咖啡
   if (q.includes('咖啡') || (q.includes('血壓') && q.includes('喝'))) {
-    if (isHighBp) {
+    /**
+     * ⚠️⚠️ 2026-10-07：**只有在真的收到血壓值時，才可以講「您的血壓」。**
+     *
+     * 【原本錯在哪 —— 這是最嚴重的一種錯：捏造健康數據】
+     *   下面原本寫 `const systolic = indicators?.systolicBp || 135;`，
+     *   於是**沒有收到任何血壓值**時，`systolic` 會變成 135，
+     *   而 135 < 140 → 走到「您的血壓目前維持得還不錯」那一段。
+     *
+     *   問題是：問答區從 2026-09-30 起就**不再送出生理指標**
+     *   （見 `HealthQASection` 的說明），所以這條路徑**永遠**拿不到血壓值。
+     *   也就是說，每一位「只在本機」的使用者問咖啡問題，
+     *   都會被告知「您的血壓目前維持得還不錯」——
+     *   **一個我們完全沒有資料、憑預設值編出來的健康評估。**
+     *
+     *   這比不回答更危險：使用者會把它當成事實。
+     *   （同型問題在標籤路徑已經修過一次：「離線時系統會捏造一份看起來很肯定的
+     *     紅／黃／綠結論」—— 問答這條路當時漏掉了。）
+     *
+     * 【修法】分成三種：
+     *   有血壓值 ＋ 偏高 → 個人化（保留原樣）
+     *   有血壓值 ＋ 正常 → 個人化（保留原樣）
+     *   **沒有血壓值 → 一般版：只講咖啡怎麼喝，不宣稱使用者任何數值**
+     */
+    if (hasBp && isHighBp) {
       return {
         question,
         key_takeaway: '🟡 可以喝一點點，但建議每天不要超過一小杯，且千萬不要加糖加奶精！',
@@ -56,7 +109,8 @@ export function answerSeniorHealthQuestion(
         voice_script: `您好！針對您問的「高血壓能不能喝咖啡」，答案是可以喝一點點喔！因為您上壓有 ${systolic}，建議每天最多喝一小杯淡黑咖啡就好，千萬不要加糖或是奶精粉，下午也盡量不要喝，晚上睡得香甜，血壓才會穩喔！`,
         source: 'smart_health_qa',
       };
-    } else {
+    }
+    if (hasBp) {
       return {
         question,
         key_takeaway: '✅ 可以適量享用！每天 1～2 杯純黑咖啡沒問題，注意別加糖精奶精。',
@@ -72,6 +126,26 @@ export function answerSeniorHealthQuestion(
         source: 'smart_health_qa',
       };
     }
+    /**
+     * ⚠️ 這一版是**沒有血壓值**時用的 —— 只講咖啡怎麼喝，不講「您的血壓」。
+     *    任何「您的數值如何」的句子在這裡都是編的，一句都不能留。
+     */
+    return {
+      question,
+      key_takeaway: '✅ 可以適量享用！每天 1～2 杯純黑咖啡沒問題，注意別加糖加奶精。',
+      answer: `您好！適量喝黑咖啡對血液循環與提神是有幫助的。
+
+不過記得：盡量挑選純黑咖啡或加無糖鮮奶，不要加砂糖、煉乳或奶精。而且下午或晚上不要喝，以免影響晚上睡眠。
+
+如果您有高血壓，每天控制在 1～2 杯以內會比較安心；實際要喝多少，建議下次看診時問一下您的醫師。`,
+      safe_tips: [
+        '推薦黑咖啡或加無糖低脂鮮奶。',
+        '避免空腹大量喝咖啡，以防刺激胃酸逆流。',
+        '下午兩點後改喝溫開水或大麥茶。',
+      ],
+      voice_script: `您好！適量喝黑咖啡對血液循環與提神是有幫助的。記得挑純黑咖啡或加無糖鮮奶，不要加砂糖、煉乳或奶精，下午或晚上也盡量不要喝，以免影響睡眠。如果您有高血壓，每天一到兩杯以內比較安心。`,
+      source: 'smart_health_qa',
+    };
   }
 
   // 2. 血糖高與水果 / 香蕉
@@ -179,10 +253,31 @@ export function answerSeniorHealthQuestion(
   }
 
   // 7. 通用溫馨大白話解答
+  /**
+   * ★★ 2026-10-07：**開頭一定要說清楚「這一題我答不了」。**
+   *
+   * 【為什麼要改】
+   *   原本這段直接給一般養生建議，**完全不說自己沒聽懂**。
+   *   使用者問了一個具體問題（例如「我可以吃人參嗎」），
+   *   得到的是一段「少油少鹽多喝水」，而且看不出來問題根本沒被回答。
+   *   那不是回答，那是**把問題掩蓋掉** —— 使用者會以為這就是針對他的答案。
+   *
+   *   而且開頭要依「為什麼走這條路」分開講：
+   *     只在本機模式的使用者是**主動選擇**不送給 AI（他是有連線的），
+   *     告訴他「連不上 AI」是假的，也會讓他以為「網路好一點就有 AI 回答」。
+   */
+  const fallbackLead =
+    reason === 'user_choice'
+      ? `您好！您選擇了「只在本機」模式，我只用 App 內建的知識回答。您問的「${question}」不在內建知識庫裡，所以我沒辦法針對這個問題回答，只能給您一般性的日常建議。`
+      : `您好！我目前連不上 AI 服務，沒辦法針對您問的「${question}」詳細回答。`;
+
   return {
     question,
-    key_takeaway: '✅ 遵守「少油、少鹽、無糖、多喝溫水」的大原則，吃原形食物最安心！',
-    answer: `您好！關於您問的「${question}」：
+    key_takeaway:
+      reason === 'user_choice'
+        ? '💡 這一題不在內建知識庫裡，以下是通用的日常建議。'
+        : '💡 目前連不上 AI，以下是通用的日常建議。',
+    answer: `${fallbackLead}
 
 針對日常身體保養，最核心的秘訣就是保持飲食清淡：
 1. 烹飪少放一湯匙醬油、味精與豆瓣醬，減少心臟與腎臟負擔。
@@ -192,11 +287,16 @@ export function answerSeniorHealthQuestion(
 
 如果您有按時吃醫院開的慢性病藥物，記得一定要遵照醫囑，不要自行停藥或隨意吃偏方喔！`,
     safe_tips: [
+      reason === 'user_choice'
+        ? '內建知識庫只涵蓋常見問題，換個問法可能也對不上。'
+        : '稍等一下再問一次 —— AI 可能只是暫時忙碌。',
       '新鮮原形食物最好（新鮮青菜、豆腐、魚肉）。',
-      '少吃過度加工包裝零食與重口味醃漬品。',
       '如有特殊身體不適，請在看診時跟主治醫生諮詢。',
     ],
-    voice_script: `您好！關於您的健康疑問，最重要的是日常飲食少油少鹽、多喝溫開水，少吃加工零食，吃飽飯後散步走動一下，身體就會越來越硬朗舒適喔！`,
+    voice_script:
+      reason === 'user_choice'
+        ? '您好！您選擇了只在本機模式，我只用 App 內建的知識回答。您問的這一題不在內建知識庫裡，所以我沒辦法針對它回答，只能給您一般性的日常建議：飲食少油少鹽、多喝溫開水、少吃加工零食。'
+        : '您好！我目前連不上 AI 服務，沒辦法針對您的問題詳細回答，請稍後再問一次。這段時間請記得飲食少油少鹽、多喝溫開水、少吃加工零食。',
     source: 'smart_health_qa',
   };
 }
@@ -215,20 +315,22 @@ export function answerSeniorHealthQuestion(
  */
 function answerInEnglish(
   question: string,
-  indicators?: Partial<SeniorPhysicalIndicators>
+  indicators?: Partial<SeniorPhysicalIndicators>,
+  /** 見 `answerSeniorHealthQuestion` 的說明：決定後備文案怎麼講 */
+  reason: 'user_choice' | 'unreachable' = 'unreachable'
 ): HealthQuestionAnswer {
   const q = (question || '').trim().toLowerCase();
-  const systolic = indicators?.systolicBp || 135;
-  const isHighBp = systolic >= 140;
-  const bloodSugar = indicators?.bloodSugar || 6.5;
-  const isHighSugar =
-    indicators?.bloodSugarUnit === 'mg/dL' ? bloodSugar >= 130 : bloodSugar >= 7.0;
+  // 與中文版同一個理由：預設值會把「沒有資料」變成「數值正常」（見中文版的說明）
+  const hasBp = typeof indicators?.systolicBp === 'number' && indicators.systolicBp > 0;
+  const systolic = hasBp ? Number(indicators?.systolicBp) : 0;
+  const isHighBp = hasBp && systolic >= 140;
 
   const has = (...words: string[]) => words.some((w) => q.includes(w));
 
   // 1. High blood pressure and coffee
   if (has('coffee', 'caffeine') || (has('blood pressure', 'bp') && has('drink'))) {
-    if (isHighBp) {
+    // 只有真的收到血壓值才能講「your blood pressure」—— 見中文版的說明
+    if (hasBp && isHighBp) {
       return {
         question,
         key_takeaway:
@@ -245,19 +347,42 @@ High blood pressure does not mean you must give up coffee completely. Caffeine m
         source: 'smart_health_qa',
       };
     }
+    if (hasBp) {
+      return {
+        question,
+        key_takeaway: '✅ Enjoy it in moderation — one to two cups of plain black coffee a day is fine.',
+        answer: `Hello! Your blood pressure is holding up well. In moderation, black coffee can help circulation and alertness for many older adults.
+
+Just remember: choose plain black coffee or add unsweetened milk. Do not add sugar, condensed milk or creamer. And avoid it in the afternoon or evening so it does not disturb your sleep.`,
+        safe_tips: [
+          'Plain black coffee, or with unsweetened low-fat milk.',
+          'Avoid drinking a lot on an empty stomach — it can irritate acid reflux.',
+          'After 2pm, switch to warm water or barley tea.',
+        ],
+        voice_script:
+          'Hello! Your blood pressure is in a good range, so one or two cups of unsweetened black coffee a day is fine. Do not drink it on an empty stomach, and no creamer or sugar. Enjoy it with peace of mind!',
+        source: 'smart_health_qa',
+      };
+    }
+    /**
+     * ⚠️ 這一版是**沒有血壓值**時用的 —— 一句「your blood pressure」都不能有，
+     *    那會是我們憑空編出來、而使用者會當真的健康評估（見中文版的說明）。
+     */
     return {
       question,
       key_takeaway: '✅ Enjoy it in moderation — one to two cups of plain black coffee a day is fine.',
-      answer: `Hello! Your blood pressure is holding up well. In moderation, black coffee can help circulation and alertness for many older adults.
+      answer: `Hello! In moderation, black coffee can help circulation and alertness for many older adults.
 
-Just remember: choose plain black coffee or add unsweetened milk. Do not add sugar, condensed milk or creamer. And avoid it in the afternoon or evening so it does not disturb your sleep.`,
+Just remember: choose plain black coffee or add unsweetened milk. Do not add sugar, condensed milk or creamer. And avoid it in the afternoon or evening so it does not disturb your sleep.
+
+If you have high blood pressure, keeping it to one or two cups a day is the safer choice — your doctor can tell you what is right for you.`,
       safe_tips: [
         'Plain black coffee, or with unsweetened low-fat milk.',
         'Avoid drinking a lot on an empty stomach — it can irritate acid reflux.',
         'After 2pm, switch to warm water or barley tea.',
       ],
       voice_script:
-        'Hello! Your blood pressure is in a good range, so one or two cups of unsweetened black coffee a day is fine. Do not drink it on an empty stomach, and no creamer or sugar. Enjoy it with peace of mind!',
+        'Hello! In moderation, black coffee can help circulation and alertness. Choose plain black coffee or add unsweetened milk, and no sugar or creamer. Avoid it in the afternoon or evening so it does not disturb your sleep. If you have high blood pressure, one or two cups a day is the safer choice.',
       source: 'smart_health_qa',
     };
   }
@@ -374,24 +499,44 @@ If the swelling is sudden, or only in one leg, or you feel short of breath, plea
   }
 
   // 7. General fallback
+  /**
+   * ★★ 2026-10-07：開頭要依「為什麼走這條路」分開講（與中文版同一個理由）。
+   *
+   * 【原本錯在哪】
+   *   這裡一律寫 "I could not reach the AI right now"。
+   *   但「只在本機」模式的使用者是**主動選擇**不送給 AI —— 他是有連線的。
+   *   告訴他連不上 AI 是假的，而且會讓他以為「網路好一點就能得到 AI 回答」。
+   *
+   * 【而且原本也漏了最重要的一句】
+   *   沒有說「這一題不在內建知識庫裡」。使用者問了一個具體問題，
+   *   得到一段通用建議，卻看不出來問題根本沒被回答。
+   */
+  const byChoice = reason === 'user_choice';
+  const fallbackLead = byChoice
+    ? `Hello! You chose the on-device-only mode, so I answer from the app's built-in knowledge only. Your question — "${question}" — is not in that knowledge base, so I cannot answer it directly. Here is some general advice instead.`
+    : `Hello! I am not able to reach the AI service at the moment, so I cannot answer your exact question in detail. Please try again in a moment.`;
+
   return {
     question,
-    key_takeaway: '💡 I could not reach the AI right now, so here is some general advice.',
-    answer: `Hello! I am not able to reach the AI service at the moment, so I cannot answer your exact question in detail. Please try again in a moment.
+    key_takeaway: byChoice
+      ? '💡 That question is not in the built-in knowledge base — here is some general advice.'
+      : '💡 I could not reach the AI right now, so here is some general advice.',
+    answer: `${fallbackLead}
 
 In the meantime, a few things help most older adults:
 1. Keep meals light and low in salt, and drink warm water through the day.
 2. Eat at regular times and go easy on sugary drinks and snacks.
-3. If you feel unwell, or your readings are far from your usual range, please see a doctor.
-
-When the connection is back, ask me again and I will give you a full answer based on your own numbers.`,
+3. If you feel unwell, or your readings are far from your usual range, please see a doctor.`,
     safe_tips: [
-      'Try asking again in a moment — the AI may just be busy.',
+      byChoice
+        ? 'The built-in knowledge base only covers common questions, and rephrasing may not match either.'
+        : 'Try asking again in a moment — the AI may just be busy.',
       'Check your readings and note them down for your doctor.',
       'See a doctor promptly if you feel unwell.',
     ],
-    voice_script:
-      'Hello! I am sorry, I cannot reach the AI service right now, so I cannot answer your question in full. Please try again in a moment. In the meantime, keep your meals light and low in salt, drink warm water, and see a doctor if you feel unwell.',
+    voice_script: byChoice
+      ? 'Hello! You chose the on-device-only mode, so I answer from the app built-in knowledge only. Your question is not in that knowledge base, so I cannot answer it directly. Here is some general advice instead: keep meals light and low in salt, drink warm water, and see a doctor if you feel unwell.'
+      : 'Hello! I am sorry, I cannot reach the AI service right now, so I cannot answer your question in full. Please try again in a moment. In the meantime, keep your meals light and low in salt, drink warm water, and see a doctor if you feel unwell.',
     source: 'smart_health_qa',
   };
 }

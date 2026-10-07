@@ -106,6 +106,8 @@ import { SettingsSection } from './components/SettingsSection';
 import { FontSizeSection } from './components/FontSizeSection';
 // 學一個小知識（2026-10-07 使用者指定）：結果頁的「原理 → 自我檢核」卡片。
 import { LearnFromScanCard } from './components/LearnFromScanCard';
+// 自填病症對話框（2026-10-07 使用者指定）：按「其他」立即彈出，取代原本的行內輸入框。
+import { CustomConditionDialog } from './components/CustomConditionDialog';
 import {
   loadFontScale,
   saveFontScale,
@@ -739,6 +741,17 @@ export default function App() {
     } catch {}
   };
 
+  /**
+   * 自填病症對話框是否開啟（2026-10-07 使用者指定）。
+   *
+   * 【為什麼從「行內展開」改成「彈出對話框」】
+   *   原本勾了「其他」之後，輸入框長在清單下方 ——
+   *   但使用者勾完時視線還在原本那一列，很容易**沒注意到輸入框出現了**，
+   *   於是帶著「勾了卻沒填」的狀態離開，而那個狀態送出時是空的（等於沒把關）。
+   *   改成彈出之後，輸入框就在使用者剛點的位置上蓋住畫面，不可能被錯過。
+   */
+  const [isCustomConditionDialogOpen, setCustomConditionDialogOpen] = useState(false);
+
   // 1.0.1 清單 UI 狀態：分類篩選、展開說明的項目（單一展開）、舊版設定遷移提示
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [expandedConditionId, setExpandedConditionId] = useState<string | null>(null);
@@ -1148,6 +1161,23 @@ export default function App() {
       } catch {}
       return updated;
     });
+  };
+
+  /**
+   * 慢性病清單的列被點擊時要做什麼（2026-10-07 使用者指定）。
+   *
+   * ⚠️ 「其他（自行填寫）」是唯一**不能直接勾選**的一項。
+   *    直接勾會產生一個「勾了卻什麼都不會送出」的項目 ——
+   *    送出時組出來的是空陣列（見下方 `conditions` 的推導），
+   *    也就是說使用者以為有人在看他的病症，其實沒有。**畫面上完全看不出來。**
+   *    所以未勾時先彈對話框問內容；已勾時與其他列一致＝取消勾選。
+   */
+  const handleConditionRowClick = (id: string) => {
+    if (id === 'other' && !selectedConditions.includes('other')) {
+      setCustomConditionDialogOpen(true);
+      return;
+    }
+    handleToggleCondition(id);
   };
 
   /**
@@ -3474,44 +3504,57 @@ export default function App() {
                 )}
               </div>
 
-              {/* ── 自填病症輸入框（2026-10-06 使用者指定）─────────────────────
-                  ★ 只在勾了「其他（自行填寫）」時才出現 —— 沒勾就完全不佔版面。
-                  ★ 放在「已選擇」釘選區的正下方：使用者剛在那裡勾了「其他」，
-                    輸入框就長在旁邊，不必回頭找。
-                  ★★ 一定要**當面講清楚「本機模式無法把關」**：
-                    「勾了卻沒有把關」是本專案最危險的失敗模式 ——
-                    不報錯、不當機，使用者只會以為有人在看。
-                    所以這裡寧可講得直白，也不要讓它靜默失效。 */}
+              {/* ── 自填病症：精簡列（2026-10-07 使用者指定）───────────────────
+                  ★ 輸入框已改成「按『其他』當下彈出對話框」（見 CustomConditionDialog）。
+                    這裡只留一個**看得到自己填了什麼**的精簡列 ——
+                    沒有它，使用者填完就再也看不到內容，只能取消再勾一次。
+                  ★★ 若勾了卻沒填，這裡會出現警告：那是一個「什麼都不會送出」的狀態
+                    （送出時組出來的是空陣列），而畫面上原本完全看不出來。
+                    這是本專案最恨的靜默失效 —— 寧可講得直白，也不要讓它無聲無息。 */}
               {selectedConditions.includes('other') && (
-                <div className="flex flex-col gap-[8px] bg-slate-50 border-2 border-slate-300 rounded-[12px] px-[12px] py-[12px]">
-                  <label
-                    htmlFor="custom-condition-input"
-                    className="text-[18px] font-black text-slate-900"
+                <div
+                  id="custom-condition-summary"
+                  className={`flex items-center justify-between gap-[10px] rounded-[12px] px-[12px] py-[10px] border-2 ${
+                    customCondition.trim()
+                      ? 'bg-slate-50 border-slate-300'
+                      : 'bg-amber-50 border-amber-400'
+                  }`}
+                >
+                  <span className="text-[17px] font-black text-slate-900 leading-snug min-w-0">
+                    {customCondition.trim() ? (
+                      <>
+                        {t('conditions.customPrefix')}
+                        <span className="font-black">{customCondition}</span>
+                      </>
+                    ) : (
+                      <span className="text-amber-900">{t('conditions.customMissing')}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    id="btn-edit-custom-condition"
+                    onClick={() => setCustomConditionDialogOpen(true)}
+                    className="shrink-0 min-h-[48px] px-[14px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-900 text-[16px] font-black cursor-pointer active:scale-95 transition-all"
                   >
-                    {t('conditions.customLabel')}
-                  </label>
-                  <input
-                    id="custom-condition-input"
-                    type="text"
-                    value={customCondition}
-                    onChange={(e) => handleChangeCustomCondition(e.target.value)}
-                    /* 20 字：足夠寫下完整的病症名（最長常見者約 8 字），
-                       又能避免有人貼一整段文章進來。 */
-                    maxLength={20}
-                    placeholder={t('conditions.customPlaceholder')}
-                    className="w-full min-h-[52px] px-[12px] rounded-[10px] border-2 border-slate-400 bg-white text-[19px] font-bold text-slate-900"
-                  />
-                  <p className="text-[16px] font-bold text-slate-600 leading-snug">
-                    {t('conditions.customHint')}
-                  </p>
-                  {/* 只有在真的選了「只在本機」時才提醒 —— 其他模式不需要嚇人 */}
-                  {analysisMode === 'local_only' && (
-                    <p className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-[10px] px-[10px] py-[8px] leading-snug">
-                      {t('conditions.customLocalOnly')}
-                    </p>
-                  )}
+                    {customCondition.trim()
+                      ? t('conditions.customEdit')
+                      : t('conditions.customFillNow')}
+                  </button>
                 </div>
               )}
+
+              <CustomConditionDialog
+                open={isCustomConditionDialogOpen}
+                initialValue={customCondition}
+                isLocalOnly={analysisMode === 'local_only'}
+                onConfirm={(text) => {
+                  handleChangeCustomCondition(text);
+                  // 內容非空才勾選 —— 對話框已經擋掉空白，這裡再確認一次
+                  if (!selectedConditions.includes('other')) handleToggleCondition('other');
+                  setCustomConditionDialogOpen(false);
+                }}
+                onCancel={() => setCustomConditionDialogOpen(false)}
+              />
 
               {/* ── 主清單（依分類篩選；排除已在釘選區的項目，避免同一項出現兩次） ── */}
               <div className="flex flex-col gap-[8px]">
@@ -3565,7 +3608,7 @@ export default function App() {
                               role="checkbox"
                               aria-checked={false}
                               id={`checkbox-${cond.id}`}
-                              onClick={() => handleToggleCondition(cond.id)}
+                              onClick={() => handleConditionRowClick(cond.id)}
                               className="min-h-[56px] px-[12px] py-[8px] flex items-center gap-[8px] text-left cursor-pointer active:scale-[0.99] transition-all"
                             >
                               {/* 這一列有四樣東西（圖示／名稱／徽章／後果等級），

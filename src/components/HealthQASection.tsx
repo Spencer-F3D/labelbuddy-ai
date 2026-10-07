@@ -93,7 +93,14 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }
 
   return (
     <div className="flex flex-col space-y-4">
-      <p className="text-[16px] font-bold text-slate-800 leading-relaxed">{t('qa.hint')}</p>
+      {/* ★ 2026-10-07：開頭這一句要**依模式**不同。
+          原本固定寫「AI 會看您上面填的數字」，那有兩個問題：
+            ① 只在本機模式根本沒有 AI —— 與下方的限制說明直接矛盾
+            ② 「您上面填的數字」是舊文案：生理指標輸入區早就移除了
+               （見 `check-ui-cjk.mjs` 的說明），使用者根本沒有地方填。 */}
+      <p className="text-[16px] font-bold text-slate-800 leading-relaxed">
+        {analysisMode === 'local_only' ? t('qa.hintLocal') : t('qa.hint')}
+      </p>
 
       {/* 常見問題快選 —— 對長者來說打字很吃力，這排按鈕比輸入框更重要 */}
       <div className="flex flex-col gap-2">
@@ -116,6 +123,19 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }
           ))}
         </div>
       </div>
+
+      {/* ── 只在本機模式的限制說明（2026-10-07 使用者指定）───────────────
+          ★ 放在**提問之前**，不是回答之後。
+            使用者在送出問題之前就該知道這個模式能給什麼、不能給什麼；
+            等他看到回答了才說「這不是 AI」，說服力弱得多。
+          ★ 為什麼一定要寫：這個模式的回答是**內建知識庫的規則式答案**，
+            不是 AI 生成的 —— 問法換一個字就可能對不上，然後掉到通用回覆。
+            使用者若以為它是 AI，就會對回答的「針對性」有錯誤期待。 */}
+      {analysisMode === 'local_only' && (
+        <p className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[10px] leading-relaxed">
+          {t('qa.localLimitation')}
+        </p>
+      )}
 
       {/* 自己輸入 */}
       <div className="flex flex-col gap-2">
@@ -148,7 +168,10 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }
 
       {answer && (
         <div className="flex flex-col space-y-3 pt-1">
-          {/* 走雲端還是走離線？跟指標分析一樣要講清楚 */}
+          {/* 走雲端還是走離線？跟指標分析一樣要講清楚。
+              ★ 2026-10-07：離線要再分兩種 ——
+                「使用者自己選了只在本機」與「臨時連不上 AI」是**不同的事**，
+                原本的文案寫「目前沒有連線」，對前者是錯的（他是有連線，只是不送出去）。 */}
           <span
             className={`self-start px-3 py-1.5 rounded-lg text-[16px] font-black border-2 ${
               answer.source === 'cloud_ai'
@@ -156,7 +179,11 @@ export const HealthQASection: React.FC<HealthQASectionProps> = ({ analysisMode }
                 : 'bg-amber-100 text-amber-950 border-amber-400'
             }`}
           >
-            {answer.source === 'cloud_ai' ? t('qa.modeCloud') : t('qa.modeLocal')}
+            {answer.source === 'cloud_ai'
+              ? t('qa.modeCloud')
+              : analysisMode === 'local_only'
+                ? t('qa.modeLocalByChoice')
+                : t('qa.modeLocal')}
           </span>
 
           <p className="text-[19px] font-black text-slate-950">{answer.key_takeaway}</p>

@@ -739,7 +739,17 @@ ${contextInfo
 
     // 降級：備用大白話長者問答引擎
     console.log('[LabelBuddy AI] 健康問答啟動本機守護引擎');
-    const fallbackAnswer = answerSeniorHealthQuestion(cleanQuestion, indicators, language);
+    /**
+     * ★ 2026-10-07：要告訴引擎「為什麼」走到這條路。
+     *   只在本機模式的使用者是**主動選擇**不送給 AI（他是有連線的），
+     *   回覆寫「連不上 AI」是假的，也會讓他以為「網路好一點就有 AI 回答」。
+     */
+    const fallbackAnswer = answerSeniorHealthQuestion(
+      cleanQuestion,
+      indicators,
+      language,
+      localOnly ? 'user_choice' : 'unreachable'
+    );
     simplifyNutrientWordingInFields(fallbackAnswer as any, QA_TEXT_FIELDS);
     return res.json({
       success: true,
@@ -749,10 +759,13 @@ ${contextInfo
     console.error('處理健康問題時發生錯誤:', error);
     // ⚠️ language 宣告在 try 內，catch 取不到 → 這裡重算，否則英文模式遇到例外會冒中文
     const qaFallbackLanguage: 'zh-TW' | 'en' = req.body?.language === 'en' ? 'en' : 'zh-TW';
+    // ⚠️ localOnly 同理（也在 try 內宣告）→ 重算，否則後備文案會把「使用者選擇」講成「連不上」
+    const qaLocalOnly = req.body?.localOnly === true;
     const fallbackAnswer = answerSeniorHealthQuestion(
       req.body?.question || '常見健康保養',
       req.body?.indicators,
-      qaFallbackLanguage
+      qaFallbackLanguage,
+      qaLocalOnly ? 'user_choice' : 'unreachable'
     );
     return res.json({
       success: true,
