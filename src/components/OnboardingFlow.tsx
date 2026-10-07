@@ -59,6 +59,9 @@ import { LegalNotice } from './LegalNotice';
 import { AnalysisModePicker } from './AnalysisModePicker';
 // 語言閘門（2026-09-30）：全流程的第一頁，獨立於編號步驟之外。
 import { OnboardingLanguageStep } from './OnboardingLanguageStep';
+// 自填病症對話框（2026-10-07 使用者指定）：引導頁與設定頁**共用同一個元件** ——
+// 兩邊各寫一份的話，同一個選項在兩個地方會長得不一樣。
+import { CustomConditionDialog } from './CustomConditionDialog';
 import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { conditionName } from '../data/bilingual';
 
@@ -78,6 +81,14 @@ export interface OnboardingResult {
   analysisMode: AnalysisMode;
   /** 第 3 頁勾選的慢性病與過敏原（與設定頁共用同一個儲存鍵）。 */
   conditions: string[];
+  /**
+   * ★ 2026-10-07 新增：第 3 頁自填的病症名稱（空字串＝沒填）。
+   *
+   * ⚠️ 與 `conditions` 分開傳是刻意的：自填文字**不進** `conditions` 陣列
+   *    （那會讓 `VALID_CONDITION_IDS` 的舊版偵測誤判），
+   *    而是在 App 端組合成「其他：<文字>」再送出 —— 與設定頁同一套規則。
+   */
+  customCondition: string;
 }
 
 interface OnboardingFlowProps {
@@ -85,6 +96,8 @@ interface OnboardingFlowProps {
   initialProfileId: LearnerProfileId;
   /** 既有的慢性病勾選（重跑引導頁時沿用，不該被清空） */
   initialConditions: string[];
+  /** 既有的自填病症（重跑引導頁時沿用，不該被清空） */
+  initialCustomCondition: string;
   /** 走完引導時呼叫 */
   onComplete: (result: OnboardingResult) => void;
 }
@@ -138,6 +151,7 @@ const HOW_STEPS = ['how1', 'how2', 'how3'] as const;
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   initialProfileId,
   initialConditions,
+  initialCustomCondition,
   onComplete,
 }) => {
   const { t, language, setLanguage } = useI18n();
@@ -255,10 +269,43 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const stepId = steps[current];
   const isLast = current === steps.length - 1;
 
-  const finish = () => onComplete({ profileId, analysisMode, conditions });
+  const finish = () =>
+    onComplete({ profileId, analysisMode, conditions, customCondition });
 
   const toggleCondition = (id: string) =>
     setConditions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  /**
+   * ★★ 2026-10-07 使用者指定：**引導頁也要能自填病症**。
+   *
+   * 【為什麼原本沒有】
+   *   引導頁的勾選列只有名稱與勾選框（沒有說明、也沒有輸入框），
+   *   所以「其他（自行填寫）」在引導頁只會被列成一個
+   *   「勾了卻不能填字、等於什麼都沒做」的選項 ——
+   *   那正是本專案最想避免的靜默失效，所以當時刻意排除它。
+   *
+   * 【現在為什麼可以加】
+   *   設定頁的「其他」已經改成**按下去立即彈出對話框**（`CustomConditionDialog`），
+   *   引導頁可以直接重用同一個元件 —— 於是「勾了卻沒填」這個狀態不再存在。
+   *
+   * ⚠️ 位置：使用者指定**獨立一列**（不是收進折疊區）。
+   *    代價是這一頁多約 56px；換來的是「清單上沒有我的病」的人一眼就看到出口。
+   */
+  const [customCondition, setCustomCondition] = useState<string>(initialCustomCondition ?? '');
+  const [isCustomDialogOpen, setCustomDialogOpen] = useState(false);
+
+  /**
+   * 「其他」那一列被點擊時：未勾 → 先彈對話框問內容；已勾 → 取消勾選。
+   * ⚠️ 與設定頁 `App.tsx` 的 `handleConditionRowClick` 同一套行為，
+   *    兩邊不一致的話，同一個選項在兩個地方會長得不一樣。
+   */
+  const handleCustomRowClick = () => {
+    if (!conditions.includes('other')) {
+      setCustomDialogOpen(true);
+      return;
+    }
+    toggleCondition('other');
+  };
 
   /**
    * 第 3 頁的清單分成三組：
@@ -266,12 +313,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
    *   ② `otherChronicItems` 常見補充病症 6 項 —— **收在「其他常見病症」裡**
    *   ③ `allergenItems`     食物過敏原 4 項 —— 直接列出（後果等級完全不同，要顯眼）
    *
-   * ⚠️ ①② 都排除 `localRule === false`，也就是「其他（自行填寫）」：
-   *   引導頁的勾選列只有名稱與勾選框（沒有說明、也沒有輸入框），
-   *   把它列出來只會變成一個「勾了卻不能填字、等於什麼都沒做」的選項 ——
-   *   那正是本專案最想避免的靜默失效。
+   * ⚠️ ①② 都排除 `localRule === false`，也就是「其他（自行填寫）」。
    *   判準用 `localRule`（語意）而不是寫死 `id !== 'other'`（字串）——
    *   日後若又多了一個自填類項目，這裡自動就對。
+   *
+   * ★★ 2026-10-07 更新：**「其他（自行填寫）」現在有了自己的獨立一列**
+   *    （見下方 `#onboard-custom-condition`），仍然不在這三組裡面 ——
+   *    因為它需要的是「按下去彈出對話框」，不是一個普通的勾選列。
+   *
+   *    原本排除它的理由是「引導頁沒有輸入框，勾了等於什麼都沒做」；
+   *    那個理由在對話框做好之後就不成立了。
    */
   const mainChronicItems = PHYSICAL_INDICATORS.filter(
     (c) => c.category !== 'allergen' && c.category !== 'other' && c.localRule !== false
@@ -553,9 +604,83 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   </div>
                 )}
 
+                {/* ── 自填病症（2026-10-07 使用者指定）─────────────────────
+                    ★ 使用者指定**獨立一列**、不收進折疊區：
+                      清單上沒有自己病症的人，一眼就要看到出口。
+                    ★ 按下去立即彈出對話框（與設定頁共用 CustomConditionDialog）
+                      —— 所以不會產生「勾了卻沒填」那個靜默失效的狀態。 */}
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={conditions.includes('other')}
+                  id="onboard-custom-condition"
+                  onClick={handleCustomRowClick}
+                  className={`w-full min-h-[56px] px-4 py-2 rounded-xl border-2 border-dashed flex items-center gap-3 text-left transition-all active:scale-[0.99] cursor-pointer ${
+                    conditions.includes('other')
+                      ? 'bg-blue-50 border-blue-900'
+                      : 'bg-white border-slate-400'
+                  }`}
+                >
+                  <span className="flex-1 min-w-0 text-[20px] font-black leading-tight text-blue-950">
+                    {t('onboard.conditionsCustom')}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`w-[44px] h-[44px] rounded-[10px] border-[3px] flex items-center justify-center shrink-0 ${
+                      conditions.includes('other')
+                        ? 'bg-blue-900 border-blue-900 text-white'
+                        : 'bg-white border-slate-400'
+                    }`}
+                  >
+                    {conditions.includes('other') && <Check className="w-[26px] h-[26px] stroke-[4]" />}
+                  </span>
+                </button>
+
+                {/* 填了什麼要看得到；勾了沒填要當面警告（不可靜默） */}
+                {conditions.includes('other') && (
+                  <div
+                    id="onboard-custom-summary"
+                    className={`flex items-center justify-between gap-[10px] rounded-xl px-4 py-2 border-2 ${
+                      customCondition.trim() ? 'bg-slate-50 border-slate-300' : 'bg-amber-50 border-amber-400'
+                    }`}
+                  >
+                    <span className="text-[16px] font-black text-slate-900 leading-snug min-w-0">
+                      {customCondition.trim() ? (
+                        <>
+                          {t('conditions.customPrefix')}
+                          <span className="font-black">{customCondition}</span>
+                        </>
+                      ) : (
+                        <span className="text-amber-900">{t('conditions.customMissing')}</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      id="btn-onboard-edit-custom"
+                      onClick={() => setCustomDialogOpen(true)}
+                      className="shrink-0 min-h-[48px] px-[14px] rounded-[10px] bg-white border-2 border-slate-400 text-slate-900 text-[16px] font-black cursor-pointer active:scale-95 transition-all"
+                    >
+                      {customCondition.trim() ? t('conditions.customEdit') : t('conditions.customFillNow')}
+                    </button>
+                  </div>
+                )}
+
+                <CustomConditionDialog
+                  open={isCustomDialogOpen}
+                  initialValue={customCondition}
+                  isLocalOnly={analysisMode === 'local_only'}
+                  onConfirm={(text) => {
+                    setCustomCondition(text);
+                    if (!conditions.includes('other')) toggleCondition('other');
+                    setCustomDialogOpen(false);
+                  }}
+                  onCancel={() => setCustomDialogOpen(false)}
+                />
+
                 {/* ★ 清單上沒有的病症要告訴使用者去哪裡加 ——
                     否則他會以為這個 App 只能選這幾項。
-                    （自填輸入框只在設定頁，見上方 mainChronicItems 的說明。） */}
+                    ⚠️ 2026-10-07：這一句原本是「可以在之後的健康設定裡自行填寫」，
+                      現在上面就有自填那一列，所以改成指向它。 */}
                 <p className="text-[16px] font-bold text-slate-600 leading-snug">
                   {t('onboard.conditionsMore')}
                 </p>

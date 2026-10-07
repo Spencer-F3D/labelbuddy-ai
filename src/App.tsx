@@ -684,6 +684,35 @@ export default function App() {
   });
 
   /**
+   * 「其他（自行填寫）」的自填病症名稱（2026-10-06）。
+   *
+   * ⚠️ 它**不進 `selectedConditions`** —— 那是一組固定的 id，
+   *    存自填文字進去會讓 `VALID_CONDITION_IDS` 的舊版偵測誤判
+   *    （見上方遷移邏輯：只要出現非法 id 就會跳遷移提示）。
+   *    所以自填文字有自己的一個鍵。
+   *
+   * ⚠️ 這個 state **必須宣告在 `handleOnboardingComplete` 之前** ——
+   *    引導頁第 3 頁（2026-10-07 起）也會回傳自填內容，那個 handler 要寫入它。
+   *    放在後面的話，TypeScript 會報「用於宣告之前」。
+   *    （`selectedConditions` 也是基於同一個理由被移到上面。）
+   */
+  const [customCondition, setCustomCondition] = useState<string>(() => {
+    try {
+      return localStorage.getItem(STORAGE_CUSTOM_CONDITION_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+
+  /** 自填病症的輸入處理。立即寫入儲存 —— 沒有「儲存」按鈕，長者不會記得按。 */
+  const handleChangeCustomCondition = (text: string) => {
+    setCustomCondition(text);
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_CONDITION_KEY, text);
+    } catch {}
+  };
+
+  /**
    * 走完首次啟動引導頁。
    *
    * 這裡是**唯一**能設定分析模式的地方（引導頁）＋ 設定頁的模式切換。
@@ -694,10 +723,15 @@ export default function App() {
     profileId,
     analysisMode: chosenMode,
     conditions: chosenConditions,
+    // ★ 2026-10-07：引導頁第 3 頁也能自填病症了
+    customCondition: chosenCustomCondition,
   }: OnboardingResult) => {
     setLearnerProfileId(profileId);
     setAnalysisMode(chosenMode);
     setSelectedConditions(chosenConditions);
+    // ⚠️ 走 `handleChangeCustomCondition` 而不是 `setCustomCondition` ——
+    //    那個函式同時負責寫入儲存，直接呼叫 setState 會漏掉寫檔。
+    handleChangeCustomCondition(chosenCustomCondition ?? '');
     setOnboarded(true);
 
     try {
@@ -714,30 +748,6 @@ export default function App() {
 
     try {
       navigator.vibrate([40, 60, 40]);
-    } catch {}
-  };
-
-  /**
-   * 「其他（自行填寫）」的自填病症名稱（2026-10-06）。
-   *
-   * ⚠️ 它**不進 `selectedConditions`** —— 那是一組固定的 id，
-   *    存自填文字進去會讓 `VALID_CONDITION_IDS` 的舊版偵測誤判
-   *    （見上方遷移邏輯：只要出現非法 id 就會跳遷移提示）。
-   *    所以自填文字有自己的一個鍵。
-   */
-  const [customCondition, setCustomCondition] = useState<string>(() => {
-    try {
-      return localStorage.getItem(STORAGE_CUSTOM_CONDITION_KEY) ?? '';
-    } catch {
-      return '';
-    }
-  });
-
-  /** 自填病症的輸入處理。立即寫入儲存 —— 沒有「儲存」按鈕，長者不會記得按。 */
-  const handleChangeCustomCondition = (text: string) => {
-    setCustomCondition(text);
-    try {
-      localStorage.setItem(STORAGE_CUSTOM_CONDITION_KEY, text);
     } catch {}
   };
 
@@ -1915,6 +1925,8 @@ export default function App() {
         <OnboardingFlow
           initialProfileId={learnerProfileId}
           initialConditions={selectedConditions}
+          /* ★ 2026-10-07：引導頁也能自填病症，重跑時沿用既有值 */
+          initialCustomCondition={customCondition}
           onComplete={handleOnboardingComplete}
         />
       )}

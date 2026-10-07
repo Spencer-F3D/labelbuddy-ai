@@ -460,6 +460,132 @@ async function boot(mode, lang = 'zh-TW') {
     await sleep(400);
   }
 
+  /* ══════════════════════════════════════════════════════════════════
+   * 第四輪：**引導頁**（2026-10-07 使用者指定「引導頁也要有」）
+   * ══════════════════════════════════════════════════════════════════
+   * 【為什麼一定要單獨跑一輪】
+   *   引導頁的慢性病步驟與設定頁是**兩個不同的元件**（`OnboardingFlow` vs `App`），
+   *   自填的 state 也是各一份。設定頁測過不代表引導頁會動 ——
+   *   尤其引導頁那條路徑要「回傳給 App 並寫進儲存」，中間任何一段漏接都不會報錯。
+   */
+  console.log('\n── 第四輪：引導頁的自填病症 ──');
+  await cdp.eval(`
+    (() => {
+      localStorage.clear();
+      return 'ok';
+    })()
+  `);
+  await navigateUntilReady();
+  await sleep(1200);
+
+  // 語言閘門
+  const gate = await waitFor(`!!document.getElementById('onboarding-language-zh-TW')`, 10000);
+  if (gate) {
+    await cdp.eval(clickId('onboarding-language-zh-TW'));
+    await sleep(400);
+    await cdp.eval(clickId('onboarding-language-confirm'));
+    await sleep(1500);
+  }
+  check('走過語言閘門', gate === true);
+
+  /**
+   * 逐步走引導頁，**在慢性病那一頁停下來操作**。
+   *
+   * ⚠️ 不能像 `check-ui-cjk.mjs` 那樣「一直按下一步到沒有為止」——
+   *    那樣會直接跳過要驗的那一頁。所以每一輪先看 `#onboard-custom-condition`
+   *    在不在，在就操作，然後才按下一步。
+   */
+  let interacted = false;
+  for (let i = 0; i < 14; i++) {
+    const onConditions = await cdp.eval(`!!document.getElementById('onboard-custom-condition')`);
+    if (onConditions && !interacted) {
+      interacted = true;
+      check('★ 引導頁有「其他（自行填寫）」那一列', true);
+      await cdp.eval(clickId('onboard-custom-condition'));
+      const dlg = await waitFor(dialogOpen, 5000);
+      check('★ 引導頁按「其他」也會彈出對話框', dlg === true);
+      await shot('07-onboard-dialog');
+      if (dlg) {
+        await cdp.eval(TYPE_INTO('custom-condition-input', '甲狀腺機能低下'));
+        await sleep(300);
+        await cdp.eval(clickId('btn-custom-condition-confirm'));
+        await sleep(700);
+        check(
+          '★ 引導頁確定後顯示精簡列（看得到自己填了什麼）',
+          (await cdp.eval(`!!document.getElementById('onboard-custom-summary')`)) === true
+        );
+        // ⚠️ 一定要先捲到那一列再拍 —— 引導頁很長，不捲的話截圖只有上方那 12 項，
+        //    看不到新加的東西（等於沒有證據）。
+        await cdp.eval(`
+          (() => {
+            const el = document.getElementById('onboard-custom-summary')
+              || document.getElementById('onboard-custom-condition');
+            if (el) el.scrollIntoView({ block: 'center' });
+            return !!el;
+          })()
+        `);
+        await sleep(600);
+        await shot('08-onboard-filled');
+      }
+    }
+    /**
+     * ⚠️ 最後一頁（私隱條款）**沒勾同意就不放行** ——
+     *    「開始使用」按下去不會有反應，迴圈會一直卡在同一頁。
+     *    第一次跑就是卡在這裡（連續 7 輪都停在「私隱與 AI 使用方式」）。
+     *
+     * ⚠️ 同意框在 `LegalNotice` 裡，**沒有 id**（它是共用元件，加固定 id
+     *    在同時渲染兩份時會撞號），所以用 `input[type="checkbox"]` 選。
+     *    用 `.click()` 而不是設 `.checked` —— 那是 React 受控元件，
+     *    直接改 property 不會觸發 onChange。
+     */
+    await cdp.eval(`
+      (() => {
+        const cb = document.querySelector('#onboarding-flow input[type="checkbox"]');
+        if (cb && !cb.checked) cb.click();
+        return true;
+      })()
+    `);
+    await sleep(200);
+
+    const clicked = await cdp.eval(`
+      (() => {
+        const btn = [...document.querySelectorAll('button')].map((e) => ({
+          t: (e.textContent || '').trim(),
+          id: e.id || '',
+        }));
+        const b = [...document.querySelectorAll('button')].find((e) =>
+          /^(下一步|開始使用)$/.test((e.textContent || '').trim()));
+        if (!b) return JSON.stringify({ ok: false, buttons: btn.slice(-6) });
+        b.click();
+        return JSON.stringify({ ok: true, label: (b.textContent || '').trim() });
+      })()
+    `);
+    const info = JSON.parse(clicked);
+    if (!info.ok) {
+      console.log(`   ℹ️  第 ${i + 1} 輪找不到下一步，畫面上的按鈕：${JSON.stringify(info.buttons)}`);
+      break;
+    }
+    const head = await cdp.eval(`
+      (document.querySelector('#onboarding-flow h1')?.innerText || document.body.innerText || '')
+        .replace(/\\s+/g, ' ').slice(0, 46)
+    `);
+    console.log(`   ℹ️  第 ${i + 1} 輪：按「${info.label}」｜${head}`);
+    await sleep(1100);
+  }
+  check('★ 在引導頁的慢性病步驟真的操作到了（不是被跳過）', interacted === true);
+
+  await sleep(1500);
+  check(
+    '★★ 走完引導頁後，自填內容寫進了 labelbuddy_custom_condition_v1',
+    (await cdp.eval(`localStorage.getItem('labelbuddy_custom_condition_v1')`)) === '甲狀腺機能低下',
+    `→ ${await cdp.eval(`localStorage.getItem('labelbuddy_custom_condition_v1')`)}`
+  );
+  check(
+    '★★ 走完引導頁後，「其他」也在勾選清單裡',
+    (await cdp.eval(conditionsInStorage)).includes('other'),
+    JSON.stringify(await cdp.eval(conditionsInStorage))
+  );
+
   console.log(`\n${'='.repeat(66)}`);
   console.log(`結果：${pass} 項通過 / ${fail} 項有問題`);
   console.log(`截圖存於：${OUT}`);

@@ -971,6 +971,42 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ---
 
+### [2026-10-07 20:15] 墨影（Mo）
+
+**做了什麼**：使用者指定「自填病症引導頁也要有」→ 已加上（他選**獨立一列**，不收折疊區）。
+
+| 檔案 | 動作 |
+| --- | --- |
+| `OnboardingFlow.tsx` | `OnboardingResult` 加 `customCondition`；props 加 `initialCustomCondition`；新增 `#onboard-custom-condition` 一列 ＋ `#onboard-custom-summary`；重用 `CustomConditionDialog` |
+| `App.tsx` | 傳 `initialCustomCondition`；`handleOnboardingComplete` 走 `handleChangeCustomCondition` |
+| `translations.ts` | 新增 `onboard.conditionsCustom`；`onboard.conditionsMore` 改成指向新那一列 |
+
+**為什麼原本沒有**：引導頁的勾選列只有名稱與勾選框，把「其他（自行填寫）」列出來
+只會變成「勾了卻不能填字、等於什麼都沒做」。**對話框做好之後那個理由就不成立了**
+—— 所以現在可以直接重用同一個元件，行為與設定頁一致。
+
+**怎麼驗證**：
+- `check-custom-condition.mjs` **31 項全過**（新增第 4 輪：真的走完引導頁，
+  在慢性病那頁按「其他」→ 對話框 → 填字 → 完成 → 確認寫進
+  `labelbuddy_custom_condition_v1` 且 `other` 在勾選清單裡）
+- `verify:all` 全綠；`check:layout` 中英各 0 筆問題；`check:ui` 17 畫面英文零中文
+- 實測頁面長度：第 3 頁 1624px → **1723px**（2.54 → 2.69 螢幕，+99px）
+
+**⚠️ 跨工作目錄的提醒**：
+1. **`OnboardingResult` 多了必填欄位 `customCondition: string`** ——
+   如果你那邊有別的呼叫端，會編譯失敗（好事，不會靜默）。
+2. **`customCondition` 的 state 被我搬到 `handleOnboardingComplete` 之前**
+   （原本在後面，會被 TypeScript 擋）。不要搬回去。
+3. **`onboard.conditionsMore` 的文案改了**（原本叫使用者「去健康設定填」，
+   現在引導頁自己就有出口）。
+4. 引導頁第 3 頁變長 99px。若你覺得太長，可以把它收進「其他常見病症」折疊區
+   （會少 56px 左右）—— 但使用者這次明確選了「更顯眼」。
+
+**還沒做／有疑問**：
+- ⚠️ 第二階段（KV 線上題庫）仍未開始。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |

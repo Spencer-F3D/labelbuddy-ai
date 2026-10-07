@@ -450,7 +450,11 @@ const zhTW = {
   'onboard.conditionsAllergyNote': '會過敏的食物請務必打勾。',
   /* ★ 2026-10-06：自填病症的輸入框只在設定頁（引導頁沒有輸入框），
      所以要明講去哪裡加 —— 否則使用者會以為只能選這幾項。 */
-  'onboard.conditionsMore': '清單上沒有的病症，可以在之後的「健康設定」裡自行填寫。',
+  /* ★ 2026-10-07：引導頁也能自填病症了（獨立一列，按下去彈出對話框）。
+     這一句原本是「可以在之後的健康設定裡自行填寫」——
+     現在上面就有出口，所以改成指向它（叫使用者去別頁填是多繞一圈）。 */
+  'onboard.conditionsCustom': '其他（自行填寫）',
+  'onboard.conditionsMore': '清單上沒有的病症，請選上面的「其他（自行填寫）」。',
   /* ★ 2026-10-06：常見補充病症收在一個折疊區裡（這一頁原本已 3.1 個螢幕高）。
      ⚠️ `conditionsOtherSelected` 是**收合時的必要資訊** ——
         收起「已選 2 項」的話，使用者會以為自己的勾選不見了。 */
@@ -1194,8 +1198,9 @@ const en: Record<TranslationKey, string> = {
   'onboard.conditionsAllergy': 'Food allergies',
   'onboard.conditionsAllergyNote': 'Please tick any food you are allergic to.',
   'onboard.conditionsMore':
-    'If your condition is not on the list, you can type it in later under "Health settings".',
+    'If your condition is not on the list, choose "Other (type it yourself)" above.',
   'onboard.conditionsOther': 'Other common conditions',
+  'onboard.conditionsCustom': 'Other (type it yourself)',
   'onboard.conditionsOtherHint': 'Tap to expand',
   'onboard.conditionsOtherSelected': '{n} selected',
   'onboard.identityTitle': 'First, who are you?',
