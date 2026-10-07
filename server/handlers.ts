@@ -61,6 +61,8 @@ import { buildUserConstraintLine } from './conditionConstraint';
 // ⚠️ 這是**會呼叫雲端**的功能，所以 handler 內必須有同意閘門（見 handleQuizQuestion）。
 import { SYSTEM_INSTRUCTION_QUIZ, buildQuizPrompt } from './quizPrompt';
 import { normalizeQuizQuestion, pickBuiltinFallback } from './quizValidate';
+// 線上題庫（2026-10-07 第二階段）：只認介面，不認 KV（見 server/quizBank.ts）
+import { findBankMatch, listQuestionsSince, writeQuestionsToBank } from './quizBank';
 import { isLabelKey } from '../src/data/labelKeys';
 import { getLearnerProfile, getNutrientDirections } from '../src/data/learnerProfiles';
 // 雙語對照（2026-09-28）：提示詞與本機引擎都要依語言輸出正確的名稱。
@@ -832,6 +834,23 @@ export async function handleQuizQuestion(body: any, headers: Headers, deps: Core
       });
     }
 
+    // ── ★ 先查線上題庫（2026-10-07 第二階段）──────────────────────
+    //   命中就**完全不呼叫 AI** —— 這是省額度最主要的手段。
+    //   ⚠️ 只有「labelKeys 有交集」才算命中（見 findBankMatch 的說明）；
+    //      通用題不算，否則 AI 生成永遠不會被觸發。
+    if (deps.quizBank) {
+      try {
+        const hit = await findBankMatch(deps.quizBank, labelKeys, excludeIds);
+        if (hit) {
+          console.log('[LabelBuddy AI] 出題：命中線上題庫，未消耗任何 API 額度');
+          return res.json({ success: true, data: hit, fromBank: true });
+        }
+      } catch (e) {
+        // 題庫查詢失敗不該讓出題失敗 —— 繼續往下走 AI 那條路
+        console.warn('[LabelBuddy AI] 查詢線上題庫失敗，改用 AI 生成:', e);
+      }
+    }
+
     // ── 呼叫雲端 AI 生成 ─────────────────────────────────────────
     const aiResult = await callAiModel(req, {
       systemInstruction: SYSTEM_INSTRUCTION_QUIZ,
@@ -854,6 +873,27 @@ export async function handleQuizQuestion(body: any, headers: Headers, deps: Core
 
     const candidate = aiResult ? normalizeQuizQuestion(aiResult.data, labelKeys) : null;
     if (candidate) {
+      /**
+       * ★ 寫進線上題庫（第二階段）。
+       *
+       * 【為什麼「不等寫完就回」】
+       *   KV 是**最終一致性**（跨 PoP 最多約 60 秒）。
+       *   如果等它寫完才回，使用者要為一個「別台裝置才會用到」的動作多等。
+       *   → 先把題目 inline 回給本次使用者（前端立刻 merge 進本機題庫，
+       *     同一台裝置馬上就能再用到），寫 KV 只是順便。
+       *
+       * ⚠️ 但仍然 **await**（不是 fire-and-forget）：
+       *    Worker 的 isolate 在回應送出後可能被凍結，
+       *    沒有 await 的 Promise 會**無聲無息地不完成** ——
+       *    題目永遠不會進題庫，而且沒有任何錯誤訊息。
+       */
+      if (deps.quizBank) {
+        try {
+          await writeQuestionsToBank(deps.quizBank, [candidate]);
+        } catch (e) {
+          console.warn('[LabelBuddy AI] 寫入線上題庫失敗（不影響本次出題）:', e);
+        }
+      }
       return res.json({ success: true, data: candidate, fromBank: false });
     }
 
@@ -872,6 +912,63 @@ export async function handleQuizQuestion(body: any, headers: Headers, deps: Core
     } catch {
       return res.json({ success: true, data: null });
     }
+  }
+}
+
+/**
+ * 對應 `/api/quiz-bank`（GET `?since=<ms>`）—— 線上題庫同步（2026-10-07 第二階段）。
+ *
+ * 【為什麼沒有同意閘門】
+ *   同意閘門的規則是「**會把使用者的資料送到 AI 供應商**的功能都要有兩道防線」。
+ *   這個端點：
+ *     · 不呼叫任何 AI 供應商
+ *     · 不帶任何個人資料（沒有標籤、沒有病史、沒有照片）
+ *     · 回傳的是**大家共用的公開題庫**
+ *   → 所以不需要閘門。前端的同步 effect 在 `local_only` 時仍然會跳過它，
+ *     那是「少發一個請求」的額外好處，不是安全性要求。
+ *
+ * ⚠️ **但如果哪天這個端點開始帶上個人化的參數（例如帶著使用者的 labelKeys
+ *    去查），就必須回頭補上同意閘門。** 這一條寫在這裡，是為了讓那個人看到。
+ *
+ * 【`since` 的語意】
+ *   用戶端**上次成功合併**的時間（毫秒）。
+ *   ⚠️ 用戶端必須「先合併、成功後才推進 since」——
+ *      先推進再合併的話，中途失敗會永久漏掉那一段題目，而且不會報錯。
+ */
+export async function handleQuizBank(body: any, headers: Headers, deps: CoreDeps): Promise<ApiResult> {
+  const req: any = { body, headers: Object.fromEntries(headers) };
+  const res: any = makeRes();
+
+  const rawSince = Number(req.body?.since);
+  const since = Number.isFinite(rawSince) && rawSince > 0 ? rawSince : 0;
+
+  // ── 沒有綁 KV（本機 Node、或 binding 被拿掉）→ 回空題庫，不要報錯 ──
+  //    ⚠️ 回 200 而不是 4xx/5xx：對用戶端來說「題庫是空的」與
+  //       「這個部署沒有題庫」要做的事完全一樣（什麼都不必合併）。
+  //       回錯誤只會讓前端多一個要處理的分支，而且會蓋掉真正該注意的錯誤。
+  if (!deps.quizBank) {
+    return res.json({
+      success: true,
+      data: { questions: [], version: 0, updatedAt: 0 },
+      bankAvailable: false,
+    });
+  }
+
+  try {
+    const { questions, version, updatedAt } = await listQuestionsSince(deps.quizBank, since);
+    return res.json({
+      success: true,
+      data: { questions, version, updatedAt },
+      bankAvailable: true,
+    });
+  } catch (error: any) {
+    console.error('[LabelBuddy AI] 讀取線上題庫失敗:', error);
+    // 題庫讀不到不該讓任何主流程壞掉 —— 回空題庫，前端照常運作
+    return res.json({
+      success: true,
+      data: { questions: [], version: 0, updatedAt: 0 },
+      bankAvailable: false,
+    });
   }
 }
 

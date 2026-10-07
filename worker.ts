@@ -32,10 +32,12 @@ import {
   handleAskHealthQuestion,
   handleHealth,
   handlePrivacy,
+  handleQuizBank,
   handleQuizQuestion,
 } from './server/handlers';
 import { handleFitnessReport } from './server/fitnessReport';
 import type { ApiResult, CoreDeps } from './server/core';
+import { makeQuizBankStore, type KvLike } from './server/quizBank';
 
 /**
  * 平台相依能力。
@@ -45,8 +47,21 @@ import type { ApiResult, CoreDeps } from './server/core';
  *    客戶端若送圖片（舊版），handler 會回 OCR_NOT_AVAILABLE，
  *    提示對方改用支援前端辨識的版本 —— 明確回報比默默失敗好。
  */
-const deps: CoreDeps = {};
-
+/**
+ * ★★ 2026-10-07 第二階段：**`deps` 從 module 層搬進 `fetch` 內**。
+ *
+ * 【原本錯在哪】
+ *   `deps` 是 module 層的常數，整個 Worker 實例共用一份。
+ *   這對第一階段的 `{}` 沒有影響（它是空的）。
+ *   但 KV 綁定是 **per-request 的 `env`** ——
+ *   module 層根本拿不到 `env`，所以 `deps.quizBank` 不可能在那裡建構。
+ *
+ *   ⚠️ 更糟的是：如果硬把它寫成 module 層的可變物件，
+ *      Cloudflare 會在多個請求之間**重複使用同一個 isolate**，
+ *      於是不同請求會互相看到對方的綁定 —— 那是一個極難重現的 bug。
+ *
+ * → 現在 `deps` 在 `fetch` 內依 `env` 建構，一次請求一份，不會互相污染。
+ */
 type Handler = (body: any, headers: Headers, deps: CoreDeps) => Promise<ApiResult>;
 
 const ROUTES: Record<string, { handler: Handler; method: 'GET' | 'POST' }> = {
@@ -58,6 +73,9 @@ const ROUTES: Record<string, { handler: Handler; method: 'GET' | 'POST' }> = {
   // 出題（2026-10-07）：「學一個小知識」的測驗題。
   // ⚠️ 含同意閘門：localOnly 時只回內建題，不呼叫任何外部服務。
   '/api/quiz-question': { handler: handleQuizQuestion, method: 'POST' },
+  // 線上題庫同步（2026-10-07 第二階段）：`?since=<ms>` 只回更新的題。
+  // ⚠️ 這是 GET —— 題庫是「大家共用的公開內容」，不含任何個人資料。
+  '/api/quiz-bank': { handler: handleQuizBank, method: 'GET' },
   '/api/privacy': { handler: handlePrivacy, method: 'GET' },
   '/api/ai-status': { handler: handleAiStatus, method: 'GET' },
   '/api/health': { handler: handleHealth, method: 'GET' },
@@ -88,12 +106,31 @@ function jsonResponse(result: ApiResult, extra: Record<string, string> = {}): Re
 export interface Env {
   /** Workers Assets 綁定（前端 build 產物） */
   ASSETS: { fetch: (request: Request) => Promise<Response> };
+  /**
+   * 線上題庫（2026-10-07 第二階段）。
+   *
+   * ⚠️ 用**結構型別**而不是 `import type { KVNamespace } from '@cloudflare/workers-types'`
+   *    —— 引入那個套件會讓整個專案的型別環境跟著換一套，
+   *    而我們只用到 get／put／list 三個方法。
+   * ⚠️ optional：未綁定時不注入 `deps.quizBank`，功能自動降級（見 quizBank.ts）。
+   */
+  QUIZ_BANK?: KvLike;
   [key: string]: unknown;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    /**
+     * ★ 平台相依能力，**每個請求各建一份**。
+     *
+     * 【為什麼不能放在 module 層】
+     *   見上方 `type Handler` 的說明：`env` 是 per-request 的，
+     *   module 層拿不到它；而且 isolate 會跨請求重用，
+     *   共用一份可變物件會讓不同請求互相污染。
+     */
+    const deps: CoreDeps = env.QUIZ_BANK ? { quizBank: makeQuizBankStore(env.QUIZ_BANK) } : {};
 
     // 預檢請求（APK 跨來源時會先送這個）
     if (request.method === 'OPTIONS') {
@@ -110,10 +147,31 @@ export default {
       }
 
       try {
-        // GET 沒有 body；POST 才解析 JSON。
-        // 解析失敗時給空物件，讓 handler 用既有的「未收到內容」邏輯回應，
-        // 而不是讓整個請求以 500 收場。
-        const body = route.method === 'POST' ? await request.json().catch(() => ({})) : {};
+        /**
+         * GET 沒有 body；POST 才解析 JSON。
+         * 解析失敗時給空物件，讓 handler 用既有的「未收到內容」邏輯回應，
+         * 而不是讓整個請求以 500 收場。
+         *
+         * ★ 2026-10-07：GET 改成傳**查詢參數**（`?since=...`）。
+         *
+         * 【為什麼要這樣做】
+         *   handler 的簽名是 `(body, headers, deps)` —— 拿不到 URL。
+         *   而 `/api/quiz-bank?since=<ms>` 需要那個 `since`。
+         *
+         *   三個選擇：
+         *     ① 改 handler 簽名加第 4 個參數 → 要動**所有** handler 與兩平台的呼叫端
+         *     ② 只為這一個 handler 開特例 → 下一個需要查詢參數的人又要再開一次
+         *     ③ **GET 的查詢參數就放進 `body`** ← 採用
+         *   ③ 讓「GET 的輸入」與「POST 的輸入」在 handler 眼中長得一樣，
+         *   而 `body` 這個名字在這裡的意義就是「這次請求的輸入參數」。
+         *
+         * ⚠️ `server.ts`（本機 Node）必須做一樣的事，否則同一支 handler
+         *    在本機與線上行為不同 —— 那是最難查的一種 bug。
+         */
+        const body =
+          route.method === 'POST'
+            ? await request.json().catch(() => ({}))
+            : Object.fromEntries(url.searchParams);
         const result = await route.handler(body as any, request.headers, deps);
         return jsonResponse(result);
       } catch (error) {

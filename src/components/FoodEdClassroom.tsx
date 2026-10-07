@@ -40,8 +40,17 @@ import type {
 import {
   KNOWLEDGE_CARDS,
   QUIZ_QUESTIONS,
-  getQuestionsByTopic,
+  // ⚠️ `getQuestionsByTopic`（educationContent.ts）**現在沒有任何呼叫端了**。
+  //    第二階段的合併改成在「全部題目」那一層做（見下方 `allQuestions`）——
+  //    因為統計數字（X / 60）需要跨主題的總數，不能只拿單一主題的清單。
+  //
+  //    計劃書明訂它「保持不動（維持純函式）」，所以**刻意保留不刪**：
+  //    它仍是 `educationContent.ts` 對外的資料 API，
+  //    而且是未來「只取某主題」時最自然的入口。
+  //    （若日後確定不需要，連同這裡的註解一起刪掉即可。）
 } from '../data/educationContent';
+// 線上題庫（2026-10-07 第二階段）
+import { getBankQuestions, subscribeQuizBank } from '../data/quizBank';
 import {
   getLearnerProfile,
   TOPIC_LABELS,
@@ -241,10 +250,45 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
     return sorted.map((c) => localizeCard(c, language));
   }, [topicFilter, profileId, language]);
 
+  /* -------- 線上題庫（2026-10-07 第二階段）-------- */
+  /**
+   * 題庫變更時要重算題目清單。
+   *
+   * ⚠️ **一定要訂閱。** `syncQuizBank()` 是在 App 掛載時非同步跑的；
+   *    使用者如果那時候正停在學堂頁，新題目補進來卻沒有重新渲染 ——
+   *    要離開再回來才看得到，而**畫面上完全看不出來有東西沒更新**。
+   *
+   * ⚠️ 這裡的 state 只是「重新渲染的觸發器」，值本身沒有意義。
+   *    刻意不用 `getBankQuestions()` 當 state —— 那會多存一份可能過期的複本。
+   */
+  const [bankTick, setBankTick] = useState(0);
+  useEffect(() => subscribeQuizBank(() => setBankTick((n) => n + 1)), []);
+
+  /**
+   * 內建 60 題 ＋ 線上題庫（以 `id` 去重，內建優先）。
+   *
+   * ⚠️ 為什麼是「內建優先」而不是「線上優先」：
+   *    內建題經過 `check-quiz-bank.ts` 的完整性驗證（選項數、正解範圍、
+   *    英文對照都在），品質是確定的。線上題雖然也經過 `normalizeQuizQuestion`
+   *    驗證，但多一層「優先相信已驗證過的資料」比較安全。
+   *    （id 是內容雜湊，所以同一題本來就不會有兩份。）
+   */
+  const allQuestions = useMemo(() => {
+    const byId = new Map<string, QuizQuestion>();
+    for (const q of QUIZ_QUESTIONS) byId.set(q.id, q);
+    for (const q of getBankQuestions()) if (!byId.has(q.id)) byId.set(q.id, q);
+    return [...byId.values()];
+    // bankTick 是刻意的依賴：它代表「題庫內容可能變了」
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bankTick]);
+
   /* -------- 測驗題清單 -------- */
   const questions = useMemo(
-    () => getQuestionsByTopic(quizTopic).map((q) => localizeQuestion(q, language)),
-    [quizTopic, language]
+    () =>
+      allQuestions
+        .filter((q) => !quizTopic || q.topic === quizTopic)
+        .map((q) => localizeQuestion(q, language)),
+    [allQuestions, quizTopic, language]
   );
   const currentQuestion = questions[quizIndex];
 
@@ -254,6 +298,23 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
     for (const a of progress.attempts) if (a.isCorrect) set.add(a.questionId);
     return set;
   }, [progress.attempts]);
+
+  /**
+   * ★ 答對題數的**分子**，必須用與分母同一份清單過濾。
+   *
+   * 【為什麼不能直接用 `uniqueCorrect.size`】
+   *   `uniqueCorrect` 是**歷史上所有**答對過的題目 id ——
+   *   包含別的主題的題、也包含已經不在目前清單裡的題。
+   *   分母是 `allQuestions.length`。兩者不同調就會出現
+   *   **「62 / 60」**這種一看就壞掉的數字，而且不會有任何錯誤訊息。
+   *
+   *   （第二階段加入線上題庫之後，這個風險從「理論上」變成「真的會發生」——
+   *     題庫會隨時間增減。）
+   */
+  const correctCount = useMemo(() => {
+    const ids = new Set(allQuestions.map((q) => q.id));
+    return [...uniqueCorrect].filter((id) => ids.has(id)).length;
+  }, [uniqueCorrect, allQuestions]);
 
   const cardReadCount = progress.readCardIds.length;
 
@@ -337,7 +398,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
               id: 'quiz',
               labelKey: 'classroom.tabQuiz',
               icon: Target,
-              badge: `${QUIZ_QUESTIONS.length}`,
+              badge: `${allQuestions.length}`,
             },
             {
               id: 'cards',
@@ -450,7 +511,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
               {t('classroom.allQuestions')}
             </button>
             {TOPIC_ORDER.map((topic) => {
-              const count = QUIZ_QUESTIONS.filter((q) => q.topic === topic).length;
+              const count = allQuestions.filter((q) => q.topic === topic).length;
               if (count === 0) return null;
               return (
                 <button
@@ -563,7 +624,7 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
               <Award className="w-8 h-8 text-emerald-800 mx-auto mb-1" />
               <p className="text-[20px] font-black text-emerald-900 leading-none">
                 {uniqueCorrect.size}
-                <span className="text-[20px] text-slate-500">/{QUIZ_QUESTIONS.length}</span>
+                <span className="text-[20px] text-slate-500">/{allQuestions.length}</span>
               </p>
               <p className="text-[16px] font-bold text-slate-700 mt-1">
                 {t('classroom.correctCount')}
@@ -590,12 +651,12 @@ export const FoodEdClassroom: React.FC<FoodEdClassroomProps> = ({
           </div>
 
           {/* 尚未答對的題目提示 */}
-          {uniqueCorrect.size < QUIZ_QUESTIONS.length && (
+          {correctCount < allQuestions.length && (
             <div className="rounded-2xl bg-amber-50 border-2 border-amber-400 p-4">
               <p className="text-[18px] font-bold text-amber-900 mb-1.5 flex items-center gap-2">
                 <Target className="w-5 h-5" />
                 {t('classroom.remaining', {
-                  n: QUIZ_QUESTIONS.length - uniqueCorrect.size,
+                  n: allQuestions.length - correctCount,
                 })}
               </p>
               <p className="text-[16px] text-amber-800 leading-relaxed">

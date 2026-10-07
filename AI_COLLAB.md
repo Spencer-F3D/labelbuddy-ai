@@ -1007,6 +1007,72 @@ npm run ship                   # 或雙擊「一鍵同步.bat」
 
 ---
 
+### [2026-10-07 21:20] 墨影（Mo）
+
+**做了什麼**：**第二階段完成**（線上題庫 KV ＋ 跨裝置同步 ＋ 學堂合併）。
+
+| 檔案 | 動作 |
+| --- | --- |
+| `wrangler.toml` | 新增 `[[kv_namespaces]] QUIZ_BANK`（id `6f4cf68e962f4dae9d1e1e1beb85dd28`） |
+| `server/quizBank.ts` | **新增**：`QuizBankStore` ＋ KV／記憶體兩種實作 ＋ 高階操作 |
+| `server/core.ts` | `CoreDeps.quizBank?: QuizBankStore`（optional → 自動降級） |
+| `worker.ts` | ★★ **`deps` 從 module 層搬進 `fetch`**；`Env` 加 `QUIZ_BANK`；加 2 條路由；GET 查詢參數放進 `body` |
+| `server.ts` | 注入記憶體版；加路由；GET 查詢參數同步處理 |
+| `server/handlers.ts` | `handleQuizBank`（GET `?since=`）；`handleQuizQuestion` 先查題庫再生成、生成後寫入 |
+| `src/data/quizBank.ts` | `syncQuizBank()` ＋ `QUIZ_SYNC_SINCE_KEY` |
+| `src/App.tsx` | 同步 effect（`local_only` 直接 return） |
+| `src/components/FoodEdClassroom.tsx` | 合併「內建 60 題 ＋ 線上題庫」；5 處題數改用 `allQuestions.length`；★ 分子用同一份清單過濾 |
+| `scripts/check-quiz-sync.ts` | **新增**（21 項，接進 `verify:all` 與 `ship-all`） |
+
+**★★ 全案風險最高處：`deps` 必須搬進 `fetch`**
+原本是 module 層 `const deps: CoreDeps = {};`。KV 綁定在 per-request 的 `env`，
+module 層拿不到。更糟的是 Workers 會**跨請求重用同一個 isolate** ——
+共用一份可變的 `deps` 會讓不同請求互相看到對方的綁定（極難重現）。
+→ 現在寫在 `fetch` 內，一次請求一份。
+
+**★ 三個與計劃書不同的設計決定（都是為了省 KV 額度或避免靜默漏題）**
+1. **索引帶 `labelKeys`** —— 否則每次挑題要讀整個題庫（500 reads），
+   KV 免費層 100,000 reads/日只能撐 200 次請求。現在是 1＋1 次。
+2. **`createdAt` 放在題目層級** —— `?since=` 要能只回更新的題。
+3. **前端 `since` 用伺服器回的 `updatedAt`，不是 `Date.now()`** ——
+   用本機時間的話，裝置時鐘快幾秒就**永久跳過**那幾秒內產生的題目。
+   且**成功合併之後才推進**。
+
+**★ GET 的查詢參數**
+handler 簽名拿不到 URL → `worker.ts` 與 `server.ts` 都改成
+「**GET 的查詢參數放進 `body`**」。⚠️ 兩邊必須做**完全一樣的事**，
+否則同一支 handler 在本機與線上行為不同（最難查的一種 bug）。
+
+**怎麼驗證**：
+- `check-quiz-sync.ts` 21 項：★★ 併發寫入不遺失 id／★ 分頁不被忽略
+  （用每頁只回 2 個 key 的**假 KV** —— 真 KV 一次給 1000、我們上限 500，
+  **真實環境永遠碰不到分頁**）／★ 通用題不算命中／`since` 嚴格大於／上限保護
+- `check-learn-card.mjs` 12 項：新增**正向**斷言「雲端模式必須打 `/api/quiz-bank`」
+  （只驗「local_only 零請求」的話，同步整個壞掉也會通過）
+- `verify:all` 全綠｜`check:layout` 中英各 0 筆問題｜`check:ui` 17 畫面英文零中文
+- 後端實測：空題庫 → AI 生成 → 寫入 → **同標籤再問命中題庫、不再呼叫 AI** →
+  `since` 過濾正確 → `localOnly` 完全不碰題庫
+
+**⚠️ 跨工作目錄的提醒**：
+1. **`worker.ts` 的 module 層 `deps` 已被刪除**。若你在別處依賴它，會編譯失敗。
+2. **`CoreDeps` 多了 optional 的 `quizBank`**；`handleQuizBank` 是新的 export。
+3. **`server.ts` 與 `worker.ts` 的 GET 請求現在會把查詢參數放進 `body`** ——
+   兩邊必須一致。
+4. **`FoodEdClassroom.tsx` 不再 import `getQuestionsByTopic`**。
+   ⚠️ 那個函式（`educationContent.ts`）現在**沒有任何呼叫端**。
+   計劃書明訂「保持不動」，所以我**刻意保留不刪** ——
+   若你確定不需要，可以連同 `FoodEdClassroom.tsx` 的註解一起刪掉。
+5. **`syncQuizBank()` 在 `local_only` 時不執行**（App 的 effect 直接 return）。
+   若你新增會呼叫雲端的東西，記得同一條規則。
+
+**還沒做／有疑問**：
+- ⚠️ **`wrangler.toml` 的 KV id 已寫入版控**。id 不是機密，但**改 id 等於換一個空題庫**。
+- ⚠️ 題庫上限 500 題（保護 KV 免費層 1000 writes/日）。達到後只回傳不寫入。
+- ⚠️ 第一階段的已知限制（AI 生成的題只存在該台手機）**已解除**：
+  現在生成後會寫進 KV，其他裝置最多延遲約 60 秒（KV 最終一致性）。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |

@@ -48,6 +48,8 @@ import { buildRecognitionResult, type OcrRecognitionResult } from './labelParser
 import { analyzeSeniorPhysicalIndicators } from './smartIndicatorAnalyzer';
 import { answerSeniorHealthQuestion } from './smartHealthQA';
 import { buildConditionReminders } from './conditionAdvice';
+// 線上題庫（2026-10-07 第二階段）：只匯入介面，實作由各平台注入（見 CoreDeps）。
+import type { QuizBankStore } from './quizBank';
 // 本機引擎的英文對照表。公開 translateLocalText 是為了讓「食育欄位備援」
 // 也能用同一份對照，而不是在 core.ts 另維護一份（兩份遲早會漂移）。
 // ⚠️ localEngineEn.ts 不 import 任何 Node 模組，所以 Worker 也能安全使用。
@@ -106,6 +108,14 @@ export interface ApiResult {
 export interface CoreDeps {
   /** 伺服器端 OCR。Worker 不提供；未提供時圖片模式會回錯誤。 */
   recognizeImage?: (cleanBase64: string) => Promise<OcrRecognitionResult>;
+  /**
+   * 線上題庫（2026-10-07 第二階段）。
+   *
+   * ⚠️ **optional 是刻意的**：`env.QUIZ_BANK` 未綁定時不注入，
+   *    handler 走「無題庫」分支 —— 仍然能用 AI 生成題目，只是不查也不寫。
+   *    功能不會壞，只失去線上題庫。回退時只要不綁 KV 即可，不必改程式。
+   */
+  quizBank?: QuizBankStore;
 }
 
 dotenv.config();

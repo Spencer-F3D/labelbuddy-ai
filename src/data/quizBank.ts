@@ -121,6 +121,84 @@ export function getBankVersion(): number {
  *
  * @returns 實際新增了幾題（0 ＝全部都已存在）
  */
+/* ══════════════════════════════════════════════════════════════════════════
+ * 線上同步（2026-10-07 第二階段）
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 「上次成功合併」的時間（毫秒）。
+ *
+ * ⚠️⚠️ **這個值只能在合併成功之後才推進。**
+ *    先推進再合併的話，中途失敗（斷網、JSON 壞掉、存不進 localStorage）
+ *    就會**永久漏掉**那一段時間內的題目 —— 而且不會有任何錯誤訊息，
+ *    使用者只會覺得「怎麼題目比別人少」。
+ */
+export const QUIZ_SYNC_SINCE_KEY = 'labelbuddy_quiz_sync_since_v1';
+
+function readSyncSince(): number {
+  try {
+    const raw = Number(localStorage.getItem(QUIZ_SYNC_SINCE_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeSyncSince(value: number): void {
+  try {
+    localStorage.setItem(QUIZ_SYNC_SINCE_KEY, String(value));
+  } catch {
+    /* 存不進去只會讓下次多抓一次，不影響正確性 */
+  }
+}
+
+export interface QuizBankSyncResult {
+  /** 實際新增幾題（0 ＝ 沒有新題，或全部都已存在） */
+  added: number;
+  /** 伺服器回的題庫版本 */
+  version: number;
+}
+
+/**
+ * 從線上題庫同步新題目。
+ *
+ * 【設計要點】
+ *   ① **`since` 用伺服器回的 `updatedAt`**，不是 `Date.now()`。
+ *      用本機時間的話，裝置時鐘快幾秒就會永久跳過那幾秒內產生的題目。
+ *   ② **成功合併之後才寫 `since`**（見上方說明）。
+ *   ③ **失敗就往外丟**，由呼叫端決定怎麼處理 ——
+ *      同步失敗不該影響任何主流程（呼叫端會 `.catch(() => {})`）。
+ *   ④ 沒有 `updatedAt`（伺服器沒綁 KV → 空題庫）時，**不推進 `since`**，
+ *      這樣等 KV 恢復之後還能把中間的題目補回來。
+ *
+ * @param apiUrl `src/utils/apiBase.ts` 的 `apiUrl()` —— APK 的 WebView origin
+ *               是 `https://localhost`，不能自己拼相對路徑。
+ */
+export async function syncQuizBank(
+  apiUrl: (path: string) => string
+): Promise<QuizBankSyncResult> {
+  const since = readSyncSince();
+  const res = await fetch(apiUrl(`/api/quiz-bank?since=${since}`), {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`quiz-bank HTTP ${res.status}`);
+
+  const payload = await res.json();
+  const questions = payload?.data?.questions;
+  if (!Array.isArray(questions)) return { added: 0, version: 0 };
+
+  const version = Number(payload?.data?.version) || 0;
+  const added = mergeIntoBank(questions as QuizQuestion[], version);
+
+  // ★ 合併成功之後才推進
+  const updatedAt = Number(payload?.data?.updatedAt) || 0;
+  if (updatedAt > 0) {
+    writeSyncSince(Math.max(since, updatedAt));
+  }
+
+  return { added, version };
+}
+
 export function mergeIntoBank(incoming: QuizQuestion[], version?: number): number {
   if (!Array.isArray(incoming) || incoming.length === 0) {
     if (typeof version === 'number') {

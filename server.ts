@@ -37,9 +37,11 @@ import {
   handleAskHealthQuestion,
   handleHealth,
   handlePrivacy,
+  handleQuizBank,
   handleQuizQuestion,
 } from './server/handlers';
 import { handleFitnessReport } from './server/fitnessReport';
+import { makeMemoryQuizBankStore } from './server/quizBank';
 import type { ApiResult, CoreDeps, PlatformRequest } from './server/core';
 
 const app = express();
@@ -55,7 +57,21 @@ app.use(express.json({ limit: '20mb' }));
  * 這裡提供伺服器端 OCR —— 只有 Node 環境有 tesseract.js 與 fs。
  * Cloudflare Worker 的 `deps` 不會有這一項，handler 會改回「請用前端辨識」。
  */
-const deps: CoreDeps = { recognizeImage: recognizeNutritionFromImage };
+const deps: CoreDeps = {
+  recognizeImage: recognizeNutritionFromImage,
+  /**
+   * 線上題庫（2026-10-07 第二階段）。
+   *
+   * ⚠️ 本機沒有 Cloudflare KV，所以用**記憶體版** —— 重啟即清。
+   *    這對本機開發與檢查腳本完全夠用（同一個 process 內行為一致），
+   *    也讓 `handleQuizBank` 那條路徑**在本機就能被測到**，
+   *    不必等到部署上線才發現它壞了。
+   *
+   * ⚠️ 刻意**不**讓本機也去連真的 KV：
+   *    那會讓 `npm run dev` 需要網路，也會讓本機測試污染線上題庫。
+   */
+  quizBank: makeMemoryQuizBankStore(),
+};
 
 /** 把 Express 的 headers 物件轉成標準 Headers（handler 的統一介面） */
 function toHeaders(raw: unknown): Headers {
@@ -78,7 +94,18 @@ function route(handler: (body: any, headers: Headers, deps: CoreDeps) => Promise
   return async (req: express.Request, res: express.Response) => {
     try {
       const platformReq: PlatformRequest = { body: req.body, headers: req.headers };
-      const result = await handler(platformReq.body, toHeaders(platformReq.headers), deps);
+      /**
+       * ★ 2026-10-07：GET 要傳**查詢參數**（`?since=...`）。
+       *
+       * ⚠️ 這一行必須與 `worker.ts` 的 `fetch` 做**完全一樣的事**。
+       *    兩邊不一致的話，同一支 handler 在本機與線上行為不同 ——
+       *    那是最難查的一種 bug（本機全綠、上線才壞）。
+       */
+      const body =
+        req.method === 'GET'
+          ? { ...(req.query as Record<string, unknown>), ...(req.body ?? {}) }
+          : platformReq.body;
+      const result = await handler(body, toHeaders(platformReq.headers), deps);
       res.status(result.status).json(result.json);
     } catch (error) {
       console.error('[LabelBuddy AI] 未預期的處理器例外:', error);
@@ -96,6 +123,8 @@ app.post('/api/ask-health-question', route(handleAskHealthQuestion));
 app.post('/api/fitness-report', route(handleFitnessReport));
 // 出題（2026-10-07）：「學一個小知識」的測驗題
 app.post('/api/quiz-question', route(handleQuizQuestion));
+// 線上題庫同步（2026-10-07 第二階段）：`?since=<ms>` 只回更新的題
+app.get('/api/quiz-bank', route(handleQuizBank));
 app.get('/api/privacy', route(handlePrivacy));
 app.get('/api/ai-status', route(handleAiStatus));
 app.get('/api/health', route(handleHealth));

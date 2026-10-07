@@ -26,6 +26,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { apiUrl } from './utils/apiBase';
+// 線上題庫同步（2026-10-07 第二階段）
+import { syncQuizBank } from './data/quizBank';
 import {
   Camera,
   Cloud,
@@ -1132,6 +1134,28 @@ export default function App() {
         setGeminiConnected(false);
       });
   }, []);
+
+  /**
+   * 線上題庫同步（2026-10-07 第二階段）。
+   *
+   * 【為什麼是「開啟時同步一次」而不是定時輪詢】
+   *   題庫是**別人（或其他裝置）生成過的題**。使用者不會站在畫面前等它更新；
+   *   下次開啟 App 時再抓就好。輪詢只會白白消耗 KV 的讀取額度。
+   *
+   * 【★ 為什麼 `local_only` 要直接 return】
+   *   使用者選「只在本機」就是不想讓 App 連出去。
+   *   這個端點雖然不含任何個人資料（回傳的是共用的公開題庫），
+   *   但**少發一個請求**本來就是那個模式的意義 —— 不做才是對的。
+   *
+   * 【為什麼 `.catch(() => {})` 要吃掉錯誤】
+   *   同步失敗（離線、KV 掛掉、JSON 壞掉）**完全不影響**任何主流程：
+   *   挑題會退回本機題庫，AI 生成照常。讓它冒出來只會嚇到使用者。
+   *   ⚠️ 但**不要**在這裡印 console.error —— 那會讓真正的錯誤被雜訊蓋掉。
+   */
+  useEffect(() => {
+    if (analysisMode === 'local_only') return;
+    syncQuizBank(apiUrl).catch(() => {});
+  }, [analysisMode]);
 
   // 清除全部紀錄
   const handleClearDietRecords = () => {

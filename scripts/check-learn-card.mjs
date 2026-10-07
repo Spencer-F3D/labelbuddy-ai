@@ -138,6 +138,20 @@ async function runResultFlow(mode) {
     })()
   `);
 
+  /**
+   * ★ 2026-10-07 第二階段：**請求計數要從這裡才開始算**。
+   *
+   * 【踩到的情況】
+   *   上面那次 `Page.navigate`（為了到 origin 才能設 localStorage）
+   *   用的是**上一輪的模式** —— 跑 `local_only` 那一輪時，
+   *   那次載入還是 `cloud_image`，於是 App 照常同步線上題庫，
+   *   計數就抓到了 `/api/quiz-bank` → 斷言「local_only 零 quiz 請求」**誤報失敗**。
+   *
+   *   那是**探針的問題，不是程式的問題**：我們要驗的是
+   *   「用 local_only 載入的那一次，有沒有發出 quiz 請求」。
+   *   → 把重置搬到「localStorage 設好、即將用正確模式重新載入」的這一刻。
+   */
+  apiRequests = [];
   await cdp.send('Page.navigate', { url: BASE });
 
   /**
@@ -414,6 +428,20 @@ try {
    * ══════════════════════════════════════════════════════════════════ */
   console.log('\n── 第二輪：local_only（卡片仍要出現，且零 quiz 請求）──');
   apiRequests = [];
+  /**
+   * ★ 2026-10-07 第二階段：**雲端模式要同步線上題庫**。
+   *
+   * 【為什麼一定要有這條「正向」斷言】
+   *   第二輪驗的是「local_only 時零 `/api/quiz-*` 請求」——那是**負向**斷言。
+   *   如果同步功能整個壞掉（effect 沒跑、網址拼錯、被 catch 吃掉），
+   *   負向斷言**照樣通過**。只有正向斷言才能證明它真的在運作。
+   */
+  check(
+    '★ 雲端模式會同步線上題庫（GET /api/quiz-bank）',
+    cloud.apiRequests.some((u) => u.includes('/api/quiz-bank')),
+    `→ ${cloud.apiRequests.join(', ')}`
+  );
+
   const local = await runResultFlow('local_only');
 
   await shot('02-local-result');

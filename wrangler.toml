@@ -53,3 +53,26 @@ enabled = true
 APP_URL = "https://app.labelbuddy-ai.workers.dev"
 AI_REQUEST_TIMEOUT_MS = "45000"
 AI_CACHE_TTL_MS = "86400000"
+
+# ── KV：線上題庫（2026-10-07 第二階段）──────────────────────────────
+#
+# 【這個 namespace 存什麼】
+#   AI 生成的「學一個小知識」題目。存下來之後，**同一題不必再花額度生成一次**，
+#   而且換一台手機也看得到（跨裝置）。
+#
+# 【key 設計】
+#   q:<id>      單題 JSON（含英文版）
+#   bank:index  { version, ids[], updatedAt }
+#
+# 【⚠️ 為什麼可以安全地降級】
+#   `env.QUIZ_BANK` 若不存在（例如本機 `node server.ts`、或這個 binding 被拿掉），
+#   後端就不注入 `deps.quizBank` → 走「無題庫」分支：
+#   仍然能用 AI 生成題目，只是**不寫入也不查詢**。
+#   功能不會壞，只失去線上題庫。這是刻意的設計（見 server/quizBank.ts）。
+#
+# 【id 怎麼來的】
+#   `wrangler kv namespace create QUIZ_BANK`（2026-10-07 建立）。
+#   ⚠️ id 不是機密，可以進版控；但**改 id 等於換一個空題庫**。
+[[kv_namespaces]]
+binding = "QUIZ_BANK"
+id = "6f4cf68e962f4dae9d1e1e1beb85dd28"
