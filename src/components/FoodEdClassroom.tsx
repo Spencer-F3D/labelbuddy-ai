@@ -57,8 +57,19 @@ import { localizeCard, localizeQuestion } from '../data/educationContentEn';
 // 兩邊共用同一份，避免答題介面在兩個地方長得不一樣。
 import { QuizCard } from './QuizCard';
 import { topicLabel, profileDisplayName } from '../data/bilingualContent';
+// 學習進度（2026-10-07 抽到共用模組）：結果頁的「學一個小知識」也要讀寫同一把鍵，
+// 否則「在結果頁答過的題」在學堂不算數。
+import { LEARNING_PROGRESS_KEY, loadProgress, saveProgress } from '../data/learningProgress';
 
-export const LEARNING_PROGRESS_KEY = 'labelbuddy_learning_progress_v1';
+/**
+ * ⚠️ 保留這個 re-export 是刻意的。
+ *
+ * 這個常數原本定義在本檔，且是 `export` 的 —— 移出時若直接刪掉，
+ * **任何還在 import 它的地方會編譯失敗**（好事，不會靜默），
+ * 但會讓另一個工作目錄的 AI 在合併時多一次衝突。
+ * 留著這一行，兩邊都不會壞。
+ */
+export { LEARNING_PROGRESS_KEY };
 
 type ClassroomTab = 'cards' | 'quiz' | 'progress';
 
@@ -67,34 +78,6 @@ interface FoodEdClassroomProps {
   profileId: LearnerProfileId;
   /** 切換身分 */
   onChangeProfile: (id: LearnerProfileId) => void;
-}
-
-/* ---------------------------------------------------------------------------
- * 本機進度儲存
- * ------------------------------------------------------------------------- */
-
-function loadProgress(): LearningProgress {
-  const empty: LearningProgress = { readCardIds: [], attempts: [], lastVisitedAt: 0 };
-  try {
-    const raw = localStorage.getItem(LEARNING_PROGRESS_KEY);
-    if (!raw) return empty;
-    const parsed = JSON.parse(raw) as Partial<LearningProgress>;
-    return {
-      readCardIds: Array.isArray(parsed.readCardIds) ? parsed.readCardIds : [],
-      attempts: Array.isArray(parsed.attempts) ? parsed.attempts : [],
-      lastVisitedAt: typeof parsed.lastVisitedAt === 'number' ? parsed.lastVisitedAt : 0,
-    };
-  } catch {
-    return empty;
-  }
-}
-
-function saveProgress(progress: LearningProgress): void {
-  try {
-    localStorage.setItem(LEARNING_PROGRESS_KEY, JSON.stringify(progress));
-  } catch {
-    /* 無痕模式或儲存空間不足時靜默失敗，不影響學習功能 */
-  }
 }
 
 /* ---------------------------------------------------------------------------

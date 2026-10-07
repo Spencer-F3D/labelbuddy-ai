@@ -35,6 +35,7 @@ import type {
   NutrientFact,
 } from '../types';
 import { KNOWLEDGE_CARDS } from '../data/educationContent';
+import { PHYSICAL_INDICATORS } from '../data/conditions';
 import { toLabelKey } from '../data/labelKeys';
 
 /**
@@ -91,34 +92,38 @@ const HIGH_PERCENT = 80;
 const LOW_FIBER_PERCENT = 50;
 
 /**
- * 過敏原的判斷線索。
+ * 使用者勾選的條件裡，有沒有**食物過敏**。
  *
- * 【⚠️ 為什麼不能只找「過敏」兩個字】
- *   本機引擎推的訊息對四種過敏原長得不一樣：
- *     「花生堅果過敏 (絕對不能吃)」  ← 有「過敏」
- *     「海鮮過敏 (吃了會起疹)」      ← 有「過敏」
- *     「牛奶乳糖 (容易拉肚子)」      ← **沒有「過敏」**
- *     「麵粉麩質 (肚子易脹氣)」      ← **沒有「過敏」**
- *   只找「過敏」會讓乳糖與麩質兩項永遠挑不到這張卡。
+ * 【★ 為什麼用「使用者勾了什麼」當閘門，而不是看 `matched_conditions` 的字串】
  *
- * ⚠️ 這是**字串線索**，不是結構化訊號（`matched_conditions` 的型別是 `string[]`）。
- *    誤判的代價很小：多顯示一張「過敏原怎麼看」的卡 ——
- *    對一個有食物限制的人來說，那張卡本來就有用。
- *    反之漏判只是落到別張卡。所以放寬是安全的，收窄才是風險。
+ *   這一條是**端到端檢查抓出來的 bug**（2026-10-07）：
+ *
+ *   原本的寫法是「`matched_conditions` 含『過敏』就顯示過敏原卡」。
+ *   在示範拉麵（高血壓 ＋ 糖尿病）上實測，雲端 AI 回的是：
+ *     ["高血壓（鈉超標）", "糖尿病（糖與精製碳水）",
+ *      "心血管風險（高鈉與高油）", "過敏原：小麥、大豆、花生、牛肉"]
+ *   —— AI **自願**列出了產品含有的過敏原，即使使用者根本沒勾任何過敏。
+ *   於是卡片顯示「過敏原怎麼看」，把**鈉 118%** 這個真正的紅燈原因擠掉。
+ *
+ *   → 教錯優先序，比不教更糟：使用者會以為這包的問題是過敏原。
+ *
+ *   改成看「使用者勾了什麼」之後：
+ *     · 沒勾過敏 → 永遠不會被 AI 的自由文字劫持，回到鈉／糖／脂肪那條線
+ *     · 勾了過敏 → 過敏原永遠優先（對有食物過敏的人，這一項本來就比鈉更該先學）
+ *
+ * ⚠️ 代價（刻意接受）：勾了過敏但這一包不含該過敏原時，仍會顯示過敏原卡。
+ *    對一個有食物過敏的人來說，「怎麼看過敏原標示」任何時候都是有用的，
+ *    所以這個誤判是良性的；反過來漏判（有過敏卻教鈉）才是危險的。
  *
  * （原本的 P1 規格寫 `matched_conditions.some((c) => c.allergen)` ——
  *   `c` 是字串，`.allergen` 永遠是 `undefined`，那條分支**永遠不會觸發**。）
  */
-const ALLERGEN_HINTS = [
-  '過敏',
-  '乳糖',
-  '麩質',
-  '牛奶',
-  'allergy',
-  'lactose',
-  'gluten',
-  'milk',
-];
+function hasAllergyConcern(selectedConditions: string[]): boolean {
+  return selectedConditions.some((id) => {
+    const cond = PHYSICAL_INDICATORS.find((c) => c.id === id);
+    return cond?.category === 'allergen';
+  });
+}
 
 /** 依 canonical 名稱找 nutrient_fact（用 `toLabelKey`，吃得下英文名） */
 function findFact(facts: NutrientFact[], key: LabelKey): NutrientFact | undefined {
@@ -144,7 +149,7 @@ function profileCardId(profileId: LearnerProfileId): string | null {
  * @returns `null` ＝挑不到（呼叫端就不要渲染卡片，**不要留空白區塊**）
  *
  * 【判斷順序（由上往下，第一個命中就回）】
- *   1. 過敏原   —— 最安全關鍵，優先於一切
+ *   1. 過敏原   —— **僅在使用者勾過食物過敏時**（見 `hasAllergyConcern`）
  *   2. 鈉       —— 最常見
  *   3. 添加糖
  *   4. 飽和脂肪
@@ -161,20 +166,22 @@ function profileCardId(profileId: LearnerProfileId): string | null {
  */
 export function pickLearningCard(
   result: LabelAnalysisResult,
-  profileId: LearnerProfileId
+  profileId: LearnerProfileId,
+  /**
+   * 使用者勾選的慢性病／過敏原 **id**（來自設定頁或引導頁）。
+   *
+   * ⚠️ 一定要傳 —— 少了它，過敏原那一條就只能靠 `matched_conditions` 的字串猜，
+   *    而雲端 AI 會**自願**回報產品含有的過敏原，把卡片劫持走（見 `hasAllergyConcern`）。
+   */
+  selectedConditions: string[] = []
 ): LearnPick | null {
   const facts = Array.isArray(result.nutrient_facts) ? result.nutrient_facts : [];
-  const matched = Array.isArray(result.matched_conditions) ? result.matched_conditions : [];
 
   const pick = (cardId: string, reason: LearnReason): LearnPick | null =>
     cardExists(cardId) ? { cardId, reason } : null;
 
-  /* ── 1. 過敏原 ─────────────────────────────────────────────────────── */
-  const allergenHit = matched.some((c) => {
-    const s = String(c ?? '').toLowerCase();
-    return ALLERGEN_HINTS.some((h) => s.includes(h.toLowerCase()));
-  });
-  if (allergenHit) {
+  /* ── 1. 過敏原（★ 只有使用者勾過過敏才優先）──────────────────────── */
+  if (hasAllergyConcern(selectedConditions)) {
     const p = pick(LEARN_CARD_MAP.allergen, 'allergen');
     if (p) return p;
   }

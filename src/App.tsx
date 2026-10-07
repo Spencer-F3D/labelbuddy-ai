@@ -104,6 +104,8 @@ import {
 import { SettingsSection } from './components/SettingsSection';
 // 字體大小控制（2026-10-06 使用者指定）：三級，可手動覆寫身分預設值。
 import { FontSizeSection } from './components/FontSizeSection';
+// 學一個小知識（2026-10-07 使用者指定）：結果頁的「原理 → 自我檢核」卡片。
+import { LearnFromScanCard } from './components/LearnFromScanCard';
 import {
   loadFontScale,
   saveFontScale,
@@ -2890,6 +2892,30 @@ export default function App() {
                       )}
                     </button>
                   </section>
+
+                  {/* ══════════════════════════════════════════════════════
+                      學一個小知識（2026-10-07 使用者指定）
+                      —— 把「這一包」變成「一堂微課」：原理 → 自我檢核
+
+                      【為什麼放在第二層與第三層之間】
+                        使用者剛看完「為什麼」（長條圖與白話說明），
+                        正是最想知道「那到底要怎麼挑」的時刻 ——
+                        在這裡給原理與一題檢核，因果最順。
+                        ⚠️ 刻意**不放在結論卡正下方**：那會把「為什麼」
+                          （安全相關的證據）往下一屏推。
+                          （P1 規格原本建議放結論下方，使用者已否決。）
+
+                      【三種模式都會出現，含「只在本機」】
+                        原理來自已打包的知識卡、題目優先來自內建題庫 ——
+                        兩者都零網路。只有「題庫真的沒有相關的題」時才呼叫 AI，
+                        而那條路徑在 local_only 會自動關閉（見元件內說明）。
+                      ══════════════════════════════════════════════════════ */}
+                  <LearnFromScanCard
+                    result={analysisResult}
+                    profileId={learnerProfileId}
+                    analysisMode={analysisMode}
+                    selectedConditions={selectedConditions}
+                  />
 
                   {/* ══════════════════════════════════════════════════════
                       第三層：更多資訊 —— 需要時再展開，降低第一眼的負擔

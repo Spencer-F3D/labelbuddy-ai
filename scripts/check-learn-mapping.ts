@@ -117,25 +117,48 @@ console.log('\n── 2. 主題的卡片分佈（說明為何不能用主題映�
   );
 }
 
-/* ── 3. ★ 行為驗證：8 身分 × 4 情境，永遠不得回 null ───────────────── */
-console.log('\n── 3. ★ 8 身分 × 4 情境：永遠挑得到卡、且卡片存在 ──');
+/* ── 3. ★ 行為驗證：8 身分 × 5 情境，永遠不得回 null ───────────────── */
+console.log('\n── 3. ★ 8 身分 × 5 情境：永遠挑得到卡、且卡片存在 ──');
 {
-  const FIXTURES: Array<{ label: string; result: LabelAnalysisResult }> = [
+  const FIXTURES: Array<{ label: string; result: LabelAnalysisResult; conditions: string[] }> = [
     {
       label: '鈉超標',
       result: makeResult([{ name: '鈉', percent: 118 }], [], 'red'),
+      conditions: [],
     },
     {
       label: '糖超標',
       result: makeResult([{ name: '添加糖', percent: 90 }], [], 'yellow'),
+      conditions: [],
     },
     {
-      label: '命中過敏原',
+      label: '勾了花生過敏 ＋ 標籤命中',
       result: makeResult([{ name: '鈉', percent: 40 }], ['花生堅果過敏 (絕對不能吃)'], 'red'),
+      conditions: ['peanut_allergy'],
+    },
+    {
+      /**
+       * ★★ 這一格是**回歸斷言**（2026-10-07 實測抓到的 bug）。
+       *
+       * 雲端 AI 會**自願**回報產品含有的過敏原，即使使用者沒勾任何過敏：
+       *   實測示範拉麵（高血壓＋糖尿病）回的是
+       *   ["高血壓（鈉超標）", "糖尿病（糖與精製碳水）",
+       *    "心血管風險（高鈉與高油）", "過敏原：小麥、大豆、花生、牛肉"]
+       * 舊寫法（看 matched_conditions 含不含「過敏」）會被這一行劫持，
+       * 把**鈉 118%** 這個真正的紅燈原因擠掉 → 教錯優先序。
+       */
+      label: '★ AI 自願回報過敏原（使用者沒勾過敏）',
+      result: makeResult(
+        [{ name: '鈉', percent: 118 }],
+        ['高血壓（鈉超標）', '糖尿病（糖與精製碳水）', '過敏原：小麥、大豆、花生、牛肉'],
+        'red'
+      ),
+      conditions: ['hypertension', 'diabetes'],
     },
     {
       label: '綠燈（沒事）',
       result: makeResult([], [], 'green'),
+      conditions: [],
     },
   ];
 
@@ -144,7 +167,7 @@ console.log('\n── 3. ★ 8 身分 × 4 情境：永遠挑得到卡、且卡�
   for (const profileId of PROFILE_AGE_ORDER) {
     for (const fx of FIXTURES) {
       combos++;
-      const got = pickLearningCard(fx.result, profileId);
+      const got = pickLearningCard(fx.result, profileId, fx.conditions);
       if (!got) {
         problems.push(`${profileId} × ${fx.label} → null`);
         continue;
@@ -170,23 +193,41 @@ console.log('\n── 4. ★ 關鍵觸發的對應正確性 ──');
 
   const allergen = pickLearningCard(
     makeResult([{ name: '鈉', percent: 40 }], ['海鮮過敏 (吃了會起疹)'], 'red'),
-    'senior'
+    'senior',
+    ['seafood_allergy']
   );
   check(
-    '過敏原優先於鈉 → card-shopping-5',
+    '勾了海鮮過敏 ＋ 標籤命中 → 過敏原優先於鈉（card-shopping-5）',
     allergen?.cardId === 'card-shopping-5' && allergen?.reason === 'allergen',
     `實際 ${allergen?.cardId} / ${allergen?.reason}`
   );
 
-  // 乳糖／麩質的本機訊息**不含「過敏」二字**，這是最容易漏掉的一條
+  // 乳糖不耐的條件名稱是「乳糖不耐」、本機訊息是「牛奶乳糖 (容易拉肚子)」，
+  // 兩者不是彼此的子字串 —— 這正是不能靠字串猜、要看使用者勾了什麼的原因。
   const lactose = pickLearningCard(
     makeResult([], ['牛奶乳糖 (容易拉肚子)'], 'yellow'),
-    'senior'
+    'senior',
+    ['lactose_intolerance']
+  );
+  check('勾了乳糖不耐 → card-shopping-5', lactose?.cardId === 'card-shopping-5', `實際 ${lactose?.cardId}`);
+
+  /**
+   * ★★ 回歸斷言：使用者**沒勾**過敏時，AI 自願回報的過敏原不得劫持卡片。
+   *    這是 2026-10-07 端到端檢查抓到的真實 bug（見第 3 節的 fixture 說明）。
+   */
+  const volunteered = pickLearningCard(
+    makeResult(
+      [{ name: '鈉', percent: 118 }],
+      ['高血壓（鈉超標）', '糖尿病（糖與精製碳水）', '過敏原：小麥、大豆、花生、牛肉'],
+      'red'
+    ),
+    'senior',
+    ['hypertension', 'diabetes']
   );
   check(
-    '乳糖不耐（訊息不含「過敏」）也能對到 card-shopping-5',
-    lactose?.cardId === 'card-shopping-5',
-    `實際 ${lactose?.cardId}`
+    '★★ 沒勾過敏時，AI 自願回報的「過敏原：…」不得劫持卡片（應為鈉）',
+    volunteered?.cardId === 'card-dangers-1',
+    `實際 ${volunteered?.cardId}（若是 card-shopping-5 就是回歸了）`
   );
 
   // 英文模式：nutrient_facts 的名稱會是 'Sodium'（translateLocalResult 造成的）

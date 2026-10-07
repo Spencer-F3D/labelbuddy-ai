@@ -126,6 +126,18 @@ const zhTW = {
   'settings.fontSize.preview': '預覽',
   'settings.fontSize.sample': '這是調整後的字體大小，看清楚了嗎？',
 
+  /* ── 學一個小知識（2026-10-07 使用者指定）─────────────────────────
+     結果頁的學習卡片：① 原理（知識卡）→ ② 換你想想（一道測驗題）。
+     ★ 卡片在**三種模式都會出現**（含「只在本機」）——
+       知識卡與內建題庫都是已打包在前端的資料，零網路。
+     ★ 綠燈也會出現：綠色正是教「為什麼這樣算安全」最好的時機。 */
+  'learn.title': '學一個小知識',
+  'learn.knowledgeLabel': '原理',
+  'learn.tipLabel': '小撇步',
+  'learn.quizLabel': '換你想想',
+  'learn.loading': '正在為您出一題…',
+  'learn.markedRead': '已標記讀過',
+
   /* ── 拍照辨識流程（第二階段）───────────────────────────────── */
   /* 重拍提示卡 */
   'scan.retakeTitle': '這次沒成功',
@@ -890,6 +902,14 @@ const en: Record<TranslationKey, string> = {
   'settings.fontSize.large': 'Large',
   'settings.fontSize.preview': 'Preview',
   'settings.fontSize.sample': 'This is the text size you have chosen. Is it clear enough?',
+
+  /* ── Learn a little (added 2026-10-07) ── */
+  'learn.title': 'A little food wisdom',
+  'learn.knowledgeLabel': 'The idea',
+  'learn.tipLabel': 'Tip',
+  'learn.quizLabel': 'Your turn',
+  'learn.loading': 'Writing a question for you…',
+  'learn.markedRead': 'Marked as read',
 
   'scan.retakeTitle': 'That did not work',
   'scan.retakeSubtitle': 'It is not your fault — nothing is broken.',
