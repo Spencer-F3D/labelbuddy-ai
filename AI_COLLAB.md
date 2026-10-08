@@ -1073,6 +1073,65 @@ handler 簽名拿不到 URL → `worker.ts` 與 `server.ts` 都改成
 
 ---
 
+### [2026-10-08 21:30] 墨影（Mo）
+
+**做了什麼**：① 移除「上傳：病史」與私隱條款的矛盾 ② 修好 TTS 的三條靜默失敗
+③ DemoVideo 歸位（交付物）。**只動檔案，競賽文檔未動。**
+
+| 檔案 | 動作 |
+| --- | --- |
+| `src/i18n/translations.ts` | `mode.*Data` 中英 4 處：「病史」→「**把關的成分**」／`what to watch`；`legal.privacy.3` 中英改寫成**兩段邊界**＋自填例外；`settings.sound.*` 新增 5 鍵＋改 2 鍵 |
+| `server/handlers.ts` | `/api/privacy` 兩段 `description` 不再聲稱傳送「慢性病史」 |
+| `src/utils/tts.ts` | `voice===null` → `outcome:'no-voice'`；**新增 `'silent'` 型別值** ＋ 1500ms watchdog |
+| `src/components/TtsSettingsSection.tsx` | 新增獨立 `#tts-test-voice`；音量 0 不再靜默跳過；診斷區塊在音量 0 也顯示；**修掉語言區塊的掛載時快照 bug** |
+| `src/App.tsx` | `handleToggleSpeakSummary` 改為**要看 `speakText` 的回傳值**；新增 `ttsNotice` 可見提示 |
+| `scripts/check-analysis-mode.ts` | 新增 **2c 區段 9 條**（49 → **58 通過**）；改 2 條既有斷言 |
+| `scripts/check-tts-diagnostic.ts` | **新增**（`npm run check:tts`，43 通過 / 1 跳過） |
+| `scripts/probe-tts-voices.mjs` | **新增**：列舉這台機器的語音清單（`npm run probe:tts`） |
+
+**★★ 評分審查的 P0-2 是錯的**：EN `legal.privacy.3` 早就改成
+`the ingredients to watch for`（10-07 那次就改了），報告讀到舊版。
+**真正漏掉的是 `/api/privacy` 的兩段 description** —— 評審打開端點就看得到，
+而且**沒有任何測試會紅燈**。
+
+**★★ 版面鐵則（新增，已寫進 `check:mode`）**：
+「上傳：…」那一行在**長者字級（19px）下框寬只有 218px ＝ 上限 11 個全形字**。
+原本寫「要盯緊的成分」（12 字）→ 折行後**末行只剩 1 個字（孤行）**，被 `check:layout` 抓到。
+→ 改成「把關的成分」。**改這一行之前先數字數。**
+
+**★★ TTS 的診斷結論（與 10-04「程式是對的」不同）**：
+本機 Chrome／Edge **都有 zh-HK、speak 都正常**（onstart 490／713ms）→
+「找不到語音」在**這台機器不成立**。真正的三條靜默失敗是：
+① **非長者身分預設音量 0**（且音量 0 時設定頁的試聽與診斷**全部靜默跳過**）
+② `speak()` 不觸發 `onstart` 也不觸發 `onerror`
+③ **`outcome:'no-voice'` 是死值** —— 型別有、UI 有分支、**沒有生產者**
+→ UI 落到 else 顯示「沒有送出」，但 `sent` 其實是 `true`（**訊息是錯的**）。
+★ 唯一的中文粵語語音**全是網路語音**（`localService:false`）。
+
+**怎麼驗證**：
+- `check:mode` **58 通過 / 0 失敗**｜`check:tts` **43 通過 / 0 失敗 / 1 跳過**
+- `check:layout` **三種組合各 0 筆問題**（zh-TW/senior、en/senior、en/fitness）
+- `verify:all` 全綠｜`check:ui` 中文殘留 0 處（但見下方⚠️）
+- `ship` **三管道一致 15/15**，指紋 `b2c8086+2d79f01d75a4`
+
+**⚠️ 跨工作目錄的提醒**：
+1. **`TtsDiagnostic.outcome` 多了 `'silent'`**。若你有 `switch`／窮舉，會編譯失敗。
+2. **`speakText()` 的回傳值現在是有意義的**（`false` ＝ 根本沒送出去）。
+   新增朗讀呼叫點時請看它，不要像舊版那樣無條件把 UI 設成「朗讀中」。
+3. **`settings.sound.muted` 的文案改了**（「目前沒有聲音」→「App 的朗讀音量是 0」）。
+   若你有斷言依賴舊字串，要跟著改。
+4. **`mode.cloudImageData/cloudTextData` 的字數上限是 11 個全形字**（見上方鐵則）。
+
+**還沒做／有疑問**：
+- ⚠️ **`npm run check:ui` 現在是失敗的（exit 1）** ——
+  `「成分長條圖沒有渲染」` 那一條。我用 `git stash` 對照過基線，**既有問題，不是這次造成**。
+  推測是 headless 下本機 OCR 冷啟動逾時 → `ocr_failed` → 沒有 `nutrient_facts`
+  （`check:parity` 17 項全過 → **本機引擎本身沒問題**）。**待查。**
+- ⚠️ `MEMORY.md` 已 19.7KB，本次注入**被截斷**（尾段沒進來）。**需要壓縮。**
+- ⚠️ 交付物 `說明.txt` 的檢查清單尚未反映「DemoVideo 已歸位」（屬文檔，本次未動）。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |
