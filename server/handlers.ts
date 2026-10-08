@@ -997,8 +997,16 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
         requiresConsent: true,
         available: cloudAvailable,
         providers: ['Google Gemini', 'OpenRouter'],
+        /**
+         * ⚠️ 2026-10-08：原本寫「同時傳送您勾選的慢性病史」——
+         *   那與 legal.privacy.3 的「不會送出病名」互相矛盾，
+         *   而評審只要打開這個端點就會看到。
+         *   實際送給 AI 供應商的是「由病症換算出的成分約束」
+         *   （見 conditionConstraint.ts 的 buildUserConstraintLine）。
+         *   病症名稱本身只到我們這台伺服器，用來換算。
+         */
         description:
-          '照片會直接上傳給雲端視覺模型判讀（不經過本機 OCR），同時傳送您勾選的慢性病史。準確度最高，因為模型看得到標籤的實際版面。伺服器不落地儲存照片。',
+          '照片會直接上傳給雲端視覺模型判讀（不經過本機 OCR），並附上由您勾選病症換算出的「要盯緊的成分」。準確度最高，因為模型看得到標籤的實際版面。伺服器不落地儲存照片。',
       },
       cloud_text: {
         id: 'cloud_text',
@@ -1010,7 +1018,7 @@ export async function handlePrivacy(body: any, headers: Headers, deps: CoreDeps)
         available: cloudAvailable,
         providers: ['Google Gemini', 'OpenRouter'],
         description:
-          '照片在您的手機上就以離線 OCR 讀成文字，只有文字與您勾選的慢性病史會傳送給雲端文字模型。照片本身不會上傳。',
+          '照片在您的手機上就以離線 OCR 讀成文字，只有文字與由您勾選病症換算出的「要盯緊的成分」會傳送給雲端文字模型。照片本身不會上傳。',
       },
       local_only: {
         id: 'local_only',

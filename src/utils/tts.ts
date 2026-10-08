@@ -227,8 +227,18 @@ export interface TtsDiagnostic {
   lang: TTSLanguage | null;
   /** 實際挑到的語音名稱（找不到語音時為 null） */
   voiceName: string | null;
-  /** 結局 */
-  outcome: 'started' | 'blocked' | 'unsupported' | 'disabled' | 'no-voice' | 'pending';
+  /**
+   * 結局。
+   *
+   * ★ 2026-10-08 補上兩個值 —— 它們原本**沒有生產者**：
+   *   `'no-voice'` 早就寫在型別裡，卻沒有任何地方產生它，
+   *   於是 UI 的 `else` 分支永遠顯示「沒有送出」（`sent` 其實是 true，**訊息是錯的**）。
+   *   `'silent'` 是新增的 —— 用來抓「送出去了、沒報錯、但完全沒出聲」。
+   *
+   * ⚠️ 本專案紅線：**UI 有 if/else 的值，都要確認每個值真有生產者。**
+   *    這一條正是那條紅線的反面教材（型別有值、沒有生產者、UI 還寫了分支）。
+   */
+  outcome: 'started' | 'blocked' | 'unsupported' | 'disabled' | 'no-voice' | 'silent' | 'pending';
   /** 錯誤原文（如果有的話） */
   error: string | null;
 }
@@ -360,6 +370,33 @@ export function isSpeechSupported(): boolean {
 /* ── 瀏覽器路徑的狀態 ───────────────────────────────────────────── */
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 let speakTimeoutId: any = null;
+
+/**
+ * ★★ 「靜默 no-op」偵測器（2026-10-08）。
+ *
+ * 【為什麼需要】
+ *   Web Speech API 最惡劣的失敗模式是**什麼都不做也不報錯**：
+ *   裝置沒有該語言的語音、或語音是網路語音但連不上時，
+ *   `speak()` 可能既不觸發 `onstart`、也不觸發 `onerror`。
+ *   呼叫端只看得到「按了、沒聲音」，與「程式壞了」完全分不出來。
+ *   （2026-10-04 查了三層、結論是「程式是對的」—— 就是卡在這裡。）
+ *
+ * 【為什麼是 1500ms】
+ *   實測本機（`scripts/probe-tts-voices.mjs`）：
+ *     Chrome 的 Google 網路語音 onstart ≈ 490ms
+ *     Edge 的 Microsoft Online 網路語音 onstart ≈ 713ms
+ *   兩者都不到 1 秒，但都在同一個數量級 —— 門檻抓 800ms 會**誤報**。
+ *   1500ms 對真正的 no-op 只是晚一點顯示，對網路語音則有足夠餘裕。
+ */
+const SILENT_WATCHDOG_MS = 1500;
+let silentWatchdogId: any = null;
+
+function clearSilentWatchdog(): void {
+  if (silentWatchdogId) {
+    clearTimeout(silentWatchdogId);
+    silentWatchdogId = null;
+  }
+}
 
 /**
  * 語音清單是非同步載入的 —— 這是一個很容易漏掉的坑。
@@ -561,19 +598,45 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
     utterance.lang = bcp47(preferLanguage);
   }
 
+  /**
+   * ★★ 2026-10-08：`voice === null` 要**明確記成 `no-voice`**。
+   *
+   * 【為什麼】
+   *   這裡原本無條件寫 `outcome: 'started'` —— 但 `speak()` 根本還沒被呼叫。
+   *   於是「這台裝置沒有粵語語音、瀏覽器什麼都沒做」的情況下，
+   *   設定頁顯示的是「已送出朗讀」，使用者卻聽不到任何聲音。
+   *   **訊息與事實相反，而且不會有任何紅燈。**
+   *
+   *   型別裡早就有 `'no-voice'` 這個值，卻沒有任何生產者 ——
+   *   正是本專案紅線「UI 有 if/else 的值，都要確認每個值真有生產者」的反面案例。
+   *
+   * ⚠️ 這裡**不做語言降級**（粵語找不到就回 null 是刻意的，
+   *    見 `findBestVoice` 的說明）—— 我們只是把「找不到」講出來，
+   *    不偷偷改用別的語言。
+   */
   lastDiagnostic = {
     sent: true,
     lang: preferLanguage,
     voiceName: voice ? `${voice.name}（${voice.lang}）` : null,
-    outcome: 'started',
+    outcome: voice ? 'started' : 'no-voice',
     error: null,
   };
 
+  /** 有沒有真的開始發聲（給 watchdog 用） */
+  let started = false;
+
   utterance.onstart = () => {
+    started = true;
+    clearSilentWatchdog();
+    // 先前標記的「找不到語音」或「沒出聲」都已被推翻 —— 它其實有出聲
+    if (lastDiagnostic.outcome === 'no-voice' || lastDiagnostic.outcome === 'silent') {
+      lastDiagnostic = { ...lastDiagnostic, outcome: 'started' };
+    }
     options.onStart?.();
   };
 
   utterance.onend = () => {
+    clearSilentWatchdog();
     if (activeUtterance === utterance) {
       activeUtterance = null;
     }
@@ -581,6 +644,7 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
   };
 
   utterance.onerror = (e: any) => {
+    clearSilentWatchdog();
     if (activeUtterance === utterance) {
       activeUtterance = null;
     }
@@ -613,6 +677,22 @@ export function speakText(text: string, options: TTSOptions = {}): boolean {
         window.speechSynthesis.resume();
       }
       window.speechSynthesis.speak(utterance);
+      /**
+       * ★★ 靜默 no-op 偵測（2026-10-08）。
+       *
+       * 送出去之後等一段時間 —— 若 `onstart` 一直沒來、`onerror` 也沒來，
+       * 就是「有送出、沒出聲」。這是 Web Speech API 唯一無法從回呼得知的失敗，
+       * 也是三次「使用者說沒聲音、我們重現不出來」的元凶。
+       *
+       * ⚠️ 刻意**不呼叫 `options.onError`** —— 網路語音只是慢，
+       *    對它報錯會在畫面上出現假警報。這裡只更新診斷，讓設定頁說得清楚。
+       */
+      clearSilentWatchdog();
+      silentWatchdogId = setTimeout(() => {
+        if (!started) {
+          lastDiagnostic = { ...lastDiagnostic, outcome: 'silent' };
+        }
+      }, SILENT_WATCHDOG_MS);
     } catch (e) {
       options.onError?.(e);
     }
@@ -636,6 +716,9 @@ export function stopSpeech(): void {
       clearTimeout(speakTimeoutId);
       speakTimeoutId = null;
     }
+    // ★ 2026-10-08：停止時也要收掉「沒出聲」偵測器，否則它會在停止之後
+    //   才把 outcome 改成 'silent'（使用者明明是主動停掉的）
+    clearSilentWatchdog();
     try {
       window.speechSynthesis.cancel();
     } catch {

@@ -244,10 +244,20 @@ const zhTW = {
   'mode.chip.localOnly': '只在本機',
   'mode.cloudImage': '雲端',
   'mode.cloudImageNote': '最準：AI 直接看照片，連標籤排版都看得到。',
-  'mode.cloudImageData': '上傳：照片與病史',
+  /* ⚠️ 2026-10-08：原本寫「上傳：照片與病史」——
+     與 legal.privacy.3 的「不會送出病名」直接矛盾（同一個 App 內兩句話打架）。
+     本專案自己的定義是「**「上傳」一律指送到 AI 供應商**」
+     （見 server/handlers.ts 的 providerBoundaryNote），
+     而送到供應商的確實只有「由病症換算出的成分約束」——
+     病名只在我們自己的伺服器用來換算，不會轉送。
+     → 改成講「送出去的是什麼」，而不是「用什麼換算出來的」。
+     ★★ **字數上限 11 個全形字**：這一行的框寬在長者字級（19px）下只有 218px，
+        12 個字會折成 2 行且**末行只剩 1 個字（孤行）**。
+        `npm run check:layout` 會抓到（實測踩過）。改字前先量。 */
+  'mode.cloudImageData': '上傳：照片與把關的成分',
   'mode.cloudText': '本機圖像識別',
   'mode.cloudTextNote': '手機先把照片讀成文字，只把文字送給 AI。',
-  'mode.cloudTextData': '上傳：標籤與病史',
+  'mode.cloudTextData': '上傳：標籤與把關的成分',
   'mode.localOnly': '只在本機',
   /* ★ 2026-10-07 的演進：
      ① 原本寫「完全不上網」——但實測它會發兩個請求到**我們自己的伺服器**，
@@ -315,14 +325,30 @@ const zhTW = {
   'settings.sound.summaryOn': '音量 {n}%',
   'settings.sound.summaryOff': '已關閉',
   'settings.sound.on': '語音大小：{n}%',
-  'settings.sound.muted': '目前沒有聲音',
+  /* ★★ 2026-10-08：使用者回報「線上網站有聲音（區塊）顯示沒有，但音量已是最大」——
+     他調的是**手機／電腦的音量**，而 App 自己的朗讀音量是 0
+     （非長者身分的預設值，見 ttsSettings.ts）。
+     舊文案「目前沒有聲音」讀起來像在講系統音量，看不出是 App 的問題。
+     → 直接把主詞寫出來：「App 的朗讀音量」。 */
+  'settings.sound.muted': 'App 的朗讀音量是 0',
   'settings.sound.hint': '放開滑桿就會念一句讓您聽聽看。',
-  'settings.sound.mutedHint': '把滑桿往右拉就會有聲音。',
+  'settings.sound.mutedHint': '和手機音量是分開的，請拉下面的滑桿。',
+  /* ── 自助診斷（2026-10-08）────────────────────────────────────
+     三條「靜默失敗」過去都只表現成「按了沒聲音」，使用者無法自行判斷。
+     這四條把三種原因直接講出來，並給出下一步。 */
+  'settings.sound.testVoice': '🔊 測試語音',
+  'settings.sound.volumeZero': '朗讀音量是 0，所以不會有聲音。請把上面的滑桿往右拉。',
+  'settings.sound.noVoiceWeb':
+    '這台裝置沒有這個語言的語音，所以按了不會有聲音。可以改用「普通話」或「English」，或在系統設定安裝這個語言的語音包。',
+  'settings.sound.silent':
+    '已送出，但完全沒有出聲 —— 可能是這個語言的語音是「網路語音」而連不上，或這個分頁被靜音。',
   'settings.sound.nativeMissing':
     '這台手機沒有安裝這個語言的語音，所以會用預設語言（通常是普通話）念。請到手機的「設定 → 語言與輸入 → 文字轉語音」安裝對應的語音資料。',
   'settings.sound.nativeHas': '目前這台手機有的是：',
   'settings.sound.voiceUsed': '這個裝置會用',
   'settings.sound.noVoice': '找不到這個語言的語音（請在系統設定安裝）',
+  /* 診斷那一行的「結局」用短句 —— 長句會在「這個裝置會用：…」後面重複一次。 */
+  'settings.sound.noVoiceShort': '沒有這個語言的語音',
   'settings.sound.sentOk': '已送出朗讀',
   'settings.sound.sentNo': '沒有送出',
   'settings.sound.blocked': '被瀏覽器擋下（請先點一下畫面再試）',
@@ -508,10 +534,16 @@ const zhTW = {
      所以這條可以寫得比以前強 —— 而且是可以當場實測的。 */
   'legal.privacy.1': '照片會不會離開裝置，取決於你在上面選的分析模式 —— 每一個模式都寫明了「什麼會離開手機」。選「只在本機」時，App 完全不發出網路請求，開飛航模式也能用。',
   'legal.privacy.2': '伺服器不保存任何照片：不落地儲存、不寫入資料庫，處理完就丟棄。',
-  /* ★ 2026-10-07 修正：原本寫「把標籤內容與慢性病史送去判斷」——
-     但提示詞現在送的是「要盯緊的成分」（見 conditionNutrients.ts），
-     病名根本不會離開裝置。條款沒跟著改，就會變成一條可被實測推翻的敘述。 */
-  'legal.privacy.3': '飲食紀錄與身分設定只存在這台裝置。雲端模式只會把標籤內容與「要盯緊的成分」送去判斷 —— 不會送出病名，也不會保存或與任何人共享。',
+  /* ★ 2026-10-07 首次修正：原本寫「把標籤內容與慢性病史送去判斷」——
+     提示詞現在送的是「要盯緊的成分」（見 conditionNutrients.ts）。
+     ⚠️ 2026-10-08 二次修正：上一版接著寫「病名根本不會離開裝置」是**過度的**——
+       ① 病症名稱確實會離開手機、送到**我們自己的伺服器**
+          （App.tsx 送出的就是 conditions 病名陣列），只是不轉送給 AI 供應商；
+       ② 使用者**自行填寫**的病症查不到對應成分，會以原文附在提示詞後送出
+          （conditionNutrients.ts 的 unmapped 分支）。
+     → 條款改成把「兩段邊界」都講清楚，並明示自填例外。
+       只寫「不會送出病名」會與模式選擇器的「上傳：病史」互相打架。 */
+  'legal.privacy.3': '飲食紀錄與身分設定只存在這台裝置。送到 AI 供應商的只有標籤內容與「要盯緊的成分」；您勾選的病症只在我們這裡換算成成分，不會傳給供應商（自行填寫的病症除外）。內容不保存，也不與任何人共享。',
   'legal.privacy.4': '本 App 沒有帳號、沒有廣告、沒有第三方追蹤，也不收集任何個人身分資料。',
   'legal.privacy.5': '你隨時可以在設定中改回「只在本機分析」，或按「清除所有資料」把一切刪除。',
   'legal.disclaimer.title': '免責聲明',
@@ -1035,10 +1067,10 @@ const en: Record<TranslationKey, string> = {
   'mode.chip.localOnly': 'On-device',
   'mode.cloudImage': 'Cloud',
   'mode.cloudImageNote': 'Most accurate: the AI reads the photo itself, layout and all.',
-  'mode.cloudImageData': 'Uploads: photo + health info',
+  'mode.cloudImageData': 'Uploads: photo + what to watch',
   'mode.cloudText': 'On-device image recognition',
   'mode.cloudTextNote': 'Your phone turns the photo into text first; only the text is sent.',
-  'mode.cloudTextData': 'Uploads: text + health info',
+  'mode.cloudTextData': 'Uploads: text + what to watch',
   'mode.localOnly': 'On-device only',
   // ★ 2026-10-07: this is now literally true — the mode makes no network requests at all.
   'mode.localOnlyNote': 'No internet at all — works offline. Fastest and most private, but simpler advice.',
@@ -1096,14 +1128,26 @@ const en: Record<TranslationKey, string> = {
   'settings.sound.summaryOn': 'Volume {n}%',
   'settings.sound.summaryOff': 'Muted',
   'settings.sound.on': 'Voice volume: {n}%',
-  'settings.sound.muted': 'No sound right now',
+  // ★★ 2026-10-08: the old "No sound right now" read like a system-volume issue.
+  //   Users turned their phone volume up and still saw "no sound" — because the
+  //   app's own reading volume is a separate slider (0 by default for non-senior
+  //   profiles). Name the subject explicitly.
+  'settings.sound.muted': 'App reading volume is 0',
   'settings.sound.hint': 'Let go of the slider and it will read a line to you.',
-  'settings.sound.mutedHint': 'Drag the slider to the right to enable sound.',
+  'settings.sound.mutedHint': 'This is separate from your phone volume — drag the slider below.',
+  // ── Self-diagnosis (2026-10-08) ──
+  'settings.sound.testVoice': '🔊 Test voice',
+  'settings.sound.volumeZero': 'The reading volume is 0, so nothing will play. Drag the slider above to the right.',
+  'settings.sound.noVoiceWeb':
+    'This device has no voice for this language, so nothing will play. Try Mandarin or English, or install the voice in your system settings.',
+  'settings.sound.silent':
+    'Sent, but nothing was heard — this language may only have a network voice that cannot connect, or this tab is muted.',
   'settings.sound.nativeMissing':
     'This phone does not have this language installed, so it will fall back to the default voice (usually Mandarin). Install it in Settings → Languages & input → Text-to-speech.',
   'settings.sound.nativeHas': 'Available on this phone:',
   'settings.sound.voiceUsed': 'This device will use',
   'settings.sound.noVoice': 'no voice for this language (install it in system settings)',
+  'settings.sound.noVoiceShort': 'no voice for this language',
   'settings.sound.sentOk': 'sent',
   'settings.sound.sentNo': 'not sent',
   'settings.sound.blocked': 'blocked by the browser (tap the page first, then retry)',
@@ -1257,8 +1301,12 @@ const en: Record<TranslationKey, string> = {
   'legal.privacy.2':
     'The server never stores photos: no disk, no database, discarded after processing.',
   // ★ 2026-10-07: the cloud prompt carries ingredient constraints, not diagnoses.
+  // ⚠️ 2026-10-08: "never a diagnosis" alone was too strong — the condition names
+  //   DO leave the phone for our own server (they are turned into ingredient
+  //   constraints there), and a condition the user typed in themselves has no
+  //   mapping, so it is sent as written. State both hops, and the exception.
   'legal.privacy.3':
-    'Diet records and your profile stay on this device. Cloud modes send only the label content and the ingredients to watch for \u2014 never a diagnosis, never stored, never shared.',
+    'Diet records and your profile stay on this device. What reaches the AI provider is only the label content and the ingredients to watch for; the conditions you ticked are used on our side to derive them and are never sent to the provider (a condition you typed in yourself is the only exception). Nothing is stored or shared.',
   'legal.privacy.4':
     'This app has no accounts, no ads, no third-party tracking, and collects no personally identifying data.',
   'legal.privacy.5':

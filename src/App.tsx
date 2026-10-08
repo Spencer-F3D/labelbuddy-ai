@@ -149,7 +149,13 @@ import {
   categoryName as localizedCategoryName,
   profileDisplayName as localizedProfileDisplayName,
 } from './data/bilingualContent';
-import { speakText, stopSpeech, ttsLanguageFor, loadNativeVoices } from './utils/tts';
+import {
+  speakText,
+  stopSpeech,
+  ttsLanguageFor,
+  loadNativeVoices,
+  getLastTtsDiagnostic,
+} from './utils/tts';
 import { getTtsSettings } from './utils/ttsSettings';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
@@ -1001,6 +1007,19 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  /**
+   * ★★ 朗讀失敗時要顯示的訊息（2026-10-08）。
+   *
+   * 【為什麼需要】
+   *   使用者回報「線上網站有聲音（按鈕）顯示沒有，但音量已是最大的」。
+   *   舊版 `handleToggleSpeakSummary` 無條件 `setIsSpeaking(true)`，
+   *   所以按鈕會變成「停止朗讀」——**看起來有反應，實際上一個字都沒唸**。
+   *   Web Speech API 的失敗是靜默的，前端若不解讀診斷，就無從得知。
+   *
+   *   這裡存的是**已翻譯好的字串**（不是 key），因為訊息來源有三種
+   *   （音量 0／環境不支援／送出去但沒出聲），各自對應不同的鍵。
+   */
+  const [ttsNotice, setTtsNotice] = useState<string | null>(null);
   const [geminiConnected, setGeminiConnected] = useState<boolean | null>(null);
   /**
    * 載入畫面已等待的秒數。
@@ -1975,15 +1994,53 @@ export default function App() {
     if (isSpeaking) {
       stopSpeech();
       setIsSpeaking(false);
-    } else {
-      setIsSpeaking(true);
-      speakText(analysisResult.plain_summary, {
-        rate: 0.88,
-        preferLanguage: ttsLang,
-        onEnd: () => setIsSpeaking(false),
-        onError: () => setIsSpeaking(false),
-      });
+      setTtsNotice(null);
+      return;
     }
+
+    setTtsNotice(null);
+
+    /**
+     * ★★ 2026-10-08：`speakText` 的**回傳值一定要看**。
+     *   `false` 代表「根本沒送出去」（語音被關掉、或這個環境不支援）——
+     *   舊版忽略了它，於是按鈕照樣變成「停止朗讀」，
+     *   使用者看到「有反應」卻聽不到聲音，只能來回報「沒有聲音」。
+     */
+    const started = speakText(analysisResult.plain_summary, {
+      rate: 0.88,
+      preferLanguage: ttsLang,
+      onEnd: () => setIsSpeaking(false),
+      onError: () => {
+        setIsSpeaking(false);
+        setTtsNotice(t('settings.sound.blocked'));
+      },
+    });
+
+    if (!started) {
+      setIsSpeaking(false);
+      const d = getLastTtsDiagnostic();
+      setTtsNotice(
+        d.outcome === 'unsupported'
+          ? t('settings.sound.unsupported')
+          : t('settings.sound.volumeZero')
+      );
+      return;
+    }
+
+    setIsSpeaking(true);
+
+    /**
+     * ★ 第二種靜默失敗：**送出去了、沒有報錯、但完全沒出聲**。
+     *   瀏覽器不會告訴我們（`onstart` 與 `onerror` 都不觸發），
+     *   所以靠 `tts.ts` 的 watchdog 在 1.5 秒後把 outcome 標成 `'silent'`，
+     *   這裡晚一點去讀它。
+     */
+    window.setTimeout(() => {
+      if (getLastTtsDiagnostic().outcome === 'silent') {
+        setIsSpeaking(false);
+        setTtsNotice(t('settings.sound.silent'));
+      }
+    }, 1800);
   };
 
   // 重新拍照
@@ -3040,6 +3097,20 @@ export default function App() {
                         </>
                       )}
                     </button>
+
+                    {/* ★★ 朗讀失敗時的可見提示（2026-10-08）。
+                        沒有這一段，使用者按了只會看到按鈕變色卻沒聲音 ——
+                        那正是他回報「有聲音顯示沒有」時看到的畫面。
+                        ⚠️ 用 `role="status"`：這是狀態變化，不是錯誤中斷。 */}
+                    {ttsNotice && (
+                      <p
+                        role="status"
+                        id="tts-notice"
+                        className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[10px] leading-snug"
+                      >
+                        {ttsNotice}
+                      </p>
+                    )}
                   </section>
 
                   {/* ══════════════════════════════════════════════════════

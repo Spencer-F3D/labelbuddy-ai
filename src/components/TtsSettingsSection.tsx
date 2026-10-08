@@ -47,6 +47,18 @@ export const TtsVolumeSection: React.FC = () => {
   const { t, language } = useI18n();
   const [volume, setVolume] = useState(() => getTtsSettings().volume);
   const [played, setPlayed] = useState(false);
+  /**
+   * ★★ 2026-10-08：音量 0 時按下測試鈕要**說出原因**，不能靜默不做事。
+   *
+   * 【為什麼】使用者原話：「線上網站有聲音（區塊）顯示沒有，但音量已是最大的」——
+   *   他調的是**手機／電腦的音量**，而 App 自己的朗讀音量是 0
+   *   （非長者身分的預設值）。舊版在音量 0 時：
+   *     ① 滑桿放手試聽 `return` 掉
+   *     ② 語言試聽 `if (volume > 0)` 跳過
+   *     ③ 診斷區塊整個不顯示
+   *   三條路都靜默 → 使用者只看得到「按了沒反應」，無法自行診斷。
+   */
+  const [zeroWarning, setZeroWarning] = useState(false);
 
   const deviceCanSpeak = canSpeak();
   const percent = Math.round(volume * 100);
@@ -55,11 +67,39 @@ export const TtsVolumeSection: React.FC = () => {
   const changeVolume = (v: number) => {
     setVolume(v);
     setTtsVolume(v);
+    if (v > 0) setZeroWarning(false);
   };
 
-  /** 放手時唸一句 —— 這就是原本「試聽」按鈕的功能，合併進音量條 */
+  /**
+   * 放手時唸一句 —— 這就是原本「試聽」按鈕的功能，合併進音量條。
+   * ⚠️ 放手**不算「按下去」**：音量 0 時靜默是合理的（他就是不想聽）。
+   *    要能「按下去問為什麼沒聲音」的是下面那顆獨立的測試鈕。
+   */
   const previewOnRelease = () => {
     if (volume <= 0) return;
+    setPlayed(true);
+    speakText(t('settings.sound.sample'), {
+      rate: 0.88,
+      volume,
+      preferLanguage: resolveVoiceLang(language),
+    });
+  };
+
+  /**
+   * ★ 獨立的「🔊 測試語音」按鈕（2026-10-08）。
+   *
+   * 【為什麼要獨立一顆】
+   *   原本唯一的試聽入口是「放開滑桿」—— 那是一個**隱性**手勢：
+   *   使用者不會知道有東西可以按，而音量 0 時它又完全沒反應。
+   *   這顆按鈕存在的意義是「按下去一定給你一個交代」。
+   */
+  const testVoice = () => {
+    if (volume <= 0) {
+      setPlayed(false);
+      setZeroWarning(true);
+      return;
+    }
+    setZeroWarning(false);
     setPlayed(true);
     speakText(t('settings.sound.sample'), {
       rate: 0.88,
@@ -119,16 +159,53 @@ export const TtsVolumeSection: React.FC = () => {
         className="w-full h-[48px] cursor-pointer accent-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
       />
 
+      {/* ── 測試語音（2026-10-08）────────────────────────────────
+          ★ 按下去**一定給一個交代**：有聲音就唸、音量 0 就說出原因。
+            不再有「按了完全沒反應」這種無從診斷的狀態。 */}
+      <button
+        type="button"
+        id="tts-test-voice"
+        disabled={!deviceCanSpeak}
+        onClick={testVoice}
+        className="min-h-[52px] rounded-xl border-2 border-blue-800 bg-blue-50 text-blue-900 text-[17px] font-black cursor-pointer transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {t('settings.sound.testVoice')}
+      </button>
+
+      {/* 音量 0 時按下測試鈕 → 直接說出原因（不再靜默跳過） */}
+      {zeroWarning && (
+        <p className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[10px] leading-snug">
+          {t('settings.sound.volumeZero')}
+        </p>
+      )}
+
       {/* 試聽之後才顯示 —— 沒聽到聲音時要能判斷是哪一種問題
           ★★ 2026-10-04：使用者回報「朗讀示範完全沒有聲」，
              但實測程式是對的（三種語言都挑到正確語音、事件正常）。
              → 與其再猜，不如把**實際發生的事**顯示出來：
                挑了哪個語音、有沒有送出去、有沒有被瀏覽器擋下。
-             這四種原因的處理方式完全不同，不該都只說「沒聲音」。 */}
-      {played && isOn && deviceCanSpeak && (
+             這四種原因的處理方式完全不同，不該都只說「沒聲音」。
+          ★★ 2026-10-08：條件由 `played && isOn && deviceCanSpeak`
+             改為 `played && deviceCanSpeak` —— **音量 0 也要看得到原因**。
+             舊條件在音量 0 時把整個區塊藏起來，正是使用者求助無門的原因。 */}
+      {played && deviceCanSpeak && (
         <div className="flex flex-col gap-[4px]">
           {(() => {
             const d = getLastTtsDiagnostic();
+            const outcomeLabel =
+              d.outcome === 'started'
+                ? t('settings.sound.sentOk')
+                : d.outcome === 'blocked'
+                  ? t('settings.sound.blocked')
+                  : d.outcome === 'disabled'
+                    ? t('settings.sound.muted')
+                    : d.outcome === 'unsupported'
+                      ? t('settings.sound.unsupportedShort')
+                      : d.outcome === 'no-voice'
+                        ? t('settings.sound.noVoiceShort')
+                        : d.outcome === 'silent'
+                          ? t('settings.sound.silent')
+                          : t('settings.sound.sentNo');
             return (
               <p
                 className={`text-[15px] font-bold rounded-lg px-[10px] py-[6px] break-all leading-snug ${
@@ -139,19 +216,20 @@ export const TtsVolumeSection: React.FC = () => {
               >
                 {t('settings.sound.voiceUsed')}: {d.voiceName ?? t('settings.sound.noVoice')}
                 {' · '}
-                {d.outcome === 'started'
-                  ? t('settings.sound.sentOk')
-                  : d.outcome === 'blocked'
-                    ? t('settings.sound.blocked')
-                    : d.outcome === 'disabled'
-                      ? t('settings.sound.muted')
-                      : d.outcome === 'unsupported'
-                        ? t('settings.sound.unsupportedShort')
-                        : t('settings.sound.sentNo')}
+                {outcomeLabel}
                 {d.error ? ` · ${d.error}` : ''}
               </p>
             );
           })()}
+          {/* ★★ 網頁版缺語音時，把「可以怎麼做」講清楚（2026-10-08）——
+              原本只有原生（APK）才有這種指引，網頁版只顯示一行
+              「找不到這個語言的語音（請在系統設定安裝）」，
+              但網頁版要裝的是**作業系統**的語音，說法完全不同。 */}
+          {!isNativeTts() && getLastTtsDiagnostic().outcome === 'no-voice' && (
+            <p className="text-[15px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[10px] py-[8px] leading-snug">
+              {t('settings.sound.noVoiceWeb')}
+            </p>
+          )}
           <p className="text-[16px] font-bold text-slate-600 leading-snug">
             {isNativeTts() ? t('settings.sound.checkNative') : t('settings.sound.checkBrowser')}
           </p>
@@ -169,8 +247,16 @@ export const TtsVolumeSection: React.FC = () => {
  */
 export const TtsVoiceLangSection: React.FC = () => {
   const { t, language } = useI18n();
-  const [volume] = useState(() => getTtsSettings().volume);
   const [voiceLang, setVoiceLang] = useState<TTSLanguage>(() => resolveVoiceLang(language));
+  /**
+   * ★ 2026-10-08：音量 0 時選語言要說出原因。
+   *
+   * ⚠️ 這裡原本是 `const [volume] = useState(() => getTtsSettings().volume)` ——
+   *    **掛載時的快照**。使用者在上面（音量區塊）把音量拉起來之後，
+   *    這個元件不會重算，於是「選語言完全沒聲音」且沒有任何提示。
+   *    → 改成點擊當下才讀（見 `pick`）。
+   */
+  const [langZeroWarning, setLangZeroWarning] = useState(false);
   const deviceCanSpeak = canSpeak();
 
   /**
@@ -231,15 +317,20 @@ export const TtsVoiceLangSection: React.FC = () => {
      *   ② `forceLanguage: true` —— 不然示範句若含中文，
      *      會被「依文字字集改寫」的邏輯改成中文語音，
      *      使用者按 English 卻聽到粵語（實測回報的現象）
-     * ⚠️ 音量為 0 時不唸（使用者就是要安靜）。
+     * ⚠️ 音量為 0 時不唸（使用者就是要安靜）—— 但**要說出來**，
+     *    不能像以前那樣靜默跳過（見上方 `langZeroWarning` 的說明）。
      */
-    if (volume > 0) {
+    const v = getTtsSettings().volume;
+    if (v > 0) {
+      setLangZeroWarning(false);
       speakText(t(SAMPLE_KEY[next]), {
         rate: 0.88,
-        volume,
+        volume: v,
         preferLanguage: next,
         forceLanguage: true,
       });
+    } else {
+      setLangZeroWarning(true);
     }
   };
 
@@ -292,6 +383,17 @@ export const TtsVoiceLangSection: React.FC = () => {
           )}
         </p>
       )}
+      {/* ★★ 網頁版也要講清楚「沒有這個語言的語音」可以怎麼辦（2026-10-08）。
+          原本只有原生（APK）走 `isLanguageAvailable` 那條才有這個提示，
+          網頁版只顯示一行「找不到這個語言的語音（請在系統設定安裝）」——
+          但網頁要裝的是**作業系統**的語音，說法完全不同。
+          實測（`scripts/probe-tts-voices.mjs`）：Windows 上唯一的中文粵語語音
+          是 Google／Microsoft 的「網路語音」，裝置沒裝就完全沒聲音。 */}
+      {!isNativeTts() && describeVoiceFor(voiceLang) === null && (
+        <p className="text-[15px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[8px] leading-snug">
+          {t('settings.sound.noVoiceWeb')}
+        </p>
+      )}
       {/* ⚠️ 用 flex-wrap 讓按鈕整顆換行，不要用 overflow-x-auto 水平捲動 ——
           長者看不到「右邊還有東西」，會以為只有這兩個選項。 */}
       <div className="flex flex-wrap gap-[8px]" role="group" aria-label={t('settings.sound.voiceLang')}>
@@ -320,6 +422,13 @@ export const TtsVoiceLangSection: React.FC = () => {
           );
         })}
       </div>
+
+      {/* 音量 0 時選語言 → 說出原因，不要靜默跳過 */}
+      {langZeroWarning && (
+        <p className="text-[16px] font-bold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-xl px-[12px] py-[10px] leading-snug">
+          {t('settings.sound.volumeZero')}
+        </p>
+      )}
     </div>
   );
 };

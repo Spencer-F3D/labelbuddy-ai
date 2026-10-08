@@ -26,6 +26,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 let pass = 0;
@@ -427,15 +428,20 @@ try {
   /**
    * ★ 條款要說明雲端送的是「成分」而不是病名 —— 這句是**主動澄清**，
    *   不是被動免責。少了它，使用者無從知道邊界在哪。
+   *
+   * ⚠️ 2026-10-08：原本這條要求出現「不會送出病名」。那句話本身**不夠精確**
+   *   —— 病症名稱確實會離開手機（送到我們自己的伺服器用來換算成分），
+   *   只是不轉送給 AI 供應商。條款改成講「兩段邊界」，
+   *   所以斷言跟著改成驗「不會傳給供應商」。
    */
   check(
     '★ 私隱條款（中）說明雲端送的是「要盯緊的成分」',
-    /要盯緊的成分/.test(zhPrivacy) && /不會送出病名/.test(zhPrivacy),
+    /要盯緊的成分/.test(zhPrivacy) && /不會傳給供應商/.test(zhPrivacy),
     `→ ${zhPrivacy.slice(0, 60)}…`
   );
   check(
     '★ 私隱條款（英）說明雲端送的是 ingredients to watch for',
-    /ingredients to watch for/i.test(enPrivacy) && /never a diagnosis/i.test(enPrivacy),
+    /ingredients to watch for/i.test(enPrivacy) && /never sent to the provider/i.test(enPrivacy),
     `→ ${enPrivacy.slice(0, 80)}…`
   );
 
@@ -448,6 +454,127 @@ try {
     '★ 私隱條款不得概括保證「照片永遠不離開裝置」',
     !/照片永遠不離開裝置/.test(zhPrivacy) && !/the photo never leaves/i.test(enPrivacy),
     '那對 cloud_image 模式不成立'
+  );
+
+  /* ══════════════════════════════════════════════════════════════════
+   * 2c. 模式選擇器文案必須與條款指向同一個邊界（2026-10-08 新增）
+   * ══════════════════════════════════════════════════════════════════
+   *
+   * 【為什麼要新增這一節】
+   *   評分審查抓到一個 2b 守不到的洞：模式選擇器寫「上傳：照片與病史」，
+   *   而 legal.privacy.3 寫「不會送出病名」——**同一個 App 內兩句話打架**。
+   *   評審只要滑到模式選擇頁、再翻私隱條款，就會看到。
+   *   2b 只驗了「條款本身」，沒有驗「選擇器」。
+   *
+   * 【為什麼驗翻譯表而不是驗畫面】
+   *   選擇器（AnalysisModePicker.tsx）那三行文字的**唯一來源**就是
+   *   `mode.*Data` 這三個鍵（見 src/data/analysisModes.ts 的 MODE_DATA_KEY）。
+   *   驗翻譯表等於驗畫面，而且幾毫秒就跑完，不必開瀏覽器。
+   *
+   * ★ 判準來自本專案自己的定義：**「上傳」一律指「送到 AI 供應商」**
+   *   （見 server/handlers.ts 的 providerBoundaryNote）。
+   */
+  console.log('\n── 2c. 模式選擇器文案必須與條款指向同一個邊界 ──');
+
+  const modeDataText = (lang: 'zh-TW' | 'en') =>
+    ['cloudImage', 'cloudText', 'localOnly']
+      .map((m) => String((TRANSLATIONS[lang] as Record<string, string>)[`mode.${m}Data`] ?? ''))
+      .join(' ');
+
+  const zhModeData = modeDataText('zh-TW');
+  const enModeData = modeDataText('en');
+
+  check(
+    '★★ 模式選擇器（中）不得再寫「上傳：…病史」',
+    !/病史/.test(zhModeData),
+    `「上傳」指送到 AI 供應商，而送到供應商的是成分不是病名 → ${zhModeData.slice(0, 50)}…`
+  );
+  check(
+    '★★ 模式選擇器（英）不得再寫 health info',
+    !/health info/i.test(enModeData),
+    `→ ${enModeData.slice(0, 80)}…`
+  );
+  /**
+   * ⚠️ 這裡驗的是「指向同一個邊界」，不是「同一句話」。
+   *   選擇器那一行的框寬在**長者字級（19px）下只有 218px** ——
+   *   也就是**上限 11 個全形字**。所以它只能用較短的「把關的成分」；
+   *   條款不受寬度限制，用較精確的「要盯緊的成分」。
+   *   兩者指的都是**成分約束**而不是病名，那才是這一節要守的東西。
+   *   （2026-10-08 實測：寫成「要盯緊的成分」共 12 字 → 折行後末行只剩 1 個字。）
+   */
+  check(
+    '★ 模式選擇器（中）與條款指向同一個邊界（都要講「成分」而不是病名）',
+    /成分/.test(zhModeData) && /要盯緊的成分/.test(zhPrivacy),
+    `選擇器：${zhModeData.slice(0, 50)}…`
+  );
+  /**
+   * ★★ 把版面約束寫進回歸測試（2026-10-08）。
+   *   這一條不是「美感偏好」——超過 11 個全形字就會在長者字級下折行並留下孤行，
+   *   而孤行對長者等於要多掃一次那 1～2 個字。
+   *   放在這裡是因為它**幾毫秒就跑完**，不必開瀏覽器等 check:layout。
+   */
+  check(
+    '★ 雲端模式的「上傳：…」每一行都塞得進長者字級框寬（≤ 11 個全形字）',
+    ['cloudImage', 'cloudText'].every((m) => {
+      const s = String((TRANSLATIONS['zh-TW'] as Record<string, string>)[`mode.${m}Data`] ?? '');
+      return s.length > 0 && s.length <= 11;
+    }),
+    '超過 11 個全形字會在 19px 下折行並留下孤行'
+  );
+  check(
+    '★ 模式選擇器（英）與條款指向同一個邊界（兩邊都要說 watch）',
+    /watch/i.test(enModeData) && /ingredients to watch for/i.test(enPrivacy),
+    `→ ${enModeData.slice(0, 80)}…`
+  );
+  check(
+    '★ 條款（中）要寫明病症名稱不傳給供應商，並點出自填例外',
+    /不會傳給供應商/.test(zhPrivacy) && /自行填寫/.test(zhPrivacy),
+    `→ ${zhPrivacy.slice(0, 60)}…`
+  );
+  check(
+    '★ 條款（英）要寫明 conditions 不傳給供應商，並點出自填例外',
+    /never sent to the provider/i.test(enPrivacy) && /typed in yourself/i.test(enPrivacy),
+    `→ ${enPrivacy.slice(0, 80)}…`
+  );
+
+  /**
+   * ★★ `/api/privacy` 端點的描述也是**使用者／評審看得到的文案** ——
+   *   打開那個網址就會讀到。它曾經寫著「同時傳送您勾選的慢性病史」，
+   *   與條款直接矛盾，而且不會有任何測試紅燈。
+   *
+   * 【為什麼切片驗而不是整檔 grep】
+   *   `handlers.ts` 有兩處**合法**的「慢性病史」：
+   *     · 檔頭註解在說明「以前那一行提示詞長什麼樣」
+   *     · `localData.items` 說「健康設定與慢性病史」存在**裝置上**（那是對的）
+   *   整檔 grep 會誤殺。所以只切出三個模式描述所在的那一段來驗。
+   */
+  const handlersSrc = readFileSync(new URL('../server/handlers.ts', import.meta.url), 'utf8');
+  const modesBlock = (() => {
+    const start = handlersSrc.indexOf('modes: {');
+    const end = handlersSrc.indexOf('providerBoundaryNote');
+    return start >= 0 && end > start ? handlersSrc.slice(start, end) : '';
+  })();
+  /**
+   * ⚠️ **一定要先剝掉註解再驗**。
+   *   那裡有一段註解在說明「原本寫的是什麼」（`原本寫「…慢性病史」`），
+   *   直接 grep 會把那段說明當成違規 —— 但註解不是使用者看得到的文案，
+   *   而且刻意保留舊字串才看得出「改了什麼、為什麼改」。
+   */
+  const stripComments = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const modesCode = stripComments(modesBlock);
+
+  check(
+    '★★ /api/privacy 的三模式描述不得出現「病史」',
+    modesCode.length > 0 && !/病史/.test(modesCode),
+    modesBlock.length === 0
+      ? '切不出 modes 區塊（handlers.ts 結構變了？請更新這支腳本的切片錨點）'
+      : '雲端模式的 description 仍聲稱傳送「慢性病史」，與條款矛盾'
+  );
+  check(
+    '★ /api/privacy 的雲端模式描述要說出送的是「要盯緊的成分」',
+    (modesCode.match(/要盯緊的成分/g) ?? []).length >= 2,
+    'cloud_image 與 cloud_text 兩段都要講清楚送的是成分'
   );
 
   console.log('\n── 3. 難字簡化：片語要換，化學名稱不能動 ──');

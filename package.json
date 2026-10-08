@@ -31,6 +31,8 @@
     "check:bank": "tsx scripts/check-quiz-sync.ts",
     "check:parity": "tsx scripts/check-offline-parity.ts",
     "check:conditions-ui": "node scripts/check-custom-condition.mjs",
+    "check:tts": "tsx scripts/check-tts-diagnostic.ts",
+    "probe:tts": "node scripts/probe-tts-voices.mjs",
     "check:consistency": "tsx scripts/check-consistency.ts",
     "check:pregnancy": "node scripts/check-pregnancy.mjs",
     "apk": "node scripts/build-apk.mjs",
