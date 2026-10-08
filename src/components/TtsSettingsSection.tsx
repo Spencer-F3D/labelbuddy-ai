@@ -23,7 +23,9 @@
 import React, { useEffect, useState } from 'react';
 import { Volume2, VolumeX, Languages } from 'lucide-react';
 import { useI18n } from '../i18n/I18nContext';
-import { getTtsSettings, setTtsVolume, setTtsVoiceLang, resolveVoiceLang } from '../utils/ttsSettings';
+// ⚠️ 2026-10-09：`setTtsVolume` / `setTtsVoiceLang` 已移到父層（App.tsx）呼叫 ——
+//    子元件改成受控後只負責回報，寫入儲存是父層的事（單一寫入點）。
+import { getTtsSettings, resolveVoiceLang } from '../utils/ttsSettings';
 import {
   speakText,
   canSpeak,
@@ -42,10 +44,31 @@ const VOICE_LANGS: TTSLanguage[] = ['cantonese', 'mandarin', 'english'];
 
 /**
  * 音量區塊（標題由呼叫端提供：「音量」）。
+ *
+ * ★★ 2026-10-09：**改成受控元件**（`value` ＋ `onChange`）。
+ *
+ * 【原本的 bug（使用者回報）】
+ *   「調整音量後關閉音量控制面板，外部的音量顯示數值不會同步更新。」
+ *   舊版這裡自己用 `useState` 存音量，只呼叫模組層的 `setTtsVolume()`；
+ *   而 `SettingsSection` 的收合摘要（「音量 40%」）是**父層 App.tsx**
+ *   用它的 `ttsSettings` state 算出來的 —— 父層**從來沒有被通知**。
+ *   → 面板開著時看到的是子元件的 state（正確），
+ *     一收起來就換成父層的舊值（**錯誤**），而且切分頁也不會好。
+ *
+ * 【為什麼受控才是正解，而不是「叫子元件通知父層」】
+ *   同一個數值有兩個來源（父層 state ＋ 子元件 state）本來就會漂移。
+ *   收斂成**一個來源**（父層），子元件只負責顯示與回報 ——
+ *   結構上就不可能再不一致（而不是靠記得同步）。
  */
-export const TtsVolumeSection: React.FC = () => {
+export interface TtsVolumeSectionProps {
+  /** 目前音量（0～1）。由父層持有 —— 見上方說明。 */
+  value: number;
+  /** 音量變更時回報父層（父層負責寫入儲存與更新摘要） */
+  onChange: (volume: number) => void;
+}
+
+export const TtsVolumeSection: React.FC<TtsVolumeSectionProps> = ({ value, onChange }) => {
   const { t, language } = useI18n();
-  const [volume, setVolume] = useState(() => getTtsSettings().volume);
   const [played, setPlayed] = useState(false);
   /**
    * ★★ 2026-10-08：音量 0 時按下測試鈕要**說出原因**，不能靜默不做事。
@@ -61,12 +84,13 @@ export const TtsVolumeSection: React.FC = () => {
   const [zeroWarning, setZeroWarning] = useState(false);
 
   const deviceCanSpeak = canSpeak();
+  const volume = value;
   const percent = Math.round(volume * 100);
   const isOn = volume > 0;
 
   const changeVolume = (v: number) => {
-    setVolume(v);
-    setTtsVolume(v);
+    // ⚠️ 只回報，不自己寫儲存 —— 寫入由父層的 onChange 統一負責
+    onChange(v);
     if (v > 0) setZeroWarning(false);
   };
 
@@ -245,9 +269,24 @@ export const TtsVolumeSection: React.FC = () => {
  * ★ 這三個選項是**發音語言**，與介面文字語言無關 ——
  *   英文介面也可以選粵語發音。區塊內要講清楚，否則會被誤解。
  */
-export const TtsVoiceLangSection: React.FC = () => {
+export interface TtsVoiceLangSectionProps {
+  /** 目前朗讀語言（由父層推導後傳入） */
+  value: TTSLanguage;
+  /** 語言變更時回報父層（父層負責寫入儲存與更新摘要） */
+  onChange: (lang: TTSLanguage) => void;
+}
+
+export const TtsVoiceLangSection: React.FC<TtsVoiceLangSectionProps> = ({ value, onChange }) => {
   const { t, language } = useI18n();
-  const [voiceLang, setVoiceLang] = useState<TTSLanguage>(() => resolveVoiceLang(language));
+  /**
+   * ★★ 2026-10-09：與音量區塊**同一個 bug、同一個修法**（改成受控）。
+   *
+   * 舊版是 `useState(() => resolveVoiceLang(language))` ＋ `setTtsVoiceLang()`，
+   * 父層的「朗讀語言」收合摘要因此**永遠停在舊值** ——
+   * 使用者回報的是音量那一格，但語言這一格有一模一樣的問題。
+   * （本專案的老毛病：改了一處、另一處沒改，而且不會報錯。）
+   */
+  const voiceLang = value;
   /**
    * ★ 2026-10-08：音量 0 時選語言要說出原因。
    *
@@ -306,8 +345,8 @@ export const TtsVoiceLangSection: React.FC = () => {
   } as const;
 
   const pick = (next: TTSLanguage) => {
-    setVoiceLang(next);
-    setTtsVoiceLang(next);
+    // ⚠️ 只回報，不自己寫儲存 —— 寫入由父層的 onChange 統一負責
+    onChange(next);
     /**
      * 選完立刻唸一句 —— 語言這種東西**非聽不可**，
      * 只看「粵語／普通話」四個字，使用者無法確認差別。

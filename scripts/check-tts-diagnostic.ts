@@ -343,6 +343,61 @@ if (STATIC_ONLY) {
     } else {
       skipped('沒有粵語語音時的指引', '無法判斷這台裝置的語音狀態');
     }
+
+    /* ── 8. ★★ 收起面板後，收合摘要必須反映最新值（2026-10-09 使用者回報）──
+     *
+     * 【為什麼要這一條】
+     *   舊版子元件自己存 state、父層的 `summary` 卻來自父層自己的 state，
+     *   兩者從不同步 → 「調完音量、收起面板，摘要還是舊的百分比」。
+     *   這個 bug **不會報錯、不會當掉**，只有把面板收起來才看得到 ——
+     *   正是本專案最怕的那一類，所以要用真實瀏覽器釘住。
+     */
+    const openSection = (id: string) =>
+      evalJs(`(() => { const b = document.getElementById('${id}-toggle'); if (!b) return false; b.click(); return true; })()`);
+    const sectionText = (id: string) =>
+      evalJs(`(() => { const b = document.getElementById('${id}-toggle'); return b ? b.innerText : ''; })()`);
+
+    // 先確保音量區塊是展開的（預設是收合的）
+    if (!(await evalJs(`(() => document.getElementById('settings-sound-toggle')?.getAttribute('aria-expanded') === 'true')()`))) {
+      await openSection('settings-sound');
+      await sleep(600);
+    }
+    await evalJs(`
+      (() => {
+        const s = document.getElementById('tts-volume');
+        if (!s) return false;
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(s, '45');
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+        s.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      })()
+    `);
+    await sleep(700);
+    await openSection('settings-sound'); // 收起
+    await sleep(800);
+    const volSummary = String(await sectionText('settings-sound'));
+    check(
+      '★★ 收起「音量」面板後，收合摘要要反映最新音量（不是舊值）',
+      volSummary.includes('45%'),
+      `→ 摘要為「${volSummary.replace(/\n/g, ' / ')}」，預期含 45%`
+    );
+
+    // 朗讀語言：同一個 bug、同一個修法，也要釘住
+    if (!(await evalJs(`(() => document.getElementById('settings-voice-lang-toggle')?.getAttribute('aria-expanded') === 'true')()`))) {
+      await openSection('settings-voice-lang');
+      await sleep(600);
+    }
+    await evalJs(`(() => { document.getElementById('tts-lang-english')?.click(); })()`);
+    await sleep(700);
+    await openSection('settings-voice-lang'); // 收起
+    await sleep(800);
+    const langSummary = String(await sectionText('settings-voice-lang'));
+    check(
+      '★★ 收起「朗讀語言」面板後，收合摘要要反映最新語言',
+      langSummary.includes(String((TRANSLATIONS['zh-TW'] as Record<string, string>)['settings.sound.langEnglish'])),
+      `→ 摘要為「${langSummary.replace(/\n/g, ' / ')}」`
+    );
   } catch (e: any) {
     fail++;
     console.log(`  ❌ 瀏覽器檢查失敗：${e?.message ?? e}`);

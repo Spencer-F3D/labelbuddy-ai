@@ -156,7 +156,7 @@ import {
   loadNativeVoices,
   getLastTtsDiagnostic,
 } from './utils/tts';
-import { getTtsSettings } from './utils/ttsSettings';
+import { getTtsSettings, setTtsVolume, setTtsVoiceLang, resolveVoiceLang } from './utils/ttsSettings';
 import { generateSampleLabelDataUrl, DEMO_LABELS } from './data/samples';
 import { DietHealthHistory } from './components/DietHealthHistory';
 import { HealthQASection } from './components/HealthQASection';
@@ -3535,14 +3535,23 @@ export default function App() {
               icon={<LanguagesIcon className="w-[26px] h-[26px]" />}
               title={t('settings.sound.voiceLang')}
               summary={t(
-                ttsSettings.voiceLang === 'mandarin'
+                resolveVoiceLang(language) === 'mandarin'
                   ? 'settings.sound.langMandarin'
-                  : ttsSettings.voiceLang === 'english'
+                  : resolveVoiceLang(language) === 'english'
                     ? 'settings.sound.langEnglish'
                     : 'settings.sound.langCantonese'
               )}
             >
-              <TtsVoiceLangSection key={`lang-${ttsSettings.voiceLang ?? 'auto'}`} />
+              {/*
+                ★★ 2026-10-09：受控（`value` ＋ `onChange`），見 TtsSettingsSection 的說明。
+                ⚠️ 摘要改用 `resolveVoiceLang(language)` 而不是 `ttsSettings.voiceLang` ——
+                  後者是 `null`（沒選過）時，摘要會顯示「粵語」，
+                  但子元件用的是「跟隨介面語言」（英文介面＝English）→ **兩邊不一致**。
+              */}
+              <TtsVoiceLangSection
+                value={resolveVoiceLang(language)}
+                onChange={(next) => setTtsSettingsState(setTtsVoiceLang(next))}
+              />
             </SettingsSection>
 
             <SettingsSection
@@ -3555,8 +3564,21 @@ export default function App() {
                   : t('settings.sound.summaryOff')
               }
             >
-              {/* key 帶音量：使用者在滑桿放手後，區塊會以新值重建 */}
-              <TtsVolumeSection key={ttsSettings.volume} />
+              {/*
+                ★★ 2026-10-09 修掉使用者回報的同步 bug。
+                【症狀】調完音量、收起面板 → 收合摘要還是舊的百分比。
+                【原因】舊版這裡是 `<TtsVolumeSection key={ttsSettings.volume} />`，
+                  但那個 `key` **永遠不會變** —— 因為 `ttsSettings` 只在
+                  ① 切換身分 ② 掛載 時更新（見上方兩個 setTtsSettingsState）。
+                  滑桿只改了子元件自己的 state ＋ 模組層儲存，
+                  **父層完全不知情** → 摘要停在舊值，切分頁也不會好。
+                  （那個 key 的註解寫著「放手後會以新值重建」，是一個從未成立的假設。）
+                【修法】受控：父層是唯一來源，子元件只回報。
+              */}
+              <TtsVolumeSection
+                value={ttsSettings.volume}
+                onChange={(v) => setTtsSettingsState(setTtsVolume(v))}
+              />
             </SettingsSection>
 
             {/* 第二部分原本是「日常生理指標量測」（血壓／心跳／血糖／尿酸／血脂

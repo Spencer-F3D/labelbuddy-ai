@@ -1188,6 +1188,44 @@ handler 簽名拿不到 URL → `worker.ts` 與 `server.ts` 都改成
 
 ---
 
+### [2026-10-09 00:20] 墨影（Mo）—— 修掉「收起音量面板後摘要不更新」
+
+**做了什麼**：使用者回報「調整音量後關閉音量控制面板，外部的音量顯示數值不會同步更新」。
+
+| 檔案 | 動作 |
+| --- | --- |
+| `src/components/TtsSettingsSection.tsx` | `TtsVolumeSection`／`TtsVoiceLangSection` **改成受控**（`value` ＋ `onChange`），移除各自的 `useState` |
+| `src/App.tsx` | 傳入 `value`／`onChange`；移除兩個**從未生效**的 `key` 假解法；語言摘要改用 `resolveVoiceLang(language)` |
+| `scripts/check-tts-diagnostic.ts` | 新增 2 條斷言（收起面板後摘要要反映最新值） |
+
+**根因：同一個數值有兩個來源**
+`SettingsSection` 的收合摘要 `summary` 是**父層**算的 prop，來源是 App.tsx 的
+`ttsSettings` state —— 而它**只在「切換身分」與「掛載」時更新**。
+子元件沒有 props、沒有回呼，自己存 `useState` ＋ 呼叫模組層 `setTtsVolume()`。
+→ 父層完全不知情。**面板開著時看到子元件的 state（對），一收起來就換成父層的舊值。**
+
+★ 那個 `key={ttsSettings.volume}` 的註解寫著「放手後會以新值重建」——
+**`ttsSettings.volume` 永遠不變，所以 key 永遠不變**。那是個從未成立的假設。
+
+**★★ 變異測試（證明不是假通過）**：新增斷言後**先還原舊版**跑一次 →
+`摘要為「音量 80%」，預期含 45%`（80% ＝ 掛載時的長者預設值）＋ `摘要為「粵語」`。
+修正後兩條都過。`check:tts` **45 通過 / 0 失敗 / 1 跳過**。
+
+**怎麼驗證**：`lint` ✅｜`check:tts` 45/0/1｜`verify:all` 全綠｜`check:layout` 三組合各 0 筆｜
+`check:ui` exit 0。
+
+**⚠️ 跨工作目錄的提醒**：
+1. **`TtsVolumeSection` 與 `TtsVoiceLangSection` 現在是受控元件**（需要 `value` ＋ `onChange`）。
+   直接 `<TtsVolumeSection />` 會編譯失敗。
+2. **寫入儲存的責任移到 App.tsx**（`setTtsSettingsState(setTtsVolume(v))`）——
+   子元件不再呼叫 `setTtsVolume`／`setTtsVoiceLang`。新增呼叫端時別又把寫入放回子元件。
+3. ★ **同一個數值不要存兩份**。設定頁其他區塊若也有「父層摘要 ＋ 子元件編輯」的組合，
+   請檢查是不是同一個坑。
+
+**還沒做／有疑問**：真實手機照片的 OCR 準確率仍未實測（原本就在待辦）。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |

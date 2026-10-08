@@ -95,6 +95,10 @@ WebView origin 是 `https://localhost` → API 一律走 `src/utils/apiBase.ts` 
 ★ 朗讀語言由**文字字集**決定（含 CJK → 中文；純拉丁 → 英文），**不是**介面語言。
 ★ 「設定 → 朗讀音量」與**手機／系統音量是兩件事**（文案必須講清楚）。
 ★ 工具：`npm run probe:tts`／`npm run check:tts`。
+★★ **同一數值只能有一個來源**（受控元件）：設定頁的收合摘要是**父層**算的 prop，
+子元件若自己再存一份 state 就會漂移 —— 而且**只有收起面板才看得到**
+（2026-10-09 修過音量與朗讀語言兩處）。★ **假的 `key` 解法比沒有解法更糟**：
+註解寫得像處理好了，會讓後來的人以為那條路已通。
 
 ## ⚠️ AI 供應商與模型鏈（會變動，失敗時先重查）→ `ARCHITECTURE.md`
 輪替鏈 `orderedProviders(hasClientKey, hasImage)` = **nvidia → gemini → openrouter**；
