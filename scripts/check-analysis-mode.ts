@@ -577,6 +577,40 @@ try {
     'cloud_image 與 cloud_text 兩段都要講清楚送的是成分'
   );
 
+  console.log('\n── 2d. 本機模式的 OCR 來源必須真的存在 ──');
+
+  /**
+   * ★★ 抓到什麼（2026-10-08）
+   *
+   *   `runBrowserOcr()` 是從 `lastPhotoFileRef` **重新編碼**的 ——
+   *   那是 2026-10-02 為了「失敗時用更高解析度重試」而留下的原始檔。
+   *   但那個 ref **只在 `handleFileChange`（相機／相簿）裡被設定**；
+   *   示範標籤（`handleLoadSample`）那條路徑漏了。
+   *   → 在「只送文字」與「只在本機」模式按內建示範標籤**一定回「請重拍」**，
+   *     即使那張圖清楚得像印刷品。
+   *
+   * ★ 為什麼值得一條斷言：它**不會報錯**，而且失敗訊息是
+   *   「照片太模糊」——**看起來像使用者的問題**。
+   *   這是本專案最怕的那一類（不報錯、只給錯建議），
+   *   而 `check:ui` 的「成分長條圖沒有渲染」正是它的下游症狀。
+   */
+  const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const loadSampleBody = (() => {
+    const i = appSrc.indexOf('const handleLoadSample');
+    return i >= 0 ? appSrc.slice(i, i + 3000) : '';
+  })();
+
+  check(
+    '★★ 示範標籤路徑必須設定 lastPhotoFileRef（否則本機 OCR 讀不到這張）',
+    /lastPhotoFileRef\.current\s*=/.test(loadSampleBody),
+    'runBrowserOcr() 從這個 ref 重新編碼；沒設就 return null → 一律回「請重拍」'
+  );
+  check(
+    '★ lastPhotoFileRef 至少有兩個設定點（相機／相簿 ＋ 示範標籤）',
+    (appSrc.match(/lastPhotoFileRef\.current\s*=/g) ?? []).length >= 2,
+    'OCR 的唯一來源；少一個就會有一條路徑靜默失效'
+  );
+
   console.log('\n── 3. 難字簡化：片語要換，化學名稱不能動 ──');
   const { simplifyNutrientWording } = await import('../src/data/bilingual');
 

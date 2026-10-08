@@ -1482,6 +1482,37 @@ export default function App() {
     );
 
     setPreviewImage(sampleDataUrl);
+
+    /**
+     * ★★ 2026-10-08 修正（真正的產品 bug，不是測試問題）。
+     *
+     * 【症狀】在「只送文字」與「只在本機」模式下按**內建示範標籤**，
+     *   一定回「這次沒成功／請重拍」，即使照片清楚得像印刷品。
+     *   （`npm run check:ui` 的「成分長條圖沒有渲染」就是在抓這件事。）
+     *
+     * 【原因】OCR 是從 `lastPhotoFileRef` **重新編碼**的（見 `runBrowserOcr`）——
+     *   那是 2026-10-02 為了「失敗時用更高解析度重試」而留下的原始檔。
+     *   但那個 ref **只在 `handleFileChange`（相機／相簿）裡被設定**；
+     *   示範標籤這條路徑只設了 `previewImage`。
+     *   → `runBrowserOcr()` 第一行 `if (!file) return null;` 直接回 null，
+     *     OCR 從來沒跑，`ocrText` 是空字串 → 規則引擎只能回「請重拍」。
+     *
+     * 【為什麼以前沒被發現】
+     *   `cloud_image`（預設模式）**不做 OCR**，直接把照片送雲端，所以看起來正常；
+     *   而且失敗訊息是「照片太模糊」——**看起來像使用者的問題**，
+     *   不像程式的問題。這正是本專案最怕的那一類（不會報錯、只給錯建議）。
+     *
+     * 【修法】把 data URL 轉成 Blob 存進同一個 ref，讓兩條路徑行為一致。
+     */
+    try {
+      const blob = await (await fetch(sampleDataUrl)).blob();
+      lastPhotoFileRef.current = new File([blob], 'demo-label.png', {
+        type: blob.type || 'image/png',
+      });
+    } catch (e) {
+      console.warn('示範標籤轉檔失敗（本機 OCR 會讀不到這張）:', e);
+    }
+
     await sendImageForAnalysis(sampleDataUrl);
   };
 

@@ -96,12 +96,31 @@ for (const sampleId of SAMPLES) {
     continue;
   }
 
-  for (const [label, conditions] of Object.entries(CONDITION_SETS)) {
-    checks++;
-    const raw = analyzeNutritionWithIndicators(profile, conditions, undefined, 'en');
+/**
+ * ★★ 一定要帶 `numericLimits`（2026-10-08 修掉一個「假通過」）。
+ *
+ * 【原本的問題】這裡傳的是 `undefined`，於是引擎裡的
+ *   `overLimit = nutrientFactsForRisk.filter(f => f.percent >= 100)`
+ *   **永遠是空的** → 走不到「沒勾慢性病、但某項超過每日上限」那條分支
+ *   （`smartNutritionAnalyzer.ts` 的
+ *     `matchedConditions.length === 0 && overLimit.length > 0`）。
+ *   結果：那條分支的文案沒有英文對照，而**這支檢查全綠**。
+ *   實際症狀是英文介面冒出中文 ——
+ *   `check:ui` 在「示範標籤 ＋ 只在本機」抓到 4 處殘留才曝光。
+ *
+ * 【教訓】測試少傳一個參數，就會**安靜地跳過整條分支**。
+ *   和本專案紅線「假通過比紅燈危險」是同一件事。
+ *   真實路徑是 `analyzeLabelLocally()` → 它傳的是
+ *   `learnerProfile.numericLimits`。
+ */
+const SENIOR_LIMITS = getLearnerProfile('senior').numericLimits;
 
-    // 模擬 handler 的完整流程：補上 nutrient_facts 與教育欄位，再套用對照表
-    const facts = buildLocalNutrientFacts(profile, undefined);
+for (const [label, conditions] of Object.entries(CONDITION_SETS)) {
+  checks++;
+  const raw = analyzeNutritionWithIndicators(profile, conditions, SENIOR_LIMITS, 'en');
+
+  // 模擬 handler 的完整流程：補上 nutrient_facts 與教育欄位，再套用對照表
+  const facts = buildLocalNutrientFacts(profile, SENIOR_LIMITS);
     const edu = buildEducationFields(facts, profile.foodName);
     const withEdu = { ...raw, ...edu, nutrient_facts: facts };
     const out = translateLocalResult(withEdu as unknown as LabelAnalysisResult, 'en');

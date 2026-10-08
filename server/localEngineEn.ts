@@ -46,12 +46,25 @@ export const LOCAL_TEXT_EN: Record<string, string> = {
     '✅ The ingredients are gentle — safe to eat.',
   '🟡 黃燈提醒：嚐一兩口就好，不要吃太多':
     '🟡 Caution: a taste or two is fine — do not eat much.',
+  /**
+   * ★ 2026-10-08 補上。這一句是「**沒勾慢性病、但某項超過每日上限**」的黃燈
+   *   （2026-10-07 新增的分支，見 `smartNutritionAnalyzer.ts` 的
+   *   `matchedConditions.length === 0 && overLimit.length > 0`）。
+   *   加分支時**漏了這一條的英文對照** ——
+   *   英文介面下只有這個分支會冒出中文，而 `check:i18n` 的樣本沒走到它。
+   *   （實測：`check:ui` 在示範標籤 ＋ 只在本機時抓到 4 處中文殘留。）
+   */
+  '🟡 黃燈提醒：這一項已經超標':
+    '🟡 Caution: this one is already over the limit',
 
   // ── 白話摘要 ──────────────────────────────────────────────
   '各項營養指標未發現嚴重超標情況，成分相對單純健康。':
     'No nutrient is seriously over the limit. The ingredients are relatively simple and healthy.',
   '吃的時候記得配一杯溫開水，也可以分給家人一起吃，不要一次吃太多。':
     'Have a glass of warm water with it, and share it with family — do not eat it all at once.',
+  // ★ 2026-10-08：與上面那條黃燈標題同一組（「沒勾慢性病＋超標」分支的建議）。
+  '想吃的話，份量減半、多喝開水，也可以分給家人一起吃。':
+    'If you want it, halve the portion, drink more water, and share it with family.',
   '平時早餐或點心時間吃剛剛好，清淡好消化，祝您天天健康活力好！':
     'Perfect for breakfast or a snack — light and easy to digest. Wishing you good health every day!',
   '建議在超市改買：新鮮豆腐、綠色蔬菜、清蒸魚、燕麥片或無糖豆漿，清淡又顧健康！':
@@ -340,6 +353,25 @@ const TEMPLATE_PATTERNS: Array<{ re: RegExp; build: (m: RegExpMatchArray) => str
     re: /^這包的(.+?)是 (.+?) (\S+)，等於您一天上限的 (\d+)%。$/,
     build: (m) =>
       `This pack has ${m[2]} ${unitName(m[3], 'en')} of ${nutrientName(m[1], 'en')} — that is ${m[4]}% of your daily limit.`,
+  },
+  {
+    /**
+     * ★ 2026-10-08 新增：**沒勾慢性病、但某項超過每日上限**的黃燈摘要。
+     *
+     * 【為什麼一定要用樣板而不是對照表】
+     *   這一句把商品名、成分名、數值、單位、百分比都**插進句子裡**，
+     *   每次都不一樣 —— 純查表不可能命中。
+     *   （本專案第五次踩到「插值變數漏翻」，見 MEMORY.md 的五類靜默 bug。）
+     *
+     * ⚠️ 轉換發生在 `simplifyNutrientWording` **之前**
+     *   （見 localAnalysis.ts 的順序），所以這裡拿到的成分名是 **canonical**
+     *   （「鈉」而不是「鹽分」），`nutrientName()` 才對得上。
+     */
+    re: /^您好！這款【(.+?)】的「(.+?)」每份就有 (.+?) (\S+)，已經佔了整天上限的 (\d+)%。您沒有勾選相關的慢性病，所以這不是針對您的病況判斷；但如果經常吃這一類食品，還是建議少買、或改成偶爾吃一次就好。$/,
+    build: (m) => {
+      const s = subjectClause(m[1]);
+      return `Hello! ${s.text} ${s.verb} ${m[3]} ${unitName(m[4], 'en')} of ${nutrientName(m[2], 'en')} per serving — already ${m[5]}% of the daily limit. You have not selected any related health condition, so this is not a judgement about your condition; but if you eat this kind of food often, it is still better to buy it less often, or only once in a while.`;
+    },
   },
   {
     // 沒有任何超標項目時

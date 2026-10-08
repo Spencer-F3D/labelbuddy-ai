@@ -152,6 +152,35 @@ function canonical(value: unknown): string {
   return JSON.stringify(walk(value));
 }
 
+/**
+ * 找出兩個物件「**值**不同」的欄位（含路徑）。
+ *
+ * ★ 2026-10-08 新增。原本 golden 比對失敗時只印「行為變了：<key>」——
+ *   要判斷「這是刻意的修正，還是真的改壞了」，得自己打開 fixture 一行一行比。
+ *   **失敗訊息不夠用，就等於每次都要重做一次診斷。**
+ *   （上面那個 `keyDiff` 只比**鍵集合**，值不同它看不到。）
+ */
+function valueDiff(a: any, b: any, prefix = ''): string[] {
+  const out: string[] = [];
+  const ka = a && typeof a === 'object' ? Object.keys(a) : [];
+  const kb = b && typeof b === 'object' ? Object.keys(b) : [];
+  for (const k of new Set([...ka, ...kb])) {
+    const at = prefix ? `${prefix}.${k}` : k;
+    const va = a?.[k];
+    const vb = b?.[k];
+    if (va && vb && typeof va === 'object' && typeof vb === 'object') {
+      out.push(...valueDiff(va, vb, at));
+    } else if (JSON.stringify(va) !== JSON.stringify(vb)) {
+      const fmt = (x: unknown) => {
+        const s = typeof x === 'string' ? x : JSON.stringify(x);
+        return s && s.length > 72 ? `${s.slice(0, 72)}…` : String(s);
+      };
+      out.push(`${at}: golden「${fmt(vb)}」→ 現在「${fmt(va)}」`);
+    }
+  }
+  return out;
+}
+
 /** 找出兩個物件「鍵集合」的差異（漏欄位比值不同更難發現） */
 function keyDiff(a: any, b: any, prefix = ''): string[] {
   const out: string[] = [];
@@ -247,6 +276,7 @@ const DATA_FIELDS = [
     console.log('── 1. 逐組比對（後端 API vs 前端純函式 vs golden）──');
     const apiVsLocal: string[] = [];
     const apiVsGolden: string[] = [];
+    const goldenFieldDiff: string[] = [];
     const fieldProblems: string[] = [];
 
     for (const c of CASES) {
@@ -265,6 +295,7 @@ const DATA_FIELDS = [
       }
       if (canonical(apiData) !== canonical(goldenData)) {
         apiVsGolden.push(c.key);
+        goldenFieldDiff.push(`${c.key}\n       ${valueDiff(apiData, goldenData).join('\n       ')}`);
       }
       const kd = keyDiff(apiData, localData);
       if (kd.length) fieldProblems.push(`${c.key}: ${kd.slice(0, 3).join(' / ')}`);
@@ -278,7 +309,9 @@ const DATA_FIELDS = [
     check(
       `② 後端 API ＝ 重構前 golden（${CASES.length} 組）★ 這條才是真的在驗行為`,
       apiVsGolden.length === 0,
-      apiVsGolden.length ? `行為變了：${apiVsGolden.slice(0, 3).join(', ')}` : ''
+      apiVsGolden.length
+        ? `行為變了：${apiVsGolden.slice(0, 3).join(', ')}\n     ${goldenFieldDiff.slice(0, 3).join('\n     ')}`
+        : ''
     );
     check('③ 欄位集合完全相同（沒有漏欄位或多欄位）', fieldProblems.length === 0, fieldProblems.slice(0, 3).join('; '));
 

@@ -1132,6 +1132,56 @@ handler 簽名拿不到 URL → `worker.ts` 與 `server.ts` 都改成
 
 ---
 
+### [2026-10-08 22:40] 墨影（Mo）—— 追 `check:ui` 的紅燈，抓到兩個**真產品 bug**
+
+上一則我把 `check:ui` 的「成分長條圖沒有渲染」列為「既有問題、待查」。
+**追下去之後發現它不是測試問題，是兩個真的產品 bug。**
+
+| 檔案 | 動作 |
+| --- | --- |
+| `src/App.tsx` | ★★ `handleLoadSample` 補上 `lastPhotoFileRef`（示範標籤路徑原本漏了） |
+| `server/localEngineEn.ts` | 補 2 條 `LOCAL_TEXT_EN` ＋ 1 條 `TEMPLATE_PATTERNS`（插值樣板） |
+| `scripts/check-i18n-leaks.ts` | ★★ 改傳 `getLearnerProfile('senior').numericLimits`（原本傳 `undefined`） |
+| `scripts/check-analysis-mode.ts` | 新增 2d 區段 2 條（60 通過） |
+| `scripts/check-offline-parity.ts` | 新增 `valueDiff()`：失敗時印出**哪個欄位**變了 |
+| `scripts/fixtures/offline-analysis-golden.json` | 更新 2 組（逐欄位證明過，只有 3 個文字欄位變） |
+
+**🐛 Bug 1：示範標籤在「只送文字」與「只在本機」模式一律回「請重拍」**
+`runBrowserOcr()` 從 `lastPhotoFileRef` 重新編碼，但那個 ref
+**只在 `handleFileChange`（相機／相簿）裡被設定** —— 示範標籤漏了。
+→ `if (!file) return null;` 直接回 null，OCR 從來沒跑。
+**為什麼難發現**：`cloud_image`（預設）不做 OCR，看起來正常；
+而失敗訊息是「照片太模糊」——**看起來像使用者的問題**。
+
+**🐛 Bug 2：本機引擎「沒勾慢性病＋某項超標」的黃燈沒有英文對照**
+（Bug 1 修好後 `check:ui` 才冒出 4 處中文。）
+那是 2026-10-07 新增的分支，`localEngineEn.ts` 只補了「有勾慢性病」那條。
+
+**★★ 而且 `check:i18n` 是「假通過」**：它傳 `numericLimits: undefined`，
+於是 `overLimit` 永遠是空的 → 走不到那條分支。
+**測試少傳一個參數，就安靜地跳過整條分支。**
+
+**★ golden 的處理方式（值得沿用）**：先加 `valueDiff()` 印出欄位級差異，
+確認**只有 3 個文字欄位、只有那 2 組**變動，且 golden 裡存的是**中文**
+（證明它記下的正是那個 bug），**才**更新 fixture。
+
+**怎麼驗證**：`check:ui` **exit 0**（長條圖渲染 ＋ 17 畫面 0 處中文）／
+`check:layout` 三組合各 0 筆／`check:parity` 17/0／`check:mode` 60/0／`verify:all` 全綠。
+
+**⚠️ 跨工作目錄的提醒**：
+1. **`lastPhotoFileRef` 現在有兩個設定點**（相機／相簿 ＋ 示範標籤）。
+   新增任何「不經過 `<input type=file>`」的圖片來源時，**一定要設它**，
+   否則本機 OCR 會靜默地不跑。`check:mode` 的 2d 區段會擋。
+2. **`LOCAL_TEXT_EN` 新增了 2 條、`TEMPLATE_PATTERNS` 新增 1 條**。
+3. **`check-i18n-leaks.ts` 現在會傳 `numericLimits`** ——
+   若你的分支只在「有上限」時才會走到，現在會真的被檢查到（可能冒出既有漏翻）。
+
+**還沒做／有疑問**：
+- ⚠️ 真實手機照片的 OCR 準確率仍未實測（原本就在待辦）。
+- ⚠️ `MEMORY.md` 已 19.7KB、注入被截斷，**需要壓縮**（見上一則）。
+
+---
+
 ## 5. 相關文件（不要重複造輪子）
 
 | 檔案 | 內容 |
